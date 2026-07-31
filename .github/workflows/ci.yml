@@ -17,7 +17,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: "3.13"
       - name: Install dependencies
-        run: uv venv --python 3.13
+        run: uv venv --allow-existing --python 3.13
       - name: Ruff check
         run: uv run --no-project --with ruff ruff check packages/reach/src/ scripts/reachbridge-kems-gateway.py tests/test_reach_kems.py
       - name: Ruff format check
@@ -35,6 +35,6 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: "3.13"
       - name: Install dependencies
-        run: uv venv --python 3.13
+        run: uv venv --allow-existing --python 3.13
       - name: Run tests
         run: PYTHONPATH=packages/reach/src uv run --no-project --with pytest --with pytest-asyncio pytest tests/test_reach_kems.py -q --tb=short
