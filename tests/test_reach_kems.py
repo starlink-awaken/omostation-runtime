@@ -10,7 +10,13 @@ def manifest() -> dict[str, object]:
     return {
         "schema": "bos.reachbridge.manifest.v1",
         "run_id": "bos-mesh-test-1",
-        "documents": [{"source_ref": "vault://redacted/source.md", "sha256": "a" * 64, "bytes": 12}],
+        "documents": [
+            {
+                "source_ref": "vault://redacted/source.md",
+                "sha256": "a" * 64,
+                "bytes": 12,
+            }
+        ],
     }
 
 
@@ -29,14 +35,18 @@ def test_manifest_rejects_raw_content() -> None:
         prepare_manifest(payload)
 
 
-def test_dispatch_fails_without_explicit_transport(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dispatch_fails_without_explicit_transport(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("BOS_REACHBRIDGE_ENDPOINT", raising=False)
     monkeypatch.delenv("BOS_REACHBRIDGE_MODE", raising=False)
     with pytest.raises(RuntimeError, match="not configured"):
         dispatch_manifest(manifest())
 
 
-def test_local_hermes_dispatch_is_idempotent(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_local_hermes_dispatch_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     import reach_gateway
 
     relay = tmp_path / "relay.json"

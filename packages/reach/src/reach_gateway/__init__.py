@@ -19,26 +19,30 @@ from pathlib import Path
 
 HERMES_BIN = Path(os.environ.get("BOS_HERMES_BIN", "/opt/homebrew/bin/hermes"))
 HERMES_DIR = Path(os.environ.get("BOS_HERMES_DIR", str(Path.home() / ".hermes")))
-RELAY_FILE = Path(os.environ.get("BOS_HERMES_RELAY_FILE", str(HERMES_DIR / "outbound_relay.json")))
+RELAY_FILE = Path(
+    os.environ.get("BOS_HERMES_RELAY_FILE", str(HERMES_DIR / "outbound_relay.json"))
+)
 
 
 class ScenarioLevel(Enum):
     EMERGENCY = "emergency"  # 阻断预警：多通道强弹窗
-    ACTIONABLE = "actionable" # 需打钩决策：发送带按钮消息
-    BULLETIN = "bulletin"   # 消息摘要：合并静默推送
-    SILENT = "silent"       # 仅静默落盘日志，不弹窗
+    ACTIONABLE = "actionable"  # 需打钩决策：发送带按钮消息
+    BULLETIN = "bulletin"  # 消息摘要：合并静默推送
+    SILENT = "silent"  # 仅静默落盘日志，不弹窗
 
 
 @dataclass
 class ReachPayload:
     title: str
     body: str
-    app_id: str = "app_default_metaos"       # 1. 多应用 ID
-    user_id: str = "usr_primary_owner"       # 2. 多用户 ID
-    scenario: ScenarioLevel = ScenarioLevel.ACTIONABLE # 3. 多场景级
+    app_id: str = "app_default_metaos"  # 1. 多应用 ID
+    user_id: str = "usr_primary_owner"  # 2. 多用户 ID
+    scenario: ScenarioLevel = ScenarioLevel.ACTIONABLE  # 3. 多场景级
     action_url: str | None = None
     target_devices: list[str] = field(default_factory=lambda: ["desktop", "mobile"])
-    target_channels: list[str] = field(default_factory=lambda: ["mac_native", "hermes_relay"])
+    target_channels: list[str] = field(
+        default_factory=lambda: ["mac_native", "hermes_relay"]
+    )
     dispatch_id: str | None = None
 
 
@@ -49,11 +53,13 @@ class MacNativeProvider:
         try:
             subtitle = f"{payload.app_id} | {payload.scenario.value}"
             script = (
-                f'display notification {json.dumps(payload.body, ensure_ascii=False)} '
-                f'with title {json.dumps(payload.title, ensure_ascii=False)} '
-                f'subtitle {json.dumps(subtitle, ensure_ascii=False)}'
+                f"display notification {json.dumps(payload.body, ensure_ascii=False)} "
+                f"with title {json.dumps(payload.title, ensure_ascii=False)} "
+                f"subtitle {json.dumps(subtitle, ensure_ascii=False)}"
             )
-            result = subprocess.run(["osascript", "-e", script], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                ["osascript", "-e", script], check=False, capture_output=True, text=True
+            )
             return result.returncode == 0
         except (OSError, subprocess.SubprocessError) as e:
             print(f"⚠️ MacNativeProvider 异常: {e}")
@@ -84,7 +90,9 @@ class HermesRelayProvider:
 
             # Write atomically so the Hermes consumer never observes a partial envelope.
             temporary = RELAY_FILE.with_suffix(".tmp")
-            temporary.write_text(json.dumps(relay_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            temporary.write_text(
+                json.dumps(relay_data, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
             temporary.replace(RELAY_FILE)
 
             # A relay file is a queued handoff. If Hermes is installed, require
@@ -124,7 +132,9 @@ class ReachGateway:
         return bool(results) and all(results)
 
 
-def dispatch_http(endpoint: str, token: str, manifest: dict[str, object], timeout: int) -> dict[str, object]:
+def dispatch_http(
+    endpoint: str, token: str, manifest: dict[str, object], timeout: int
+) -> dict[str, object]:
     """Send the redacted manifest to a configured enterprise endpoint."""
     body = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
     headers = {
@@ -134,12 +144,19 @@ def dispatch_http(endpoint: str, token: str, manifest: dict[str, object], timeou
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
+    request = urllib.request.Request(
+        endpoint, data=body, headers=headers, method="POST"
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read(1024 * 1024).decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"ReachBridge HTTP dispatch failed: {type(exc).__name__}") from exc
-    if not isinstance(payload, dict) or payload.get("dispatch_id") != manifest["dispatch_id"]:
+        raise RuntimeError(
+            f"ReachBridge HTTP dispatch failed: {type(exc).__name__}"
+        ) from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("dispatch_id") != manifest["dispatch_id"]
+    ):
         raise RuntimeError("ReachBridge response did not confirm dispatch_id")
     return payload

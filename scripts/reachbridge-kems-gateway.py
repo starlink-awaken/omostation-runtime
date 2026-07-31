@@ -20,7 +20,10 @@ def main() -> int:
     try:
         result = dispatch_manifest(manifest, timeout=args.timeout)
     except (OSError, RuntimeError, ValueError) as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        print(
+            json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False),
+            file=sys.stderr,
+        )
         return 1
     print(json.dumps(result.as_dict(), ensure_ascii=False))
     return 0

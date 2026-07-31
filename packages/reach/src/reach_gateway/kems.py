@@ -32,7 +32,9 @@ class KemsDispatchResult:
 
 
 def _canonical_manifest(manifest: dict[str, object]) -> bytes:
-    return json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
 
 
 def validate_manifest(manifest: dict[str, object]) -> None:
@@ -48,7 +50,9 @@ def validate_manifest(manifest: dict[str, object]) -> None:
         if not isinstance(document, dict):
             raise ManifestError("document entry must be an object")
         source_ref = document.get("source_ref")
-        if not isinstance(source_ref, str) or not source_ref.startswith("vault://redacted/"):
+        if not isinstance(source_ref, str) or not source_ref.startswith(
+            "vault://redacted/"
+        ):
             raise ManifestError("document source_ref must be redacted")
         if "content" in document or "body" in document or "text" in document:
             raise ManifestError("raw document content is forbidden")
@@ -64,7 +68,9 @@ def prepare_manifest(manifest: dict[str, object]) -> dict[str, object]:
     return prepared
 
 
-def dispatch_manifest(manifest: dict[str, object], *, timeout: int = 15) -> KemsDispatchResult:
+def dispatch_manifest(
+    manifest: dict[str, object], *, timeout: int = 15
+) -> KemsDispatchResult:
     """Dispatch a redacted manifest through explicitly configured transport.
 
     ``BOS_REACHBRIDGE_ENDPOINT`` selects HTTP transport. Otherwise
@@ -82,7 +88,9 @@ def dispatch_manifest(manifest: dict[str, object], *, timeout: int = 15) -> Kems
             prepared,
             timeout,
         )
-        return KemsDispatchResult(dispatch_id, str(response.get("status", "accepted")), "http", digest)
+        return KemsDispatchResult(
+            dispatch_id, str(response.get("status", "accepted")), "http", digest
+        )
 
     if os.environ.get("BOS_REACHBRIDGE_MODE") != "local_hermes":
         raise RuntimeError("ReachBridge transport is not configured")
