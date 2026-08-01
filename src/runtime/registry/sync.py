@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -107,6 +108,7 @@ class GossipSync:
         local_node_id: str,
         sync_interval: int = DEFAULT_SYNC_INTERVAL,
         sync_timeout: int = DEFAULT_SYNC_TIMEOUT,
+        on_push: Callable[[dict, str], Awaitable[list]] | None = None,
     ) -> None:
         self._store = store
         self._local_node_id = local_node_id
@@ -118,6 +120,7 @@ class GossipSync:
         self._task: asyncio.Task | None = None
         self._last_sync_result: SyncResult | None = None
         self._mutation_task: asyncio.Task | None = None
+        self._on_push = on_push
 
     # ── Peer management ──────────────────────────────────────────
 
@@ -150,12 +153,18 @@ class GossipSync:
         if self._task:
             self._task.cancel()
             try:
-                await self._task
-            except asyncio.CancelledError:
+                if not self._task.done():
+                    await self._task
+            except (asyncio.CancelledError, RuntimeError):
                 pass
-        self._task = None
+            self._task = None
         if self._mutation_task:
             self._mutation_task.cancel()
+            try:
+                if not self._mutation_task.done():
+                    await self._mutation_task
+            except (asyncio.CancelledError, RuntimeError):
+                pass
             self._mutation_task = None
         logger.info("GossipSync stopped")
 
@@ -240,6 +249,17 @@ class GossipSync:
                 if peer.consecutive_failures >= 3:
                     peer.reachable = False
                     self._store.mark_node_agents_offline(peer.node_id)
+        if self._on_push and pushed > 0:
+            delta = {
+                "type": "mutation_push",
+                "agents": [a.to_dict() for a in agents],
+                "vclock": self._vclock,
+                "pushed_count": pushed,
+            }
+            try:
+                await self._on_push(delta, self._local_node_id)
+            except Exception:
+                logger.warning("on_push callback failed", exc_info=True)
         return pushed
 
     def apply_delta(self, agents: list[dict], source_node_id: str = "", vclock: int = 0) -> int:

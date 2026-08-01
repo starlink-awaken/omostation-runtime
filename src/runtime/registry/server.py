@@ -12,8 +12,10 @@ from pydantic import BaseModel
 from .dispatch import Dispatcher, TaskRequest, TaskStatus
 from .heartbeat import HeartbeatManager
 from .models import AgentInfo, AgentStatus, Capability, NodeInfo, NodeRole
+from .push import PushTrigger
 from .store import RegistryStore
 from .sync import GossipSync, Peer
+from .task_fallback import FallbackResult, TaskFallbackManager
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +84,8 @@ _store: RegistryStore | None = None
 _heartbeat: HeartbeatManager | None = None
 _dispatcher: Dispatcher | None = None
 _sync: GossipSync | None = None
+_push_trigger: PushTrigger | None = None
+_fallback: TaskFallbackManager | None = None
 
 
 class SyncDeltaRequest(BaseModel):
@@ -93,11 +97,17 @@ class SyncDeltaRequest(BaseModel):
 def create_app(persist_path: str | None = None, node_id: str = "local") -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        global _store, _heartbeat, _dispatcher, _sync
+        global _store, _heartbeat, _dispatcher, _sync, _push_trigger, _fallback
         _store = RegistryStore(persist_path)
         _heartbeat = HeartbeatManager(_store)
         _dispatcher = Dispatcher(_store)
-        _sync = GossipSync(_store, local_node_id=node_id)
+        _fallback = TaskFallbackManager(_dispatcher, max_retries=3, base_delay=0.5)
+        _push_trigger = PushTrigger()
+        _sync = GossipSync(
+            _store,
+            local_node_id=node_id,
+            on_push=_push_trigger.push_delta,
+        )
         _heartbeat.start()
         await _sync.start()
         yield
@@ -177,12 +187,15 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
         return {"ok": True}
 
     @app.post("/tasks", status_code=201)
-    def submit_task(req: SubmitTaskRequest) -> dict:
+    async def submit_task(req: SubmitTaskRequest) -> dict:
+        assert _fallback is not None
         request = TaskRequest(name=req.name, required_capabilities=req.required_capabilities, priority=req.priority, payload=req.payload)
-        assignment = _dispatcher.submit(request)
-        if assignment is None:
-            return {"task_id": request.task_id, "status": "pending", "message": "No capable agent available, queued"}
-        return {"task_id": assignment.task_id, "agent_id": assignment.agent_id, "agent_name": assignment.agent_name, "status": "dispatched"}
+        event = await _fallback.submit_with_fallback(request)
+        if event.result == FallbackResult.DISPATCHED:
+            return {"task_id": event.task_id, "status": "dispatched", "attempts": event.attempts}
+        if event.result == FallbackResult.ESCALATED:
+            return {"task_id": event.task_id, "status": "escalated", "attempts": event.attempts, "error": event.error}
+        return {"task_id": event.task_id, "status": "pending", "attempts": event.attempts}
 
     @app.get("/tasks")
     def list_tasks(status: str | None = Query(None)) -> list[dict]:
@@ -254,10 +267,33 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
-        store = _get_store()
+        store = _store
         agents = store.list_agents()
         healthy = [a for a in agents if a.status != AgentStatus.OFFLINE]
         return HealthResponse(status="ok", agents=len(agents), nodes=len(store.list_nodes()), healthy_agents=len(healthy))
+
+    @app.get("/tasks/fallback/status")
+    def fallback_status() -> dict:
+        assert _fallback is not None
+        return _fallback.get_status()
+
+    @app.post("/tasks/fallback/retry")
+    def fallback_retry() -> dict:
+        assert _fallback is not None
+        events = _fallback.retry_pending()
+        return {"retried": len(events), "dispatched": sum(1 for e in events if e.result == FallbackResult.DISPATCHED)}
+
+    @app.get("/push/status")
+    def push_status() -> dict:
+        assert _push_trigger is not None
+        return _push_trigger.get_status()
+
+    @app.post("/push/peers")
+    def add_push_peer(peer: RegisterNodeRequest) -> dict:
+        assert _push_trigger is not None
+        nid = peer.host.replace(".", "-") + f"-{peer.port}"
+        _push_trigger.add_peer(nid, f"http://{peer.host}:{peer.port}")
+        return {"ok": True, "peer_id": nid, "peers": len(_push_trigger.list_peers())}
 
     return app
 
