@@ -1,44 +1,32 @@
-# Contributing to omostation / 贡献指南
+# Contributing to runtime
 
-> Welcome! 欢迎贡献。本文档提供参与 omostation 项目的完整指引。
->
-> This document provides complete guidance for contributing to omostation.
+> service lifecycle, scheduling, health monitoring and KEI sandbox
+> 服务生命周期、调度、健康监控与 KEI 沙箱
 
-[English](#english) | [中文](#中文)
+Thank you for considering a contribution! This guide covers the development workflow, commit conventions, and review process for **runtime**.
 
----
+## Development Environment
 
-<a name="english"></a>
+- **Stack**: Python (uv, pytest)
+- **Python requirement**: see [`pyproject.toml`](pyproject.toml) (if applicable)
 
-## English
-
-### Project Scope
-
-See [`docs/project-registry.yaml`](docs/project-registry.yaml) for the authoritative project list, layer assignments, and package counts. The primary development areas are:
-
-- **kairon**: Python monorepo — knowledge engineering pipeline
-- **agora**: Python — I0 MCP service mesh
-- **cockpit**: Python — L3 unified entry (CLI + Web)
-- **gbrain**: TypeScript — knowledge database
-- **omo**: Python — governance & self-healing
-
-### Development Workflow
+## Quick Start
 
 ```bash
-# kairon
-cd projects/kairon && uv sync && make test
+# Install dependencies
+uv sync
 
-# agora
-cd projects/agora && uv sync && uv run pytest tests/ -q
+# Run tests
+uv run pytest "tests/" -q
 
-# cockpit
-cd projects/cockpit && uv sync && uv run pytest src/cockpit/tests/ -q
+# Run lint
+uv run ruff check "src/"
 
-# gbrain
-cd projects/gbrain && bun install && bun test
+# Format code
+make fmt
 ```
 
-### Commit Convention
+## Commit Convention
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -49,73 +37,26 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `test(scope):` — Tests
 - `chore(scope):` — Maintenance
 
-### Code Standards
+## Code Standards
 
-- **Python**: ruff format + ruff check, line-length=120, Python 3.13+
-- **TypeScript**: bun fmt + bun lint
-- **Pre-commit**: auto ruff check on staged Python files across all projects
+- Keep changes focused and scoped to one concern per PR.
+- Add or update tests for new behavior.
+- Ensure the lint/test commands above pass before requesting review.
 
-### Pull Request Process
+## Project-Specific Notes
 
-1. Create a feature branch from `main`
-2. Make changes following code standards
-3. Run tests for affected projects
-4. Ensure pre-commit check passes
-5. Submit PR with clear description
+- KEI sandbox isolation is a security boundary; never weaken sandbox defaults without an ADR.
+- Run `make sync-state` after state schema changes and commit generated state if the Makefile requires it.
 
----
+## Pull Request Process
 
-<a name="中文"></a>
+1. Create a feature branch from `main`.
+2. Make changes following the conventions above.
+3. Run the project's test and lint commands.
+4. Submit a PR with a clear description of the change and its motivation.
 
-## 中文
+## Getting Help
 
-### 项目范围
-
-项目数量、分层、包数等元数据见 [`docs/project-registry.yaml`](docs/project-registry.yaml)。主要开发领域：
-
-- **kairon**: Python monorepo — 知识工程管线
-- **agora**: Python — I0 MCP 服务网格
-- **cockpit**: Python — L3 统一入口 (CLI + Web)
-- **gbrain**: TypeScript — 知识数据库
-- **omo**: Python — 治理与自愈引擎
-
-### 开发流程
-
-```bash
-# kairon
-cd projects/kairon && uv sync && make test
-
-# agora
-cd projects/agora && uv sync && uv run pytest tests/ -q
-
-# cockpit
-cd projects/cockpit && uv sync && uv run pytest src/cockpit/tests/ -q
-
-# gbrain
-cd projects/gbrain && bun install && bun test
-```
-
-### 提交规范
-
-遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
-
-- `feat(scope):` — 新功能
-- `fix(scope):` — 修复
-- `refactor(scope):` — 代码重构
-- `docs(scope):` — 文档
-- `test(scope):` — 测试
-- `chore(scope):` — 运维
-
-### 代码规范
-
-- **Python**: ruff format + ruff check, 行长=120, Python 3.13+
-- **TypeScript**: bun fmt + bun lint
-- **Pre-commit**: 自动 ruff 检查所有项目已暂存的 Python 文件
-
-### PR 流程
-
-1. 从 `main` 创建功能分支
-2. 按代码规范进行修改
-3. 运行受影响项目的测试
-4. 确保 pre-commit 检查通过
-5. 提交 PR 并附清晰说明
+- See [`AGENTS.md`](AGENTS.md) for AI-agent developer rules.
+- See [`CLAUDE.md`](CLAUDE.md) for session startup context.
+- Workspace architecture: [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md)

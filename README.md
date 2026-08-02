@@ -1,182 +1,147 @@
-# omostation · eCOS v6
+# runtime
+
+🌐 [简体中文](README.zh.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://github.com/starlink-awaken/omostation/actions/workflows/workspace.yml/badge.svg)](https://github.com/starlink-awaken/omostation/actions)
+[![Contributing](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Security](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
+[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/uv-package%20manager-purple.svg)](https://docs.astral.sh/uv/)
 
-> 知识工程与 AI 操作系统工作区 — 多项目、多语言、多层次。
+    > L1 · 服务生命周期、调度、健康监控与 KEI 沙箱
+    > Metadata SSOT: [`../../docs/project-registry.yaml`](../../docs/project-registry.yaml)
 
-[English](#english) | [中文](#中文)
+    ## What It Owns
 
----
+    服务生命周期、调度、健康监控与 KEI 沙箱.
 
-<a name="english"></a>
-
-## English
-
-### Overview
-
-**omostation** is the root workspace of **eCOS v6**, a polyglot monorepo that integrates knowledge engineering, agent governance, BOS service routing, runtime orchestration, and personal/work knowledge operations.
-
-It is organized as a **5+4+1+1 layered architecture**:
-
-| Layer | Name | Projects | Role |
-|-------|------|----------|------|
-| **L0** | Protocol | `ecos` | SSB signature chain, MOF metamodel, L0 constraints |
-| **L1** | Runtime | `runtime` | Matrix/Scheduler/KEI sandbox |
-| **L2** | Engine | `kairon`, `gbrain`, `omo`, `metaos`, `omo-debt`, `family-hub` | Knowledge engine, governance kernel, knowledge store |
-| **L3** | Entry | `cockpit`, `cockpit-ui` | Unified CLI/Web dashboard |
-| **L4** | Self | `l4-kernel` | Self-management domain |
-| **I0** | Weave | `agora` | MCP Hub, BOS URI routing mesh |
-| **M0** | Crosscut | `model-driven` | Lifecycle meta-framework |
-| **X** | Extension | `aetherforge`, `c2g`, `bus-foundation`, `observability` | Compute, strategy, bus, observability |
-
-> Architecture contracts: [`ARCHITECTURE.md`](ARCHITECTURE.md)
-> Project layer index: [`docs/generated/project-layer-index.md`](docs/generated/project-layer-index.md)
-> Layer dependency rules: [`docs/layer-contract.yaml`](docs/layer-contract.yaml)
-
-### Entry Points
-
-| Audience | Entry | Source of Truth |
-|----------|-------|-----------------|
-| Human CLI/Web | `cockpit` | [`protocols/port-registry.yaml`](protocols/port-registry.yaml) |
-| AI Agent | `agora` MCP with `bos://` URIs | [`projects/agora/etc/bos-services.yaml`](projects/agora/etc/bos-services.yaml) |
-| Agent workflow | `bin/agent-workflow.py` | [`.omo/_truth/registry/agent-workflows.yaml`](.omo/_truth/registry/agent-workflows.yaml) |
-| Runtime state | `omo state sync` | [`.omo/state/system.yaml`](.omo/state/system.yaml) |
-| Governance | `omo` CLI/MCP | [`.omo/_truth/registry/governance-checks.yaml`](.omo/_truth/registry/governance-checks.yaml) |
-
-### Quick Start
+    ## Installation
 
 ```bash
-# Clone with submodules
+# Clone the workspace recursively
 git clone --recursive https://github.com/starlink-awaken/omostation.git
-cd omostation
+cd omostation/projects/runtime
 
-# Run the full local gate
-make ci-local-fast
-
-# Or run specific checks
-make check-layers        #  Layer dependency validation
-make ssot-status         #  SSOT file change tracking
-make gac-local-gate      #  Full governance-as-code gate
-
-# Run project tests
-cd projects/kairon && make test-diff
-cd projects/gbrain && bun test
+# Install dependencies with uv
+uv sync
 ```
 
-### Governance Tools
+Requires Python 3.13+ (see `pyproject.toml`).
 
-| Tool | Command | Purpose |
-|------|---------|---------|
-| Layer dependency check | `make check-layers` | Validates cross-layer imports against [`docs/layer-contract.yaml`](docs/layer-contract.yaml) |
-| SSOT watcher | `make ssot-{status,log,sync}` | SHA-256 change tracking for 12 SSOT files, audit log in `.omo/ssot-audit-log.jsonl` |
-| GaC local gate | `make gac-local-gate` | Full governance gate (validate, drift, lint, AGCP, MOF, SSOT) |
-| Agent workflow | `bin/agent-workflow.py` | Workflow lifecycle: bootstrap, start, claim, verify, closeout, compliance |
-| API versioning | `/api/version`, `/api/version/history` | Cockpit API version management with FastAPI middleware |
+## Quick Start
 
-### Navigation
+    ```bash
+    uv sync
+uv run pytest "tests/" -q
+make fmt
+make sync-state
+    ```
 
-| Document | Purpose |
-|----------|---------|
-| [`docs/SYSTEM-INDEX.md`](docs/SYSTEM-INDEX.md) | **Start here** — unified navigation hub |
-| [`docs/PROJECT-COMPLETE-GUIDE.md`](docs/PROJECT-COMPLETE-GUIDE.md) | Project-wide architecture, usage, operations, and delivery guide |
-| [`docs/INDEX-PROJECTS.md`](docs/INDEX-PROJECTS.md) | Projects by layer and stack |
-| [`docs/INDEX-TOOLS.md`](docs/INDEX-TOOLS.md) | Tools and scripts |
-| [`docs/INDEX-KNOWLEDGE.md`](docs/INDEX-KNOWLEDGE.md) | ADRs, audits, patterns |
-| [`docs/INDEX-AGENTS.md`](docs/INDEX-AGENTS.md) | Agent skills and setup |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Stable architecture contracts |
-| [`AGENTS.md`](AGENTS.md) | Agent/developer operating guide |
-| [`CLAUDE.md`](CLAUDE.md) | AI session context loader |
-| [`GOVERNANCE.md`](GOVERNANCE.md) | Governance source map and delivery entry points |
-| [`docs/PANORAMA.md`](docs/PANORAMA.md) | BOS routing and system panorama |
-| [`docs/project-registry.yaml`](docs/project-registry.yaml) | Project metadata SSOT |
+## KEMS Production Gate
 
-### License
-
-MIT © [starlink-awaken](https://github.com/starlink-awaken)
-
----
-
-<a name="中文"></a>
-
-## 中文
-
-### 概述
-
-**omostation** 是 **eCOS v6** 的根工作区，一个多语言、多项目的知识工程与 AI 操作系统工作区。
-
-采用 **5+4+1+1 分层架构**：
-
-| 层 | 名称 | 项目 | 职责 |
-|----|------|------|------|
-| **L0** | 协议层 | `ecos` | SSB 签名链、MOF 元模型、L0 约束 |
-| **L1** | 运行时层 | `runtime` | Matrix/Scheduler/KEI 沙箱 |
-| **L2** | 引擎层 | `kairon`, `gbrain`, `omo`, `metaos`, `omo-debt`, `family-hub` | 知识引擎、治理中枢、知识库 |
-| **L3** | 入口层 | `cockpit`, `cockpit-ui` | 统一 CLI/Web 仪表盘 |
-| **L4** | 自我层 | `l4-kernel` | 自我管理面 |
-| **I0** | 织层 | `agora` | MCP Hub、BOS URI 路由网 |
-| **M0** | 横切框架 | `model-driven` | 生命周期元框架 |
-| **X** | 扩展层 | `aetherforge`, `c2g`, `bus-foundation`, `observability` | 算力、战略、总线、可观测性 |
-
-> 架构契约: [`ARCHITECTURE.md`](ARCHITECTURE.md)
-> 项目分层索引: [`docs/generated/project-layer-index.md`](docs/generated/project-layer-index.md)
-> 分层依赖规则: [`docs/layer-contract.yaml`](docs/layer-contract.yaml)
-
-### 入口
-
-| 受众 | 入口 | 权威来源 |
-|------|------|----------|
-| 人类 CLI/Web | `cockpit` | [`protocols/port-registry.yaml`](protocols/port-registry.yaml) |
-| AI Agent | `agora` MCP + `bos://` URI | [`projects/agora/etc/bos-services.yaml`](projects/agora/etc/bos-services.yaml) |
-| Agent 工作流 | `bin/agent-workflow.py` | [`.omo/_truth/registry/agent-workflows.yaml`](.omo/_truth/registry/agent-workflows.yaml) |
-| 运行态状态 | `omo state sync` | [`.omo/state/system.yaml`](.omo/state/system.yaml) |
-| 治理操作 | `omo` CLI/MCP | [`.omo/_truth/registry/governance-checks.yaml`](.omo/_truth/registry/governance-checks.yaml) |
-
-### 快速开始
+Run the read-only production preflight before enabling the KEMS production
+lane. It emits metadata and counts only; it never prints private source text
+or sends a dispatch request:
 
 ```bash
-git clone --recursive https://github.com/starlink-awaken/omostation.git
-cd omostation
-
-# 本地全部门
-make ci-local-fast
-
-# 或运行特定检查
-make check-layers        #  分层依赖验证
-make ssot-status         #  SSOT 变更追踪
-make gac-local-gate      #  全量治理-as-Code 门禁
-
-# 项目测试
-cd projects/kairon && make test-diff
-cd projects/gbrain && bun test
+export BOS_REACHBRIDGE_ENDPOINT="https://<enterprise-endpoint>/dispatch"
+export BOS_REACHBRIDGE_TOKEN="<secret-from-the-runtime-secret-store>"
+export KEMS_EVALUATION_MANIFEST="/secure/kems/evaluation-manifest.json"
+export KEMS_MODEL_ACCEPTANCE_REPORT="/secure/kems/model-acceptance.json"
+export KEMS_OMO_TASK_ID="<approved-task-id>"
+python scripts/kems_production_preflight.py --production
 ```
 
-### 治理工具
+Generate the manifest-bound model report with the Kairon evaluator before the
+preflight:
 
-| 工具 | 命令 | 用途 |
-|------|------|------|
-| 分层依赖检查 | `make check-layers` | 验证跨层导入是否符合 [`docs/layer-contract.yaml`](docs/layer-contract.yaml) |
-| SSOT 追踪 | `make ssot-{status,log,sync}` | 12 个 SSOT 文件的 SHA-256 变更追踪，审计日志在 `.omo/ssot-audit-log.jsonl` |
-| GaC 本地门禁 | `make gac-local-gate` | 全量治理门禁 (validate, drift, lint, AGCP, MOF, SSOT) |
-| Agent 工作流 | `bin/agent-workflow.py` | 工作流生命周期: bootstrap, start, claim, verify, closeout, compliance |
-| API 版本管理 | `/api/version`, `/api/version/history` | Cockpit API 版本管理，FastAPI 中间件 |
+```bash
+python projects/kairon/scripts/kems_evaluate_model_candidate.py \
+  --input /secure/kems/redacted-forecast-cases.json \
+  --evaluation-manifest "$KEMS_EVALUATION_MANIFEST" \
+  --candidate-model-id "candidate-v1" \
+  --output "$KEMS_MODEL_ACCEPTANCE_REPORT"
+```
 
-### 文档导航
+The command exits non-zero until the enterprise endpoint, token, adjudicated
+redacted evaluation manifest, a `shadow_pass` candidate-model report bound to
+that manifest's dataset identity and SHA-256, controlled source inventory, and
+approved OMO task are all present. The model report must retain
+`promotion=blocked_until_omo_approval`; this preflight never grants promotion.
+Local Hermes is intentionally not accepted by `--production`.
 
-| 文档 | 用途 |
-|------|------|
-| [`docs/SYSTEM-INDEX.md`](docs/SYSTEM-INDEX.md) | **从这里开始** — 统一导航中心 |
-| [`docs/PROJECT-COMPLETE-GUIDE.md`](docs/PROJECT-COMPLETE-GUIDE.md) | 项目架构、使用、运维和交付全景手册 |
-| [`docs/INDEX-PROJECTS.md`](docs/INDEX-PROJECTS.md) | 按层/栈的项目索引 |
-| [`docs/INDEX-TOOLS.md`](docs/INDEX-TOOLS.md) | 工具和脚本索引 |
-| [`docs/INDEX-KNOWLEDGE.md`](docs/INDEX-KNOWLEDGE.md) | ADR、审计、模式索引 |
-| [`docs/INDEX-AGENTS.md`](docs/INDEX-AGENTS.md) | Agent 技能和设置索引 |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | 稳定架构契约 |
-| [`AGENTS.md`](AGENTS.md) | Agent / 开发者操作指南 |
-| [`CLAUDE.md`](CLAUDE.md) | AI 会话上下文加载器 |
-| [`docs/PANORAMA.md`](docs/PANORAMA.md) | BOS 路由与系统全景 |
-| [`docs/project-registry.yaml`](docs/project-registry.yaml) | 项目元数据 SSOT |
+After the enterprise gateway returns its safe dispatch result, record the
+receipt without copying response content or credentials:
 
-### 许可证
+```bash
+python scripts/kems_dispatch_receipt.py \
+  --manifest /secure/kems/reachbridge-manifest.json \
+  --response /secure/kems/dispatch-response.json \
+  --output /secure/kems/receipts/dispatch.json \
+  --production
+```
 
-MIT © [starlink-awaken](https://github.com/starlink-awaken)
+The receipt stores only the run ID, dispatch ID, manifest SHA-256, document
+count, transport, status, and timestamp. It rejects local Hermes receipts in
+production mode and requires the gateway response to confirm both identity and
+manifest integrity.
+
+After the dispatch, close the production evidence bundle only when the same
+run's preflight evidence, redacted manifest, and HTTP receipt agree on run ID,
+document inventory, manifest SHA-256, dispatch ID, and accepted transport:
+
+```bash
+python scripts/kems_production_closeout.py \
+  --preflight-evidence /secure/kems/production-preflight.json \
+  --manifest /secure/kems/reachbridge-manifest.json \
+  --receipt /secure/kems/receipts/dispatch.json \
+  --output /secure/kems/receipts/production-closeout.json
+```
+
+The closeout emits only redacted metadata and exits non-zero when any gate is
+missing, failed, mismatched, or backed by a non-HTTP receipt.
+
+For the cross-team evidence contract and release responsibilities, see
+[`docs/KEMS-PRODUCTION-HANDOFF.md`](docs/KEMS-PRODUCTION-HANDOFF.md).
+
+    ## Key Surfaces
+
+    - `src/runtime/matrix.py`
+- `src/runtime/scheduler.py`
+- `src/runtime/kei.py`
+- `src/runtime/cron_service/`
+- `src/runtime/mcp_server.py`
+
+    ## Documentation
+
+    - Developer guide: [`AGENTS.md`](AGENTS.md)
+    - AI context loader: [`CLAUDE.md`](CLAUDE.md) when present
+    - Workspace architecture: [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md)
+    - Layer placement: [`../../LAYER-INDEX.md`](../../LAYER-INDEX.md)
+
+    ## SSOT Rules
+
+    Runtime facts, counts, ports, health, and generated inventories are intentionally not maintained here. Use the workspace registries and project source as the truth.
+## Project Governance
+
+- [Maintainers](MAINTAINERS.md)
+- [Acknowledgments](ACKNOWLEDGMENTS.md)
+
+- [Development](docs/DEVELOPMENT.md)
+- [Release Process](RELEASE.md)
+
+- [Governance](GOVERNANCE.md)
+- [Support](SUPPORT.md)
+
+- [Contributing](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Contributors](CONTRIBUTORS.md)
+## Getting Help
+
+- [FAQ](docs/FAQ.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [API / Usage Reference](docs/API.md)
+- [Architecture Overview](docs/ARCHITECTURE.md)

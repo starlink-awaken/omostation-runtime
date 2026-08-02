@@ -471,12 +471,7 @@ class AgentRuntime:
             run_id = grant.get("workflow_run_id")
         if event_sink is not None and not run_id:
             run_id = f"runtime-{uuid4().hex[:12]}"
-        run_trace_id = (
-            trace_id
-            or (context or {}).get("trace_id")
-            or os.environ.get("TRACE_ID")
-            or run_id
-        )
+        run_trace_id = trace_id or (context or {}).get("trace_id") or os.environ.get("TRACE_ID") or run_id
         base_step_run_id = f"{run_id}:runtime" if run_id else None
         if run_id is not None:
             try:
@@ -502,7 +497,9 @@ class AgentRuntime:
             cached["resumed"] = True
             return cached
         attempt = int(checkpoint.get("attempt", 0)) + 1 if checkpoint else 1
-        step_run_id = f"{base_step_run_id}:{attempt}" if base_step_run_id else None
+        step_run_id = (
+            f"{base_step_run_id}:{attempt}" if base_step_run_id else None
+        )
         admission_id = grant.get("admission_id") if isinstance(grant, dict) else None
         durable_effects = effect_store
         if durable_effects is None and isinstance(context, dict):
@@ -546,10 +543,7 @@ class AgentRuntime:
             elif not checkpoint:
                 emit(
                     "WorkflowRequested",
-                    {
-                        "workflow": "runtime.agent_task",
-                        "task_id": (context or {}).get("task_id"),
-                    },
+                    {"workflow": "runtime.agent_task", "task_id": (context or {}).get("task_id")},
                     idempotency_key=f"{run_id}:requested",
                 )
                 emit(
@@ -564,22 +558,22 @@ class AgentRuntime:
                 )
             emit(
                 "StepDispatched",
-                {
-                    "step_run_id": step_run_id,
-                    "step_name": "runtime.agent_task",
-                    "attempt": attempt,
-                    "admission_id": grant["admission_id"],
-                },
+                    {
+                        "step_run_id": step_run_id,
+                        "step_name": "runtime.agent_task",
+                        "attempt": attempt,
+                        "admission_id": grant["admission_id"],
+                    },
                 idempotency_key=f"{step_run_id}:dispatched",
             )
             emit(
                 "StepStarted",
-                {
-                    "step_run_id": step_run_id,
-                    "step_name": "runtime.agent_task",
-                    "attempt": attempt,
-                    "admission_id": grant["admission_id"],
-                },
+                    {
+                        "step_run_id": step_run_id,
+                        "step_name": "runtime.agent_task",
+                        "attempt": attempt,
+                        "admission_id": grant["admission_id"],
+                    },
                 idempotency_key=f"{step_run_id}:started",
             )
 
@@ -622,7 +616,9 @@ class AgentRuntime:
         tools = schemas if schemas else None
 
         max_turns = 30
-        retry_max_attempts = max(1, int((retry_policy or {}).get("max_attempts", 1)))
+        retry_max_attempts = max(
+            1, int((retry_policy or {}).get("max_attempts", 1))
+        )
         retry_backoff_seconds = max(
             0.0, float((retry_policy or {}).get("backoff_seconds", 0.0))
         )
@@ -630,33 +626,8 @@ class AgentRuntime:
         all_tool_calls: list[dict[str, Any]] = list(
             (checkpoint or {}).get("state", {}).get("tool_calls", [])
         )
-        effect_outcomes: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("effect_outcomes", [])
-        )
-        effect_receipts: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("effect_receipts", [])
-        )
         usage = dict((checkpoint or {}).get("state", {}).get("usage", {}))
         start_turn = int((checkpoint or {}).get("next_turn", 0))
-
-        def remember_effect(payload: dict[str, Any]) -> None:
-            """Keep one latest safe summary per effect key in resumable state."""
-            key = payload.get("effect_key")
-            effect_outcomes[:] = [
-                existing
-                for existing in effect_outcomes
-                if existing.get("effect_key") != key
-            ]
-            effect_outcomes.append(payload)
-
-        def remember_receipt(receipt: dict[str, Any]) -> None:
-            receipt_id = receipt.get("receipt_id")
-            effect_receipts[:] = [
-                existing
-                for existing in effect_receipts
-                if existing.get("receipt_id") != receipt_id
-            ]
-            effect_receipts.append(receipt)
 
         for turn in range(start_turn, max_turns):
             emit(
@@ -715,22 +686,9 @@ class AgentRuntime:
                         status="failed",
                         next_turn=turn,
                         attempt=attempt,
-                        state={
-                            "messages": messages,
-                            "tool_calls": all_tool_calls,
-                            "effect_outcomes": effect_outcomes,
-                            "effect_receipts": effect_receipts,
-                            "usage": usage,
-                        },
+                        state={"messages": messages, "tool_calls": all_tool_calls, "usage": usage},
                     )
-                return with_mesh_errors(
-                    {
-                        "error": error,
-                        "result": "",
-                        "effect_outcomes": effect_outcomes,
-                        "effect_receipts": effect_receipts,
-                    }
-                )
+                return with_mesh_errors({"error": error, "result": ""})
 
             if response.get("usage"):
                 usage = response["usage"]
@@ -769,8 +727,6 @@ class AgentRuntime:
                 result_payload = {
                     "result": result,
                     "tool_calls": all_tool_calls,
-                    "effect_outcomes": effect_outcomes,
-                    "effect_receipts": effect_receipts,
                     "turns": turn + 1,
                     "usage": usage,
                 }
@@ -784,8 +740,6 @@ class AgentRuntime:
                         state={
                             "messages": messages,
                             "tool_calls": all_tool_calls,
-                            "effect_outcomes": effect_outcomes,
-                            "effect_receipts": effect_receipts,
                             "usage": usage,
                             "result": result_payload,
                         },
@@ -809,56 +763,10 @@ class AgentRuntime:
                         ).encode("utf-8")
                     ).hexdigest()
                     effect_key = f"{base_step_run_id or 'runtime'}:effect:{effect_hash}"
-                    effect_outcome = durable_effects.execute_once_with_outcome(
+                    effect_result = durable_effects.execute_once(
                         effect_key, lambda tool_call=tc: self._execute_tool(tool_call)
                     )
-                    remember_effect(effect_outcome.safe_payload())
-                    if effect_outcome.status == "succeeded":
-                        tool_name = tc.get("function", {}).get("name", "tool")
-                        receipt = effect_outcome.external_receipt(
-                            trace_id=run_trace_id or effect_key,
-                            resource_id=str(
-                                (context or {}).get(
-                                    "resource_id", f"runtime-tool:{tool_name}"
-                                )
-                            ),
-                            operation=str((context or {}).get("operation", tool_name)),
-                            provenance_ref=str(
-                                (context or {}).get(
-                                    "provenance_ref", f"runtime://effect/{effect_key}"
-                                )
-                            ),
-                            policy_digest=str(
-                                (context or {}).get(
-                                    "policy_digest",
-                                    (grant or {}).get(
-                                        "policy_digest", "runtime-effect/v1"
-                                    )
-                                    if isinstance(grant, dict)
-                                    else "runtime-effect/v1",
-                                )
-                            ),
-                            decision_factors={"tool_name": tool_name},
-                        )
-                        remember_receipt(receipt)
-                    if effect_outcome.status == "failed":
-                        tool_result = {
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": json.dumps(
-                                {
-                                    "error_code": effect_outcome.error_code
-                                    or "EFFECT_EXECUTION_FAILED"
-                                },
-                                ensure_ascii=False,
-                            ),
-                        }
-                    else:
-                        tool_result = effect_outcome.result or {
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": "",
-                        }
+                    tool_result = effect_result["result"]
                 messages.append(tool_result)
                 all_tool_calls.append(
                     {
@@ -889,13 +797,7 @@ class AgentRuntime:
                     status="running",
                     next_turn=turn + 1,
                     attempt=attempt,
-                    state={
-                        "messages": messages,
-                        "tool_calls": all_tool_calls,
-                        "effect_outcomes": effect_outcomes,
-                        "effect_receipts": effect_receipts,
-                        "usage": usage,
-                    },
+                    state={"messages": messages, "tool_calls": all_tool_calls, "usage": usage},
                 )
 
             if finish == "error":
@@ -924,25 +826,15 @@ class AgentRuntime:
                 status="failed",
                 next_turn=max_turns,
                 attempt=attempt,
-                state={
-                    "messages": messages,
-                    "tool_calls": all_tool_calls,
-                    "effect_outcomes": effect_outcomes,
-                    "effect_receipts": effect_receipts,
-                    "usage": usage,
-                },
+                state={"messages": messages, "tool_calls": all_tool_calls, "usage": usage},
             )
-        return with_mesh_errors(
-            {
-                "result": messages[-1].get("content", "") if messages else "",
-                "tool_calls": all_tool_calls,
-                "effect_outcomes": effect_outcomes,
-                "effect_receipts": effect_receipts,
-                "turns": max_turns,
-                "usage": usage,
-                "truncated": True,
-            }
-        )
+        return with_mesh_errors({
+            "result": messages[-1].get("content", "") if messages else "",
+            "tool_calls": all_tool_calls,
+            "turns": max_turns,
+            "usage": usage,
+            "truncated": True,
+        })
 
 
 # ── API key 解析（从多个来源） ──────────────────────────────────────────────

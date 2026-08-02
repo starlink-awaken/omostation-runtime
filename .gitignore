@@ -1,198 +1,60 @@
-# === omostation root .gitignore ===
-# 根仓库只追踪元配置、基础设施和文档。
-# 项目代码在各子仓库中独立管理。
-
-# ---------------------------------------------------------------------------
-# 1. 治理平面运行时产物（OMO / OMC / spaces）
-#    这些目录承载的是会话、计划、证据等运行时/治理状态，不是仓库源码。
-# ---------------------------------------------------------------------------
-.omo/.omo/
-.omo/_archive/
-.omo/_delivery/
-.omo/_log/
-.omo/_knowledge/*.jsonl
-.omo/_control/evolution/drift-history/*.json.lock
-.omo/capabilities/
-# debt/ 派生产物 (dashboard/dispatch/action-packet/review-queue/owner-routing/reviews/
-# campaign/reporting) 高 churn, write_dashboard 等从 items/ + metrics 派生, 生成器可重建.
-# items/ 例外: canonical SSOT (跟 .omo/tasks/ 同类 lifecycle 数据), 入仓 (修正 c82cbd23 误判).
-.omo/debt/*
-!.omo/debt/items/
-.omo/evidence
-.omo/plans/
-.omo/run-continuation/
-.omo/tests/
-.omo/workers/
-
-.omc/
-
-projects/.omc/
-projects/cockpit-ui/
-projects/ecos/src/ecos/ssot/mof/m0/snapshot.yaml
-
-spaces/*.db
-
-# ---------------------------------------------------------------------------
-# 2. Runtime 运行时残渣（非持久数据）
-#    runtime/ 只保留 README 和边界契约 YAML；
-#    sandbox 中 debt/tasks/OpenSpec 是已跟踪的治理 artifacts，
-#    decayed/pitches 由 c2g 等工具自动生成，只忽略新增文件。
-# ---------------------------------------------------------------------------
-runtime/**/*.log
-runtime/**/*.jsonl
-runtime/data/
-runtime/run-continuation/*.json
-runtime/server.log
-runtime/wechat-main.png
-
-runtime/sandbox/decayed/
-runtime/sandbox/pitches/
-runtime/omo/
-runtime/agent-sessions/
-
-# OMO volatile self-healing/ingress/evolution runtime mirrors (now live under runtime/omo/)
-.omo/_delivery/ingress/
-.omo/_control/evolution/drift/
-.omo/_control/evolution/drift-history/
-.omo/_control/evolution/approval-board/
-.omo/_control/evolution/loop/
-.omo/_control/evolution/self-evolve/
-.omo/_control/evolution/radar-history.json
-.omo/change-log/mutations.jsonl
-.omo/tasks/registry/done/
-.omo/_truth/registry/dependency-baseline.yaml
-
-# ---------------------------------------------------------------------------
-# 3. Data 共享数据底座的运行时文件
-#    保留：README、访问策略 YAML、驾驶舱 CARDS Markdown。
-#    忽略：数据库、备份、索引、捕获等生成/运行时文件。
-# ---------------------------------------------------------------------------
-data/**/*.db
-data/**/*.db-shm
-data/**/*.db-wal
-data/**/*.sqlite
-data/**/*.sqlite3
-data/_index/
-data/backups/
-data/cards/*.db
-data/db/
-data/kos/
-data/sharedbrain/data/
-data/驾驶舱/documents.db
-
-# ---------------------------------------------------------------------------
-# 4. KOS 运行时目录
-#    KOS_HOME 指向根 kos/，其中 manifest + sqlite + captures 是运行时状态。
-# ---------------------------------------------------------------------------
-kos/
-
-# ---------------------------------------------------------------------------
-# 5. 生成文档与缓存
-# ---------------------------------------------------------------------------
-docs/generated/
-graphify-out/
-agent-runtime/
-_derivation_logs/
-# codebase-memory-mcp local knowledge graph (regenerate via MCP index_repository;
-# ~tens of MB compressed; do not commit — see docs/operations/codebase-memory.md)
-.codebase-memory/
-
-# ---------------------------------------------------------------------------
-# 6. 构建产物与语言缓存
-# ---------------------------------------------------------------------------
-.env
+# ── Python ──
 __pycache__/
+*.py[cod]
+*$py.class
 *.egg-info/
-*.pyc
-*.so
+.eggs/
 dist/
-node_modules/
+build/
+*.egg
 
-.coverage
-.mypy_cache/
+# ── Virtual environment ──
+.venv/
+venv/
+.venv.bak/
+
+# ── uv ──
+uv.lock
+
+# ── IDE ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Environment & Secrets ──
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials.json
+*.cred
+auth.json
+
+# ── Testing & Coverage ──
 .pytest_cache/
 .ruff_cache/
-.runtime/
+.mypy_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
-# ---------------------------------------------------------------------------
-# 7. 本地工具、Agent 与 IDE 配置
-#    AI 编码工具目录 (.claude/.crush/.serena/.reasonix/.grok/.hermes/.husky/
-#    .antigravitycli/.mimocode/.qoder/.deepeval/.idea) 已由
-#    ~/.gitignore_global 统一忽略, 此处不再重复。
-#    以下仅保留项目特有的忽略规则。
-# ---------------------------------------------------------------------------
-.metaos/
-config/
-*.local.json
+# ── Build artifacts ──
+*.so
+*.dylib
+*.dll
 
-# ---------------------------------------------------------------------------
-# 8. 本地开发沙箱与一次性脚本
-# ---------------------------------------------------------------------------
-/scratch/
-**/_tmp_*
-**/temp_*
+# ── Docker ──
+.docker/
 
-/fix_indent.py
-/patch.py
-/patch_all.py
-/patch_scenario.py
-/patch_scenario2.py
-/patch_scenario3.py
-/patch_scenario4.py
-/patch_test.py
-/patch_test2.py
-
-# ---------------------------------------------------------------------------
-# 9. 历史归档目录与临时数据
-#    已跟踪的归档文件保留；新增文件默认不进 git，需 git add -f。
-# ---------------------------------------------------------------------------
-_archived/
-
-bets.json
-tasks.json
-skills/
-!.agents/skills/
-.mimocode/
-!.mimocode/commands/
-!.mimocode/skills/
-
-# ---------------------------------------------------------------------------
-# 10. 系统文件
-# ---------------------------------------------------------------------------
-.DS_Store
-/.c2g_data/
-
-# governance-dashboard hook transient specs
-.omo/autopilot/
-
-# Runtime session continuation (transient)
-runtime/run-continuation/
-data/cards/
-
-# ADR-0128 Phase 3: runtime projection plane (canonical, generated by `omo state sync`)
-# T4 试验 PASS 2026-07-05: fresh clone 跑 omo state sync 重新生成 canonical
-# README.md 保留 tracked (导航说明), 其余 generated
-.omo/state/runtime/*
-!.omo/state/runtime/README.md
-
-# ADR-0137 (M4 派生面范式强化): 派生面应跟随 SSOT 源所在子模块,
-# 不再在主仓根 .omo/_derived/ 写派生. example:
-# projects/ecos/.omo/_derived/ (gitignored in projects/ecos/.gitignore)
-
-# ADR-0144 (M4 cron hook 例外): m4-cron-log.json SSOT 在主仓 .omo/cron/
-# 所以派生面也写到主仓根, 这是 ADR-0137 的唯一例外
-.omo/_derived/m4-cron-log.json
-
-# ADR-0151 (Round 5f): runtime/.watch-dispatch-stamps.json 是 OMO runtime-stamp-policy
-# 守门自动写入的派生面 (每次 bin/omo-state-cleanup.py sync 触发). 主仓 SSOT 跟踪
-# metadata (system.yaml, system_health.yaml, health.yaml 等), stamps 本身可重建.
-# 治本: 不在主仓 SSOT 中保留. P74 governance boundary 守护.
-runtime/.watch-dispatch-stamps.json
-.commit-suggestion
-
-# 生成 dashboard 制品 + 临时下载 (2026-07-23 清理)
-artifacts-*.html
-/archive-*/
-
-# accidental root ecos scaffold (SSOT lives in projects/ecos)
-/ecos/
+# ── Local OMC runtime state ──
+.omc/
+*.tmp

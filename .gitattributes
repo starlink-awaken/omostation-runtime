@@ -1,25 +1,22 @@
 # ── 文本文件行尾规范化 ──
 * text=auto eol=lf
 
-# ── 源代码 ──
+# ── Python ──
 *.py text diff=python
-*.ts text diff=typescript
-*.tsx text diff=typescript
-*.js text
-*.jsx text
+*.pyi text diff=python
+*.pyw text
+
+# ── Shell ──
 *.sh text eol=lf
 *.bash text eol=lf
 *.zsh text eol=lf
-*.bat text eol=crlf
-*.ps1 text
 
 # ── 文档 ──
 *.md text diff=markdown
 *.rst text
 *.txt text
-*.tex text
 
-# ── 配置/数据 ──
+# ── 配置 ──
 *.yaml text
 *.yml text
 *.json text
@@ -28,40 +25,23 @@
 *.cfg text
 *.conf text
 
-# ── 标记语言 ──
-*.html text diff=html
-*.css text
-*.scss text
-*.xml text
-
 # ── Git 文件 ──
 .gitignore text
 .gitattributes text
-.gitmodules text
 
-# ── 二进制文件（禁止 diff） ──
+# ── 二进制（禁止 diff） ──
 *.png binary
 *.jpg binary
 *.jpeg binary
 *.gif binary
 *.ico binary
 *.svg text
-*.woff binary
-*.woff2 binary
-*.eot binary
-*.ttf binary
 *.pdf binary
 *.zip binary
 *.tar.gz binary
 *.gz binary
 *.db binary
 *.sqlite binary
-*.sqlite3 binary
-*.pkl binary
 
-# ---- Lock 文件 ----
+# ── Lock 文件 ──
 uv.lock linguist-language=Python
-pnpm-lock.yaml linguist-generated
-poetry.lock linguist-generated
-package-lock.json linguist-generated
-yarn.lock linguist-generated

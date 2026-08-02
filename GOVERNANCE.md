@@ -1,41 +1,24 @@
-# Workspace Governance
+# Governance
 
-This document is a navigation pointer, not a second governance source of truth.
-The executable contracts and ownership registries remain authoritative.
+## Decision Making
 
-## Authoritative Sources
+This project follows the [omostation workspace governance model](https://github.com/starlink-awaken/omostation/blob/main/GOVERNANCE.md).
 
-- Operating rules: [`AGENTS.md`](AGENTS.md)
-- AI session startup: [`CLAUDE.md`](CLAUDE.md)
-- Governance checks and owners:
-  [`.omo/_truth/registry/governance-checks.yaml`](.omo/_truth/registry/governance-checks.yaml)
-- Document ownership and lifecycle:
-  [`.omo/_truth/registry/document-governance.yaml`](.omo/_truth/registry/document-governance.yaml)
-- Document contract:
-  [`.omo/standards/doc-ssot-contract.md`](.omo/standards/doc-ssot-contract.md)
-- Agent workflow contract:
-  [`.omo/standards/agent-workflow-contract.md`](.omo/standards/agent-workflow-contract.md)
-- Project metadata:
-  [`docs/project-registry.yaml`](docs/project-registry.yaml)
+## Maintainers
 
-## Required Delivery Path
+- omostation maintainers — see the workspace root for current contacts.
 
-Requirement changes use the registered workflow lifecycle:
+## Contributor Ladder
 
-```text
-bootstrap -> status -> start -> claim -> verify -> closeout
-```
+1. **Contributor** — anyone who opens an issue or PR.
+2. **Reviewer** — regular contributors invited to review PRs.
+3. **Maintainer** — has merge rights and is responsible for release quality.
 
-Use `bin/agent-workflow.py` and the workflow selected for the affected surface.
-Project-specific guidance belongs in each project's `AGENTS.md` and `CLAUDE.md`;
-workspace-wide rules must not be duplicated there.
+## Releases
 
-## Governance Entry Points
+Releases follow [Semantic Versioning](https://semver.org/).
+See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
-- Local gate: `make gac-local-gate`
-- Documentation SSOT check: `uv run --with pyyaml python bin/ssot/doc-ssot-lint.py --json`
-- Document governance check: `python3 bin/ssot/doc-governance-check.py --no-new-warnings`
-- Runtime projection refresh: `uv run --project projects/omo omo state sync`
+## Escalation
 
-Dynamic facts, generated projections, ports, test counts, and project inventories
-must be read from their registered SSOT rather than copied into this pointer.
+For security or conduct issues, see [`SECURITY.md`](SECURITY.md) and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
