@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from runtime.executor.engine import AgentRuntime
 from runtime.workflow_admission import admission_proof
+from runtime.workflow_effects import WorkflowEffectStore
 
 
 def _grant(run_id: str) -> dict:
@@ -113,3 +114,74 @@ def test_runtime_retries_llm_error_when_policy_allows() -> None:
     assert result["result"] == "recovered"
     assert calls == 2
     assert "StepRetryScheduled" in [event["event_type"] for event in events]
+
+
+def test_runtime_returns_omo_safe_effect_receipt(tmp_path) -> None:
+    runtime = AgentRuntime()
+    runtime._tool_registry = {
+        "lookup": {"fn": lambda query="": {"remote_id": query, "content": "secret"}}
+    }
+    responses = [
+        {
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call-1",
+                    "function": {"name": "lookup", "arguments": '{"query":"x-1"}'},
+                }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": {"total_tokens": 1},
+        },
+        {
+            "content": "done",
+            "tool_calls": [],
+            "finish_reason": "stop",
+            "usage": {"total_tokens": 2},
+        },
+    ]
+    runtime._call_llm = lambda *args, **kwargs: responses.pop(0)  # type: ignore[method-assign]
+
+    result = runtime.run_task(
+        "use the external lookup",
+        workflow_run_id="runtime-receipt",
+        admission=_grant("runtime-receipt"),
+        context={
+            "effect_store_path": str(tmp_path / "effects.jsonl"),
+            "resource_id": "source:runtime-test",
+            "operation": "lookup",
+            "provenance_ref": "runtime-test://lookup",
+        },
+    )
+
+    assert result["result"] == "done"
+    assert result["effect_outcomes"][0]["receipt_eligible"] is True
+    receipt = result["effect_receipts"][0]
+    assert receipt["resource_id"] == "source:runtime-test"
+    assert receipt["operation"] == "lookup"
+    assert "content" not in str(receipt)
+
+
+def test_runtime_compensation_projects_safe_lifecycle_events(tmp_path) -> None:
+    runtime = AgentRuntime()
+    store = WorkflowEffectStore(tmp_path / "effects.jsonl")
+    effect_key = "runtime-compensation:effect:one"
+    store.execute_once_with_outcome(effect_key, lambda: {"remote_id": "obj-1"})
+    events: list[dict] = []
+
+    payload = runtime.compensate_effect(
+        store,
+        effect_key,
+        lambda: {"remote_id": "obj-1", "private": "local-only"},
+        workflow_run_id="runtime-compensation",
+        step_run_id="runtime-compensation:runtime:1",
+        admission=_grant("runtime-compensation"),
+        event_sink=events.append,
+    )
+
+    assert payload["status"] == "compensated"
+    assert [event["event_type"] for event in events] == [
+        "CompensationStarted",
+        "WorkflowRecovered",
+    ]
+    assert all("private" not in str(event) for event in events)
