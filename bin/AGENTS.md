@@ -4,65 +4,68 @@
 # bin/
 
 ## Purpose
-`bin/` is the workspace **operations and tooling directory** — a collection of Python and shell scripts that power the eCOS v6 governance, delivery, observability, and SSOT infrastructure. These are the executable engines behind agent workflows, health monitoring, governance gates, ADR management, and delivery pipelines. All scripts run via `uv run --with "pyyaml" python` or `bash`.
+`bin/` is the workspace **operations and scripting hub** — a collection of CLI tools, automation scripts, and governance utilities that operate at the workspace level. It provides the command-line interface for agent workflows, health monitoring, SSOT management, submodule operations, and governance enforcement. This is the primary tooling layer for workspace-level automation and is the entry point for most operational tasks.
 
 ## Key Files
 | File | Description |
 |------|-------------|
-| `agent-workflow.py` | Agent workflow lifecycle — bootstrap, start, claim, verify, closeout, compliance |
-| `compass_radar.py` | Health score computation (ISC-3 composite formula: governance + freshness + runtime) |
-| `ssot-guardian.py` | SSOT consistency guardian — validates state files against ground truth |
-| `ssot-lint.py` | Doc-SSOT lint — ensures docs don't hard-code runtime facts |
-| `adr/` | ADR management library (`_lib.py`: list, create, renumber, duplicate detection) |
-| `gac/` | GaC governance toolkit — local gate, worktree guard, MOF validate |
-| `delivery/` | Delivery automation — X3 auto-distribute, G-DEL metrics |
-| `decks/` | Governance decks — port governance, capability drift |
-| `agent-workflow.py` | Central workflow orchestrator for all agent operations |
+| `agent-workflow.py` | Agent workflow lifecycle orchestrator — bootstrap, start, claim, verify, closeout, compliance |
+| `compass_radar.py` | Health score computation and governance radar (ISC-3 composite) |
+| `commit-assist.py` | Git commit assistant with style detection |
+| `layer-dependency-check.py` | Cross-layer dependency validation |
+| `ssot-watcher.py` | SSOT file change detection and alerting |
+| `check_health_ssot.py` | Health score SSOT consistency checker |
+| `classify_planned.py` | Planned task classification (needs-human vs auto-distributable) |
+| `cross_package_api_map.py` | Cross-package API surface mapping |
+| `migrate-port-env-var.py` | Port and environment variable migration tool |
+| `git-health-hook.py` | Git hook health monitoring |
+| `submodule-gitlink-check.py` | Submodule gitlink validation |
+| `submodule-reachability-gate.py` | Submodule reachability pre-push gate |
 
 ## Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `gac/` | Governance gate scripts (gac-local-gate, gac-worktree, gac-kos-sync) |
-| `ssot/` | SSOT validation and generation (doc-ssot-lint, yaml-validate, check-hardcoded-ports) |
+| `gac/` | Governance toolkit — local gate, worktree guard, KOS sync, evidence gate |
+| `ssot/` | SSOT lint, guardian, and doc-ssot validation |
 | `adr/` | ADR management utilities |
-| `delivery/` | Delivery pipeline automation |
-| `decks/` | Governance analysis decks |
+| `mof/` | MOF protocol tools and agent redlines generator |
+| `delivery/` | Delivery pipeline tools including x3-auto-distribute |
+| `decks/` | Presentation and reporting tools |
+| `collab/` | Collaboration and handoff tools |
+| `tests/` | Workspace-level tests for bin/ scripts |
 
 ## For AI Agents
 
 ### Working In This Directory
-- All Python scripts use `uv run --with "pyyaml" python "bin/script.py"` execution model
-- `agent-workflow.py` is the primary entry point for all agent operations
-- `compass_radar.py` computes the health_score stored in `.omo/state/health.yaml`
-- GaC scripts enforce governance rules. Don't bypass them without SWARM_ESCAPE_ID
-- SSOT tools validate consistency between docs and runtime state
+- Most scripts use `uv run --with "pyyaml" python` for execution
+- `agent-workflow.py` is the primary workflow orchestrator — use `bootstrap` before any editing session
+- GaC scripts enforce governance rules — don't bypass them without explicit user approval
+- SSOT files (`.omo/state/*.yaml`) should be read through scripts, not hard-coded
 
 ### Testing Requirements
 ```bash
-# Run workspace tests that validate bin/ scripts
-python -m pytest tests/ -v -k "agent_workflow or governance or ssot"
+# Run bin/ tests
+python -m pytest bin/tests/ -v
 
-# Validate a specific script
-uv run --with "pyyaml" python "bin/agent-workflow.py" doctor
+# Run specific script tests
+uv run --with "pyyaml" python "bin/tests/test_agent_workflow.py" -v
 ```
 
 ### Common Patterns
 - Scripts accept `--json` flag for machine-readable output
 - Most scripts use `argparse` with subcommands
-- SSOT validation scripts exit non-zero on violation
-- Agent workflow scripts emit events to `.omo/_delivery/agent-workflows/events.jsonl`
+- Error handling follows: print to stderr, exit non-zero on failure
 
 ## Dependencies
 
 ### Internal
-- `.omo/state/system.yaml` — runtime state consumed by compass_radar
-- `.omo/_truth/registry/agent-workflows.yaml` — workflow registry
-- `protocols/port-registry.yaml` — port governance baseline
-- `tests/` — test suite validating these scripts
+- `.omo/state/system.yaml` — runtime state (read, don't hard-code)
+- `protocols/` — port/vault/x-axis registries
+- `projects/omo/` — OMO governance kernel
 
 ### External
-- `pyyaml` — YAML parsing (via uv --with)
+- Python 3.13+
+- `pyyaml` — YAML parsing
 - `pytest` — test framework
-- `argparse` — CLI argument parsing
 
 <!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->
