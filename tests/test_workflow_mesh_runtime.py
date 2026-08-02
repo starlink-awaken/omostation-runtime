@@ -92,7 +92,12 @@ def test_runtime_retries_llm_error_when_policy_allows() -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
-            return {"content": "", "tool_calls": [], "finish_reason": "error", "error": "timeout"}
+            return {
+                "content": "",
+                "tool_calls": [],
+                "finish_reason": "error",
+                "error": "timeout",
+            }
         return {
             "content": "recovered",
             "tool_calls": [],
@@ -113,3 +118,49 @@ def test_runtime_retries_llm_error_when_policy_allows() -> None:
     assert result["result"] == "recovered"
     assert calls == 2
     assert "StepRetryScheduled" in [event["event_type"] for event in events]
+
+
+def test_runtime_returns_omo_safe_effect_receipt(tmp_path) -> None:
+    runtime = AgentRuntime()
+    runtime._tool_registry = {
+        "lookup": {"fn": lambda query="": {"remote_id": query, "content": "secret"}}
+    }
+    responses = [
+        {
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call-1",
+                    "function": {"name": "lookup", "arguments": '{"query":"x-1"}'},
+                }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": {"total_tokens": 1},
+        },
+        {
+            "content": "done",
+            "tool_calls": [],
+            "finish_reason": "stop",
+            "usage": {"total_tokens": 2},
+        },
+    ]
+    runtime._call_llm = lambda *args, **kwargs: responses.pop(0)  # type: ignore[method-assign]
+
+    result = runtime.run_task(
+        "use the external lookup",
+        workflow_run_id="runtime-receipt",
+        admission=_grant("runtime-receipt"),
+        context={
+            "effect_store_path": str(tmp_path / "effects.jsonl"),
+            "resource_id": "source:runtime-test",
+            "operation": "lookup",
+            "provenance_ref": "runtime-test://lookup",
+        },
+    )
+
+    assert result["result"] == "done"
+    assert result["effect_outcomes"][0]["receipt_eligible"] is True
+    receipt = result["effect_receipts"][0]
+    assert receipt["resource_id"] == "source:runtime-test"
+    assert receipt["operation"] == "lookup"
+    assert "content" not in str(receipt)
