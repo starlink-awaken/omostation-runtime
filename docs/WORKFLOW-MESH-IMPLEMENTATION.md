@@ -3,12 +3,13 @@ title: Workflow Mesh 实施架构与交付路线
 status: active
 lifecycle: plan
 owner: engineering-team
-last-reviewed: 2026-08-01
+last-reviewed: 2026-08-02
 review-state: evidence-refreshed
 related:
   - docs/STRATEGY-3YEAR-PANORAMA.md
   - ARCHITECTURE.md
   - .omo/standards/agent-workflow-contract.md
+  - .omo/standards/external-connection-fabric.md
 ---
 
 # Workflow Mesh 实施架构与交付路线
@@ -17,7 +18,7 @@ related:
 
 Workflow Mesh 不是新增一个工作流引擎，而是把现有 C2G、OMO、ECOS、Agora、Runtime、AetherForge、Cockpit 的执行边界收敛到一条可追踪、可恢复、可验收的运行链上。
 
-核心结果是：每一项业务意图都能沿着 `intent_id -> task_id -> workflow_run_id -> step_run_id -> evidence_id -> pr_id` 找到真实执行、失败原因、验证结果和交付结果。
+核心结果是：每一项业务意图都能沿着 `scene_id -> journey_id -> intent_id -> task_id -> workflow_run_id -> step_run_id -> evidence_id -> pr_id` 找到真实执行、失败原因、验证结果和交付结果。
 
 ## 2. 模块边界
 
@@ -32,10 +33,11 @@ Workflow Mesh 不是新增一个工作流引擎，而是把现有 C2G、OMO、EC
 | Cockpit | 任务操作、运行态、验证和交付可视化 | 不凭 Git 文件存在推断运行成功 |
 | gbrain / KOS | 事实记忆和索引检索 | 不承载一次运行的生命周期 |
 | MetaOS | 策略、预算、权限和准入约束 | 不绕过执行证据直接宣布完成 |
+| External Connection Fabric | 外部资源描述、健康、来源和生命周期 | 不拥有任务、知识、凭据或运行状态真相 |
 
 ## 3. 运行身份与事件契约
 
-所有执行必须拥有稳定的 `workflow_run_id`，默认让 `trace_id` 与其一致；调用方重试时可复用同一 ID，禁止为同一次业务执行创建无法关联的新运行。
+所有执行必须拥有稳定的 `workflow_run_id`，默认让 `trace_id` 与其一致；调用方重试时可复用同一 ID，禁止为同一次业务执行创建无法关联的新运行。面向产品的执行还必须绑定 `scene_id`、`journey_id` 和 `outcome_metric`，否则只能进入 proposal-only 或 sandbox。
 
 事件采用 `workflow-mesh/v1` 信封，至少包含：
 
@@ -52,6 +54,12 @@ stateDiagram-v2
     admitted --> dispatched: StepDispatched
     dispatched --> running: StepStarted
     running --> running: Heartbeat / CheckpointSaved
+    dispatched --> dispatched: WorkerAcknowledged
+    dispatched --> running: WorkerLeaseRenewed
+    running --> running: WorkerLeaseRenewed
+    dispatched --> unavailable: WorkerLeaseExpired
+    running --> unavailable: WorkerLeaseExpired
+    unavailable --> running: WorkerReclaimed
     running --> waiting_approval: ApprovalRequested
     waiting_approval --> running: ApprovalGranted
     running --> compensating: CompensationStarted
@@ -93,7 +101,11 @@ stateDiagram-v2
 - ECOS 生成带 `admission_id / step_run_ids / policy_digest / expires_at / proof` 的短期执行授予；OMO 校验授予后才接受 StepRun 事件，Runtime 与 AetherForge 在 Mesh 运行中缺少或伪造授予时 fail-closed。
 - Runtime/AetherForge 的子进程传播会为具体执行器派生子授予，保留父授予关联并避免把未获准的内部步骤伪装成已授权。
 - OMO 增加 admission/dispatch broker：审批、能力健康、预算门禁通过后才追加 `WorkflowRequested` 与 `WorkflowAdmitted`，并把同一授予注入 worker envelope/dispatch record。
+- OMO 将 worker 派发桥接到 Mesh：`StepDispatched` 绑定 `dispatch_id`、`worker_id`、`step_run_id` 和 `admission_id`；worker ACK、租约续期、租约失效和接管分别落为 `WorkerAcknowledged`、`WorkerLeaseRenewed`、`WorkerLeaseExpired`、`WorkerReclaimed`，并在同一 append-only 日志中幂等投影。
 - Agora 增加只读 capability health projection，将 agent、Swarm node、服务和 backend 的心跳/可用性投影成统一快照；它只提供证据，不替 OMO 迁移状态或越权放行。
+- Agora 增加 `ExternalConnectionCatalog`：通过 `external.resources` entry point 动态发现 descriptor，执行场景/权限/健康/期限/回滚准入，按决策因子路由，并在无候选时返回显式 unavailable。
+- Iris 将 connector 同时暴露为 `iris.connectors` 和 `external.resources`，新增连接器不需要修改 Agora 路由代码。
+- `ConnectionReceipt` 只携带 receipt、来源、策略、摘要哈希和结果状态，可直接生成 OMO `EvidenceRecorded` payload；`proposal_only` 资源不执行副作用。
 - Runtime 增加显式 retry policy、稳定 effect key 的副作用日志和 replay，AetherForge 增加节点重试与可选 compensation hook；默认不重试，避免隐式放大副作用。
 - OMO 增加 `workflow_eval`：从真实 append-only 事件生成 `workflow-mesh-eval/v1` 数据集，保留事件 ID 作为标签来源，并提供只读的候选策略离线评估/人工审批 proposal。
 - 各模块增加 fail-closed、事件投影、幂等和 stale 状态测试。
@@ -122,11 +134,42 @@ stateDiagram-v2
 4. 将高频稳定流程提升为模板，将不稳定流程沉淀为治理债务和人工审批规则。
 5. `workflow_eval` 先完成事件衍生标签和 proposal-only 反馈；待真实运行样本达到业务阈值后，再引入预测模型，模型不得直接写入 admission 或状态机。
 
+### P2.5：外部连接与触达
+
+1. 所有外部知识、数据、资源、方法、工具、模型和渠道先登记为统一 descriptor，再由 OMO 按场景准入。
+2. SourcePack 默认 live query 或有期限快照；未经审批不得全量复制私人原文。
+3. MethodPack 由 Sophia 编译为候选工作流，必须经过离线评测、proposal-only、shadow 和人工批准。
+4. ToolPack、ModelPack 和 ChannelPack 由 Agora、AetherForge、Runtime 分别路由和执行，回执必须回到同一条 Mesh 事件链；Agora 的 `ConnectionReceipt.evidence_payload()` 直接生成 `EvidenceRecorded` 所需的最小字段。
+5. 外部不可用、权限过期、数据过时或预算超限时，工作流进入 `degraded/unavailable`，禁止假成功。
+6. 外部 provider 通过 `external.resources` 动态加入；descriptor 变更先记录差异并重新评估准入，单个 provider 探活失败只隔离该候选。
+7. SourcePack、MethodPack、ModelPack 和 ChannelPack 必须携带刷新/评测/回滚证据；没有真实场景、结果指标和责任人时保持 `sandbox` 或 `proposal_only`。
+
 ### P1.5：派发与健康闭环
 
 1. 通过 OMO admission/dispatch broker 生成唯一的 `workflow_run_id`、短期 grant 和 worker dispatch packet；任何 capability、approval 或 budget gate 失败都不得产生执行派发。
 2. Agora 以 `workflow_capability_health` 输出统一的 `healthy/degraded/unhealthy` 快照，附带每项 capability 的来源节点、服务或 backend，作为 admission 的输入证据。
-3. 后续必须把真实 worker ACK、租约心跳、超时回收和外部副作用 receipt 接回同一条 Mesh 事件链，不能只把 packet 生成当成执行完成。
+3. 外部连接 receipt 已能回写同一条 Mesh 事件链；worker ACK、租约心跳、超时失效和接管的事件合同已经落地。下一步是把真实 daemon/watchdog 与这组 API 接上，并把外部系统的真实副作用回执接入同一条链，不能只把 packet 生成当成执行完成。
+
+4. 外部连接调用必须使用 `resource_id + trace_id + receipt_id` 作为可重放边界；原文不进入 Mesh
+   事件，只有 provenance、摘要、哈希和结果状态进入证据面。
+
+### 6.1 Worker 控制面合同
+
+`dispatch.yaml`、envelope、prompt 和 checkpoint 是操作与交接材料，不是 WorkflowRun 的事实来源。
+真实 worker 生命周期必须以同一组上下文写入 OMO：
+
+| 事件 | 前置条件 | 结果 |
+| --- | --- | --- |
+| `StepDispatched` | admitted grant、已生成 dispatch artifact | 绑定 worker 和 StepRun |
+| `WorkerAcknowledged` | worker 身份与 dispatch 匹配 | 建立首个租约，保持 `dispatched` |
+| `WorkerLeaseRenewed` | 当前租约仍有效且 ACK 已存在 | 更新 heartbeat 和到期时间，进入 `running` |
+| `WorkerLeaseExpired` | 观测时间不早于租约到期 | 进入 `unavailable`，保留失效原因 |
+| `WorkerReclaimed` | 已存在失效租约 | 绑定 successor worker/dispatch，恢复 `running` |
+
+所有事件都要求 `dispatch_id`、`worker_id`、`step_run_id`、`admission_id`，并使用稳定的
+`idempotency_key`。重复且内容一致的调用返回原事件；内容冲突或越权 worker 必须失败。当前
+可通过 `omo worker mesh-ack`、`mesh-heartbeat`、`mesh-expire`、`mesh-reclaim` 调用，自动
+watchdog 触发仍属于下一阶段的真实部署接入。
 
 ## 7. 关键里程碑与验收
 
@@ -142,13 +185,13 @@ stateDiagram-v2
 
 ## 8. 明确延期和边界
 
-当前不引入第二套工作流引擎、不把 Cockpit 做成状态写入端、不直接把 gbrain/KOS 当运行时数据库，也不在缺少真实业务场景时提前建设大规模 OCR、知识图谱或预测模型生产链。先把一条业务旅程的真实执行、失败、恢复、验证和交付闭环跑通，再扩大覆盖面。
+当前不引入第二套工作流引擎、不把 Cockpit 做成状态写入端、不直接把 gbrain/KOS 当运行时数据库，也不在缺少真实业务场景时提前建设大规模 OCR、知识图谱或预测模型生产链。外部连接同样必须先绑定真实业务旅程，再扩大覆盖面。
 
 ## 9. 验证命令
 
 ```bash
 cd projects/ecos && uv run pytest -q tests/test_workflow_mesh_contract.py tests/test_m1_adversarial.py tests/test_adversarial_m1.py tests/test_swarm_no_subprocess.py
-cd projects/omo && PYTHONPATH=src uv run --no-project --with pytest --with pyyaml --with pydantic --with httpx python -m pytest -q tests/test_workflow_mesh.py tests/test_omo_io_pydantic.py
+cd projects/omo && PYTHONPATH=src uv run --no-project --with pytest --with pyyaml --with pydantic --with httpx python -m pytest -q tests/test_workflow_mesh.py tests/test_worker_lifecycle_mesh.py tests/test_workflow_dispatch.py tests/test_omo_io_pydantic.py
 cd projects/cockpit && PYTHONPATH=src uv run --no-project --with pytest --with fastapi --with pyyaml --with httpx --with rich python -m pytest -q src/cockpit/tests/test_delivery_journey.py src/cockpit/tests/test_delivery_journey_mesh_states.py src/cockpit/tests/test_delivery_journey_workflow_mesh.py src/cockpit/tests/test_agent_workflow_command.py
 cd projects/runtime && PYTHONPATH=src uv run --no-project --with pytest --with pydantic python -m pytest -q tests/test_workflow_mesh_runtime.py
 cd projects/aetherforge && PYTHONPATH="packages/swarm/src:src" uv run --no-project --with pytest python -m pytest -q packages/swarm/tests/test_workflow_mesh.py
