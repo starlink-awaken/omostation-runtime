@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 
 from .dispatch import Dispatcher, TaskRequest
 from .store import RegistryStore
@@ -94,9 +93,7 @@ class FailoverManager:
         events: list[FailoverEvent] = []
 
         for agent in self._store.list_agents():
-            if agent.status.value == "offline":
-                # Check if agent has active tasks
-                if agent.active_tasks > 0:
+            if agent.status.value == "offline" and agent.active_tasks > 0:
                     # Find alternative agent
                     alternative = self._find_alternative(agent)
                     if alternative:
@@ -160,4 +157,4 @@ class FailoverManager:
         }
 
 
-__all__ = ["FailoverManager", "FailoverEvent"]
+__all__ = ["FailoverEvent", "FailoverManager"]

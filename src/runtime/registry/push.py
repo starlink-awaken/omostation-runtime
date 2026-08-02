@@ -12,8 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass
 
 import httpx
 
@@ -184,4 +183,4 @@ class PushTrigger:
         }
 
 
-__all__ = ["PushTrigger", "PushResult"]
+__all__ = ["PushResult", "PushTrigger"]
