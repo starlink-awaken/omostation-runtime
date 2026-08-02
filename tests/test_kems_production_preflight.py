@@ -113,6 +113,36 @@ def _adjudication_database(tmp_path):
     return path
 
 
+def _persistence_recovery_evidence(tmp_path):
+    path = tmp_path / "persistence-recovery.json"
+    snapshot_sha256 = "c" * 64
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "kems.persistence-recovery-evidence.v1",
+                "status": "passed",
+                "backend": "postgresql",
+                "backup_id": "backup-20260802-001",
+                "restore_drill_id": "restore-drill-20260802-001",
+                "backup_ref": "vault://evidence/kems/backup-20260802-001",
+                "restore_ref": "vault://evidence/kems/restore-20260802-001",
+                "backup_sha256": "d" * 64,
+                "graph_snapshot_sha256": snapshot_sha256,
+                "restored_graph_snapshot_sha256": snapshot_sha256,
+                "backup_bytes": 4096,
+                "rpo_minutes": 10,
+                "rto_minutes": 20,
+                "rpo_target_minutes": 30,
+                "rto_target_minutes": 60,
+                "performed_at": "2026-08-02T00:00:00+00:00",
+                "verification_method": "logical_restore_and_hash_compare",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def _approved_task(tmp_path):
     task_dir = tmp_path / "tasks" / "active"
     task_dir.mkdir(parents=True)
@@ -162,6 +192,7 @@ def test_preflight_is_ready_only_when_all_production_gates_pass(tmp_path, monkey
         evaluation_manifest=manifest,
         model_acceptance=_model_acceptance(tmp_path, manifest),
         adjudication_database=adjudication_database,
+        persistence_recovery_evidence=_persistence_recovery_evidence(tmp_path),
         omo_root=tmp_path / "omo",
         task_id="KEMS-001",
         production=True,
@@ -234,6 +265,7 @@ def test_preflight_writes_redacted_auditable_evidence(tmp_path, monkeypatch):
         evaluation_manifest=manifest,
         model_acceptance=_model_acceptance(tmp_path, manifest),
         adjudication_database=adjudication_database,
+        persistence_recovery_evidence=_persistence_recovery_evidence(tmp_path),
         omo_root=tmp_path / "omo",
         task_id="KEMS-001",
         production=True,
@@ -248,9 +280,65 @@ def test_preflight_writes_redacted_auditable_evidence(tmp_path, monkeypatch):
     assert evidence["evaluation"]["dataset_id"] == "real-kems"
     assert evidence["adjudication"]["available"] is True
     assert evidence["model_acceptance"]["status"] == "shadow_pass"
+    assert evidence["persistence_recovery"]["backend"] == "postgresql"
     assert evidence["omo"]["approval_ref"] == ".omo/workers/runs/KEMS-001-approval.yaml"
     assert "private source" not in output.read_text(encoding="utf-8")
     assert not list(output.parent.glob(".*.tmp"))
+
+
+def test_preflight_requires_persistence_recovery_for_production(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
+    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
+    _approved_task(tmp_path / "omo")
+    manifest = _evaluation_manifest(tmp_path)
+    result = run_preflight(
+        docs_root=_source_tree(tmp_path),
+        evaluation_manifest=manifest,
+        model_acceptance=_model_acceptance(tmp_path, manifest),
+        adjudication_database=_adjudication_database(tmp_path),
+        omo_root=tmp_path / "omo",
+        task_id="KEMS-001",
+        production=True,
+    )
+    assert result["status"] == "blocked"
+    assert any(
+        item["id"] == "persistence_recovery"
+        and not item["ok"]
+        and "evidence path" in item["detail"]
+        for item in result["checks"]
+    )
+
+
+def test_preflight_rejects_unmatched_restored_graph_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
+    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
+    _approved_task(tmp_path / "omo")
+    manifest = _evaluation_manifest(tmp_path)
+    evidence = _persistence_recovery_evidence(tmp_path)
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    payload["restored_graph_snapshot_sha256"] = "e" * 64
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+    result = run_preflight(
+        docs_root=_source_tree(tmp_path),
+        evaluation_manifest=manifest,
+        model_acceptance=_model_acceptance(tmp_path, manifest),
+        adjudication_database=_adjudication_database(tmp_path),
+        persistence_recovery_evidence=evidence,
+        omo_root=tmp_path / "omo",
+        task_id="KEMS-001",
+        production=True,
+    )
+    assert result["status"] == "blocked"
+    assert any(
+        item["id"] == "persistence_recovery"
+        and not item["ok"]
+        and "snapshot" in item["detail"]
+        for item in result["checks"]
+    )
 
 
 def test_preflight_requires_persisted_adjudication_for_production(

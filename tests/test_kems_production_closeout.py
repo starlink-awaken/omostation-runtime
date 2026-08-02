@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from scripts.kems_production_closeout import CloseoutError, validate_closeout
 
 
@@ -46,6 +45,7 @@ def _evidence(run_id: str = "run-001") -> dict[str, object]:
         "sources": [{"name": "source-1.md", "bytes": 12, "sha256": "a" * 64}],
         "evaluation": {"available": True},
         "model_acceptance": {"available": True},
+        "persistence_recovery": {"available": True},
         "omo": {"available": True},
         "checks": [{"id": "all", "ok": True, "detail": "ok"}],
     }
@@ -121,6 +121,19 @@ def test_validate_closeout_rejects_failed_preflight(tmp_path: Path) -> None:
     evidence["checks"][0]["ok"] = False
     paths[0].write_text(json.dumps(evidence), encoding="utf-8")
     with pytest.raises(CloseoutError, match="preflight"):
+        validate_closeout(
+            preflight_path=paths[0], manifest_path=paths[1], receipt_path=paths[2]
+        )
+
+
+def test_validate_closeout_requires_persistence_recovery_evidence(
+    tmp_path: Path,
+) -> None:
+    paths = _write_bundle(tmp_path)
+    evidence = json.loads(paths[0].read_text(encoding="utf-8"))
+    evidence.pop("persistence_recovery")
+    paths[0].write_text(json.dumps(evidence), encoding="utf-8")
+    with pytest.raises(CloseoutError, match="persistence_recovery"):
         validate_closeout(
             preflight_path=paths[0], manifest_path=paths[1], receipt_path=paths[2]
         )
