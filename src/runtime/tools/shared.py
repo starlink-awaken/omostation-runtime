@@ -92,8 +92,8 @@ def _record_taskobject_envelope(tool_name: str, params: dict, status: str) -> No
             import json
 
             f.write(json.dumps(envelope) + "\n")
-    except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-        pass  # noqa: S110, BLE001, S112  # defensive fallback
+    except Exception:  # noqa: BLE001, S110  # defensive fallback
+        pass  # defensive fallback
 
 
 def _run_script(script_name: str, *args: str) -> str:
@@ -106,7 +106,9 @@ def _run_script(script_name: str, *args: str) -> str:
             capture_output=True,
             text=True,
             timeout=30,
-            env=env, check=False)
+            env=env,
+            check=False,
+        )
         return (
             r.stdout.strip()
             if r.returncode == 0

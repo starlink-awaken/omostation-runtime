@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from scripts.kems_dispatch_receipt import ReceiptError, build_receipt, write_receipt
 
 
@@ -74,7 +73,7 @@ def test_receipt_rejects_mismatched_dispatch_identity() -> None:
 
 def test_receipt_rejects_raw_manifest_key() -> None:
     unsafe = manifest()
-    unsafe["documents"][0]["text"] = "private"
+    unsafe["documents"][0]["text"] = "private"  # type: ignore[reportIndexIssue]
     with pytest.raises(ReceiptError, match="forbidden"):
         build_receipt(unsafe, response_for(manifest()), production=True)
 

@@ -7,7 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from reach_gateway.kems import dispatch_manifest
+from reach_gateway.kems import dispatch_manifest  # type: ignore[reportMissingImports]
 from scripts.kems_dispatch_receipt import build_receipt
 from scripts.kems_production_preflight import run_preflight
 
@@ -203,7 +203,7 @@ def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) ->
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, *_args: object) -> None:
+        def log_message(self, *_args: object) -> None:  # type: ignore[reportIncompatibleMethodOverride]
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

@@ -46,8 +46,8 @@ def load_arch_health() -> dict:
     if test_lock.exists():
         try:
             tests["ecos"] = json.loads(test_lock.read_text())
-        except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-            pass  # noqa: S110, BLE001, S112  # defensive fallback
+        except Exception:  # noqa: BLE001, S110  # defensive fallback
+            pass  # defensive fallback
 
     # ── Governance pipeline ───────────────────────────────────
     gov_log = Path.home() / ".hermes/architecture/governance_log/governance.jsonl"
@@ -78,8 +78,8 @@ def load_arch_health() -> dict:
     if sys_yaml.exists():
         try:
             sys_info = yaml.safe_load(sys_yaml.read_text(encoding="utf-8")) or {}
-        except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-            pass  # noqa: S110, BLE001, S112  # defensive fallback
+        except Exception:  # noqa: BLE001, S110  # defensive fallback
+            pass  # defensive fallback
 
     # ── Git status ────────────────────────────────────────────
     git: dict = {}
@@ -89,7 +89,9 @@ def load_arch_health() -> dict:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=str(workspace / "projects" / "ecos"), check=False)
+            cwd=str(workspace / "projects" / "ecos"),
+            check=False,
+        )
         changed = [line for line in result.stdout.splitlines() if line.strip()]
         git["uncommitted"] = len(changed)
         git["status"] = "clean" if not changed else "dirty"
@@ -104,7 +106,9 @@ def load_arch_health() -> dict:
             capture_output=True,
             text=True,
             timeout=15,
-            cwd=str(workspace / "projects" / "ecos"), check=False)
+            cwd=str(workspace / "projects" / "ecos"),
+            check=False,
+        )
         ruff["check"] = "passed" if result.returncode == 0 else "failed"
         ruff["errors"] = (
             len(result.stdout.splitlines()) if result.returncode != 0 else 0
@@ -165,13 +169,15 @@ def load_arch_health() -> dict:
             ],
             capture_output=True,
             text=True,
-            timeout=10, check=False)
+            timeout=10,
+            check=False,
+        )
         if result.returncode == 0:
             backends = json.loads(result.stdout.strip())
             mcp["total"] = len(backends)
             mcp["backends"] = backends
-    except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-        pass  # noqa: S110, BLE001, S112  # defensive fallback
+    except Exception:  # noqa: BLE001, S110  # defensive fallback
+        pass  # defensive fallback
 
     # ── Convergence score ──────────────────────────────────────
     convergence: dict = {"score": 0, "dimensions": {}}
@@ -199,7 +205,7 @@ def load_arch_health() -> dict:
 
         # Governance freshness: fresh=100, aging=60, stale=0
         # Weight: 25%
-        gov_score = {"fresh": 100, "aging": 60, "stale": 0}.get(gov.get("health"), 50)
+        gov_score = {"fresh": 100, "aging": 60, "stale": 0}.get(gov.get("health"), 50)  # type: ignore[reportArgumentType]
         convergence["dimensions"]["governance_freshness"] = {
             "score": gov_score,
             "weight": 25,
@@ -223,8 +229,8 @@ def load_arch_health() -> dict:
         convergence["grade"] = (
             "GOOD" if total >= 80 else "WARNING" if total >= 60 else "LOW"
         )
-    except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-        pass  # noqa: S110, BLE001, S112  # defensive fallback
+    except Exception:  # noqa: BLE001, S110  # defensive fallback
+        pass  # defensive fallback
 
     return {
         "tests": tests,

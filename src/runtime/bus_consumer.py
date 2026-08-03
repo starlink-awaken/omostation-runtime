@@ -1,13 +1,14 @@
-import time
-import subprocess
-import requests
-import sqlite3
-import os
 import json
-import jwt
-import sys
-from pathlib import Path
 import logging
+import os
+import sqlite3
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import jwt
+import requests
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -107,8 +108,13 @@ def process_event(conn, event_id, payload):
         cmd = ["bun", "run", "gbrain", "put", slug, "--content", content]
         # We assume gbrain needs to be set up, so we catch errors
         result = subprocess.run(
-            cmd, cwd=str(GBRAIN_DIR), capture_output=True, text=True, timeout=30
-, check=False)
+            cmd,
+            cwd=str(GBRAIN_DIR),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
 
         if result.returncode == 0:
             logger.info(f"Successfully ingested log into gbrain: {slug}")
@@ -157,7 +163,6 @@ def retry_dlq(conn):
     for row in rows:
         logger.info(f"Retrying pending event: {row[0]}")
         # Note: In a full impl, we would reconstitute payload and call process_event again.
-        pass
 
 
 def main():
@@ -169,7 +174,7 @@ def main():
 
     session = requests.Session()
     # explicitly bypass proxy for local loopback
-    session.proxies = {"http": None, "https": None}
+    session.proxies = {"http": None, "https": None}  # type: ignore[reportAttributeAccessIssue]
 
     while True:
         try:
@@ -216,7 +221,7 @@ def main():
         except requests.exceptions.RequestException as e:
             logger.error(f"Connection error to Agora stream: {e}")
             time.sleep(5)
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback
             logger.exception(f"Unexpected error in loop: {e}")
             time.sleep(5)
 

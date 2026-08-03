@@ -175,8 +175,8 @@ class ProjectMemory:
     @staticmethod
     def _row_to_entry(row: tuple) -> ProjectMemoryEntry:
         md = {}
-        try: md = json.loads(row[5])  # noqa: E701
-        except (json.JSONDecodeError, IndexError): pass  # noqa: E701
+        try: md = json.loads(row[5])
+        except (json.JSONDecodeError, IndexError): pass
         return ProjectMemoryEntry(id=row[0], project_id=row[1], category=row[2], key=row[3], value=row[4], metadata=md, created_at=row[6], updated_at=row[7])
 
 
@@ -297,7 +297,7 @@ class OrgMemory:
     @staticmethod
     def _row_to_entry(row: tuple) -> OrgMemoryEntry:
         tags = []
-        try: tags = json.loads(row[6])  # noqa: E701
-        except (json.JSONDecodeError, IndexError): pass  # noqa: E701
+        try: tags = json.loads(row[6])
+        except (json.JSONDecodeError, IndexError): pass
         return OrgMemoryEntry(id=row[0], category=row[1], key=row[2], value=row[3], source_project=row[4], confidence=row[5], tags=tags, created_at=row[7], updated_at=row[8])
     # fmt: on

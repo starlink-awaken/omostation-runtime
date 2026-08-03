@@ -1,7 +1,7 @@
 """Tests for runtime executor engine core functions."""
 
-import os
 import json
+import os
 import sys
 import tempfile
 import types
@@ -9,7 +9,6 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
-
 
 # ── _log_execution ──────────────────────────────────────────────────────
 
@@ -311,14 +310,14 @@ def test_call_llm_uses_registry_route_for_matching_provider():
             self.__dict__.update(kwargs)
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FallbackProvider(), _FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FallbackProvider(), _FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest
-    fake_provider.ToolSchema = _ToolSchema
+    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -327,12 +326,12 @@ def test_call_llm_uses_registry_route_for_matching_provider():
             reasoning="Matched route anthropic/claude-sonnet-4",
         )
     )
-    fake_registry_loader.estimate_model_cost = (
+    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
         lambda model_id, input_tokens, output_tokens: 0.0
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")
+    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,
@@ -385,14 +384,14 @@ def test_call_llm_falls_back_when_routed_provider_unavailable():
             self.__dict__.update(kwargs)
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest
-    fake_provider.ToolSchema = _ToolSchema
+    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -401,12 +400,12 @@ def test_call_llm_falls_back_when_routed_provider_unavailable():
             reasoning="Matched route anthropic/claude-sonnet-4",
         )
     )
-    fake_registry_loader.estimate_model_cost = (
+    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
         lambda model_id, input_tokens, output_tokens: 0.0
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")
+    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,
@@ -451,26 +450,26 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
             self.__dict__.update(kwargs)
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest
-    fake_provider.ToolSchema = _ToolSchema
+    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="openai",
             model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
             reasoning="Matched route openai/gpt-4.1",
         )
     )
-    fake_registry_loader.estimate_model_cost = (
+    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
         lambda model_id, input_tokens, output_tokens: 0.42
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,
@@ -627,14 +626,14 @@ def test_call_llm_records_audit_log(tmp_path):
         return audit_log
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest
-    fake_provider.ToolSchema = _ToolSchema
+    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -643,12 +642,12 @@ def test_call_llm_records_audit_log(tmp_path):
             reasoning="Matched route anthropic/claude-sonnet-4",
         )
     )
-    fake_registry_loader.estimate_model_cost = (
+    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
         lambda model_id, input_tokens, output_tokens: 0.123
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = _record_llm_audit
+    fake_audit.record_llm_audit = _record_llm_audit  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,
@@ -722,14 +721,14 @@ def test_budget_policy_includes_task_id_and_model_in_route_info(tmp_path):
             raise AssertionError("budget must reject before provider call")
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)
-    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
+    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -738,10 +737,10 @@ def test_budget_policy_includes_task_id_and_model_in_route_info(tmp_path):
             reasoning="Matched",
         )
     )
-    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.02
+    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.02  # type: ignore[reportAttributeAccessIssue]
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,
@@ -794,24 +793,24 @@ def test_budget_debt_reuse_does_not_create_duplicate_files(tmp_path):
             raise AssertionError("generate should not be called when budget rejects")
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)
-    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
+    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="openai",
             model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
             reasoning="Matched",
         )
     )
-    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.5
+    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.5  # type: ignore[reportAttributeAccessIssue]
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,
@@ -867,24 +866,24 @@ def test_budget_reject_returns_error_dict_not_traceback(tmp_path):
             raise AssertionError("must not be reached")
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)
-    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
+    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
         types.SimpleNamespace(
             provider_name="openai",
             model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
             reasoning="Matched",
         )
     )
-    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 1.0
+    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 1.0  # type: ignore[reportAttributeAccessIssue]
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
 
     with mock.patch.dict(
         sys.modules,

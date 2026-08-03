@@ -18,9 +18,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-
-from runtime.registry.sync import GossipSync, Peer
 from runtime.registry.store import RegistryStore
+from runtime.registry.sync import GossipSync, Peer
 
 
 def _free_port() -> int:
@@ -58,11 +57,16 @@ def surviving_node_and_dead_peer():
 
     proc_alive = subprocess.Popen(
         [
-            sys.executable, "-m", "uvicorn",
+            sys.executable,
+            "-m",
+            "uvicorn",
             "runtime.registry.server:create_app",
-            "--host", "127.0.0.1",
-            "--port", str(port_alive),
-            "--log-level", "warning",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port_alive),
+            "--log-level",
+            "warning",
         ],
         env=env,
         stdout=subprocess.PIPE,
@@ -70,11 +74,16 @@ def surviving_node_and_dead_peer():
     )
     proc_dead = subprocess.Popen(
         [
-            sys.executable, "-m", "uvicorn",
+            sys.executable,
+            "-m",
+            "uvicorn",
             "runtime.registry.server:create_app",
-            "--host", "127.0.0.1",
-            "--port", str(port_dead),
-            "--log-level", "warning",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port_dead),
+            "--log-level",
+            "warning",
         ],
         env=env,
         stdout=subprocess.PIPE,
@@ -85,9 +94,9 @@ def surviving_node_and_dead_peer():
 
     try:
         assert _wait_for_healthy(base_alive), "alive node failed to start"
-        assert _wait_for_healthy(
-            f"http://127.0.0.1:{port_dead}"
-        ), "dead node failed to start"
+        assert _wait_for_healthy(f"http://127.0.0.1:{port_dead}"), (
+            "dead node failed to start"
+        )
 
         # Kill the dead peer
         proc_dead.terminate()
@@ -167,9 +176,11 @@ class TestFaultInjection:
         doomed = [a for a in agents if a["agent_id"] == "doomed-agent-001"]
         if doomed:
             # Agent exists but should be marked offline
-            assert doomed[0]["status"] in ("REMOTE_OFFLINE", "remote_offline", "offline"), (
-                f"Expected REMOTE_OFFLINE, got {doomed[0]['status']}"
-            )
+            assert doomed[0]["status"] in (
+                "REMOTE_OFFLINE",
+                "remote_offline",
+                "offline",
+            ), f"Expected REMOTE_OFFLINE, got {doomed[0]['status']}"
 
     def test_surviving_node_still_healthy(self, surviving_node_and_dead_peer):
         """The surviving node should remain healthy even with a dead peer."""

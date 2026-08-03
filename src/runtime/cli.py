@@ -350,7 +350,6 @@ def cmd_board(proposal: str, mode: str, session_id: str) -> int:
 # ─── Main ───────────────────────────────────────────────────────────────────
 
 
-
 def main(argv: list[str] | None = None) -> int:
     print("⚠️ Runtime 独立 CLI 已弃用，请使用 cockpit 替代", file=sys.stderr)
     parser = argparse.ArgumentParser(
@@ -429,7 +428,8 @@ def main(argv: list[str] | None = None) -> int:
         "board", help="Execute B.D.S.K. Virtual Board consensus cycle"
     )
     board_p.add_argument(
-        "proposal", help="Proposal or question (can include @Builder/@Devil/@Sage/@Keeper)"
+        "proposal",
+        help="Proposal or question (can include @Builder/@Devil/@Sage/@Keeper)",
     )
     board_p.add_argument(
         "--mode",
@@ -516,7 +516,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         parser.print_help()
         return 1
-
 
 
 if __name__ == "__main__":

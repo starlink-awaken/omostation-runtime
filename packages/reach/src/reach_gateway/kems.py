@@ -95,7 +95,7 @@ def dispatch_manifest(
     if os.environ.get("BOS_REACHBRIDGE_MODE") != "local_hermes":
         raise RuntimeError("ReachBridge transport is not configured")
 
-    body = f"{len(prepared['documents'])} 个私有源清单已生成，manifest={digest[:16]}"
+    body = f"{len(prepared['documents'])} 个私有源清单已生成，manifest={digest[:16]}"  # type: ignore[reportArgumentType]
     payload = ReachPayload(
         app_id="app_bos_kems",
         user_id=os.environ.get("BOS_REACHBRIDGE_USER", "usr_primary_owner"),

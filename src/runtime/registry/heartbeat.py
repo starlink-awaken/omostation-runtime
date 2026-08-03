@@ -18,7 +18,13 @@ DEFAULT_INTERVAL = 10
 
 
 class HeartbeatManager:
-    def __init__(self, store: RegistryStore, heartbeat_ttl: int = DEFAULT_TTL, zombie_threshold: int = DEFAULT_ZOMBIE, check_interval: int = DEFAULT_INTERVAL) -> None:
+    def __init__(
+        self,
+        store: RegistryStore,
+        heartbeat_ttl: int = DEFAULT_TTL,
+        zombie_threshold: int = DEFAULT_ZOMBIE,
+        check_interval: int = DEFAULT_INTERVAL,
+    ) -> None:
         self._store = store
         self._ttl = timedelta(seconds=heartbeat_ttl)
         self._zombie = timedelta(seconds=zombie_threshold)
@@ -30,9 +36,15 @@ class HeartbeatManager:
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="heartbeat-mgr")
+        self._thread = threading.Thread(
+            target=self._loop, daemon=True, name="heartbeat-mgr"
+        )
         self._thread.start()
-        logger.info("HeartbeatManager started (ttl=%ds, zombie=%ds)", self._ttl.total_seconds(), self._zombie.total_seconds())
+        logger.info(
+            "HeartbeatManager started (ttl=%ds, zombie=%ds)",
+            self._ttl.total_seconds(),
+            self._zombie.total_seconds(),
+        )
 
     def stop(self) -> None:
         self._running = False

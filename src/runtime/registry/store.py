@@ -67,7 +67,10 @@ class RegistryStore:
         with self._lock:
             marked: list[str] = []
             for agent in self._agents.values():
-                if agent.node_id == node_id and agent.status != AgentStatus.REMOTE_OFFLINE:
+                if (
+                    agent.node_id == node_id
+                    and agent.status != AgentStatus.REMOTE_OFFLINE
+                ):
                     agent.status = AgentStatus.REMOTE_OFFLINE
                     marked.append(agent.agent_id)
             if marked:
@@ -147,7 +150,12 @@ class RegistryStore:
                 self._agents[k] = AgentInfo.from_dict(v)
             for k, v in data.get("nodes", {}).items():
                 self._nodes[k] = NodeInfo.from_dict(v)
-            logger.info("Loaded %d agents, %d nodes from %s", len(self._agents), len(self._nodes), self._persist_path)
+            logger.info(
+                "Loaded %d agents, %d nodes from %s",
+                len(self._agents),
+                len(self._nodes),
+                self._persist_path,
+            )
         except Exception:
             logger.exception("Failed to load registry from %s", self._persist_path)
 

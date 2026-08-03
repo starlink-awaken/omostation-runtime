@@ -5,8 +5,8 @@ external Skills/Plugins connecting to the eCOS v6 Kernel.
 """
 
 from dataclasses import dataclass, field
-from typing import List
 from pathlib import Path
+
 import yaml
 
 
@@ -14,11 +14,11 @@ import yaml
 class SandboxPermissions:
     """Permissions requested by an extension."""
 
-    fs_read: List[str] = field(default_factory=list)
-    fs_write: List[str] = field(default_factory=list)
-    network_hosts: List[str] = field(default_factory=list)
+    fs_read: list[str] = field(default_factory=list)
+    fs_write: list[str] = field(default_factory=list)
+    network_hosts: list[str] = field(default_factory=list)
     shell_exec: bool = False
-    env_vars: List[str] = field(default_factory=list)
+    env_vars: list[str] = field(default_factory=list)
 
 
 @dataclass

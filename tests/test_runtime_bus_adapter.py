@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from runtime.runtime_bus_adapter import register_cron_job
 
 
@@ -85,6 +84,7 @@ class TestBusAdapterIntegration:
     def test_register_cron_job_uses_bus_control(self):
         """register_cron_job 内部必须调用 bus_control.schedule_callback"""
         import inspect
+
         from runtime import runtime_bus_adapter
 
         source = inspect.getsource(runtime_bus_adapter.register_cron_job)

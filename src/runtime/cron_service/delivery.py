@@ -65,7 +65,7 @@ def _timestamp() -> str:
 
 def _random_wechat_uin() -> str:
     """Generate a random UIN matching Hermes gateway format."""
-    return "".join(random.choices(string.digits, k=10))  # noqa: S311
+    return "".join(random.choices(string.digits, k=10))
 
 
 # ── iLink WeChat API ──────────────────────────────────────────────

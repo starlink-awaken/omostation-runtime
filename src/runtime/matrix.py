@@ -1,9 +1,8 @@
 """Runtime Matrix — read/query the service registry with env-var expansion."""
 
 import os
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
+from pathlib import Path
 
 # ─── Defaults ──────────────────────────────────────────────────────────────
 RUNTIME_HOME = Path(os.environ.get("RUNTIME_HOME", Path.home() / "runtime"))
@@ -17,15 +16,15 @@ class ServiceEntry:
     name: str
     type: str
     status: str
-    port: Optional[int] = None
-    launchd_label: Optional[str] = None
-    launchd_config: Optional[str] = None
-    deploy_path: Optional[str] = None
-    log_path: Optional[str] = None
-    start_command: Optional[str] = None
-    health_url: Optional[str] = None
-    docker_container: Optional[str] = None
-    notes: Optional[str] = None
+    port: int | None = None
+    launchd_label: str | None = None
+    launchd_config: str | None = None
+    deploy_path: str | None = None
+    log_path: str | None = None
+    start_command: str | None = None
+    health_url: str | None = None
+    docker_container: str | None = None
+    notes: str | None = None
     depends_on: list[str] = field(default_factory=list)
     raw: dict = field(default_factory=dict)
 
@@ -49,7 +48,7 @@ def _expand_env(s: str) -> str:
 #   8 spaces: continuation text (notes > text)
 
 
-def load_matrix(path: Optional[Path] = None) -> list[ServiceEntry]:
+def load_matrix(path: Path | None = None) -> list[ServiceEntry]:
     """Load and parse the runtime matrix YAML.
 
     Lightweight line-by-line parser for the specific matrix.yaml format.
@@ -169,7 +168,7 @@ def _parse_entry(raw: dict) -> ServiceEntry:
     )
 
 
-def get_service(name: str, path: Optional[Path] = None) -> Optional[ServiceEntry]:
+def get_service(name: str, path: Path | None = None) -> ServiceEntry | None:
     """Find a service by name."""
     for svc in load_matrix(path):
         if svc.name == name:
@@ -177,12 +176,12 @@ def get_service(name: str, path: Optional[Path] = None) -> Optional[ServiceEntry
     return None
 
 
-def list_services(path: Optional[Path] = None) -> list[ServiceEntry]:
+def list_services(path: Path | None = None) -> list[ServiceEntry]:
     """List all services."""
     return load_matrix(path)
 
 
-def resolve_path(path_str: Optional[str]) -> Optional[str]:
+def resolve_path(path_str: str | None) -> str | None:
     """Resolve a $VAR path to its actual filesystem path."""
     if not path_str:
         return None
@@ -190,7 +189,7 @@ def resolve_path(path_str: Optional[str]) -> Optional[str]:
     return os.path.expanduser(expanded)
 
 
-def health_check_url(url: Optional[str]) -> str:
+def health_check_url(url: str | None) -> str:
     """Quick HTTP health check via curl."""
     if not url:
         return "—"
@@ -200,7 +199,9 @@ def health_check_url(url: Optional[str]) -> str:
         r = subprocess.run(
             ["curl", "-sf", "-o", "/dev/null", "--max-time", "2", url],
             capture_output=True,
-            timeout=5, check=False)
+            timeout=5,
+            check=False,
+        )
         return "healthy" if r.returncode == 0 else "unreachable"
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return "error"

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
 from runtime.registry.push import PushResult, PushTrigger
 
 
@@ -28,7 +27,10 @@ class TestPushTriggerE2E:
         # Monkeypatch _push_to_peer to capture instead of HTTP
         trigger._push_to_peer = _mock_push  # type: ignore
 
-        delta = {"type": "agent_registered", "agent": {"name": "test-agent", "node_id": "node-a"}}
+        delta = {
+            "type": "agent_registered",
+            "agent": {"name": "test-agent", "node_id": "node-a"},
+        }
         results = await trigger.push_delta(delta, local_node_id="node-a")
 
         assert len(results) == 1
@@ -46,14 +48,18 @@ class TestPushTriggerE2E:
             received.append(peer_id)
             return PushResult(peer_id=peer_id, success=True, status_code=200)
 
-        trigger = PushTrigger(peers={
-            "peer-1": "http://p1:8000",
-            "peer-2": "http://p2:8000",
-            "peer-3": "http://p3:8000",
-        })
+        trigger = PushTrigger(
+            peers={
+                "peer-1": "http://p1:8000",
+                "peer-2": "http://p2:8000",
+                "peer-3": "http://p3:8000",
+            }
+        )
         trigger._push_to_peer = _mock_push  # type: ignore
 
-        results = await trigger.push_delta({"type": "heartbeat", "agent_id": "a1"}, "self")
+        results = await trigger.push_delta(
+            {"type": "heartbeat", "agent_id": "a1"}, "self"
+        )
 
         assert len(results) == 3
         assert set(received) == {"peer-1", "peer-2", "peer-3"}

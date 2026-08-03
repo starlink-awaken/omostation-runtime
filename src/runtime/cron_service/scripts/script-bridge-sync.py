@@ -28,6 +28,8 @@ from pathlib import Path
 from runtime.cron_service.classify import (
     SCRIPT_PREFIX_MAP,
     classify,
+)
+from runtime.cron_service.classify import (
     should_bridge as _should_include,
 )
 

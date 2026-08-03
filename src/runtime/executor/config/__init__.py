@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 
 from . import config as _config
-from .config import *  # noqa: F403
+from .config import *
 
 importlib.reload(_config)
 

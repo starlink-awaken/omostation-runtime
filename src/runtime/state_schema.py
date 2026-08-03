@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 _GOVERNANCE_ONLY_KEYS = {
     "current_phase",
     "current_wave",

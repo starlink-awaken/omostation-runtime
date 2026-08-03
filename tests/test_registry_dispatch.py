@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import pytest
-
-from runtime.registry.dispatch import Dispatcher, TaskAssignment, TaskRequest, TaskStatus
+from runtime.registry.dispatch import (
+    Dispatcher,
+    TaskAssignment,
+    TaskRequest,
+    TaskStatus,
+)
 from runtime.registry.models import AgentInfo, AgentStatus, Capability
 from runtime.registry.store import RegistryStore
 
@@ -19,13 +23,24 @@ def dispatcher(store: RegistryStore) -> Dispatcher:
     return Dispatcher(store)
 
 
-def _reg(store: RegistryStore, agent_id: str, *, caps: list[str] | None = None,
-         status: AgentStatus = AgentStatus.IDLE, active: int = 0) -> None:
-    store.register_agent(AgentInfo(
-        agent_id=agent_id, name=agent_id,
-        capabilities=[Capability(name=c) for c in (caps or [])],
-        status=status, active_tasks=active, max_concurrency=2,
-    ))
+def _reg(
+    store: RegistryStore,
+    agent_id: str,
+    *,
+    caps: list[str] | None = None,
+    status: AgentStatus = AgentStatus.IDLE,
+    active: int = 0,
+) -> None:
+    store.register_agent(
+        AgentInfo(
+            agent_id=agent_id,
+            name=agent_id,
+            capabilities=[Capability(name=c) for c in (caps or [])],
+            status=status,
+            active_tasks=active,
+            max_concurrency=2,
+        )
+    )
 
 
 # ── TaskRequest / TaskAssignment ────────────────────────────────────────────
@@ -38,7 +53,9 @@ class TestTaskRequest:
         assert req.required_capabilities == []
 
     def test_custom_values(self) -> None:
-        req = TaskRequest(task_id="t1", name="coding", required_capabilities=["coding"], priority=10)
+        req = TaskRequest(
+            task_id="t1", name="coding", required_capabilities=["coding"], priority=10
+        )
         assert req.task_id == "t1"
         assert req.required_capabilities == ["coding"]
 
@@ -56,26 +73,40 @@ class TestTaskAssignment:
 
 class TestDispatcherSubmit:
     def test_submit_no_agents(self, dispatcher: Dispatcher) -> None:
-        assignment = dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["coding"]))
+        assignment = dispatcher.submit(
+            TaskRequest(task_id="t1", required_capabilities=["coding"])
+        )
         assert assignment is None
         assert len(dispatcher.get_pending()) == 1
 
-    def test_submit_assigns_to_idle(self, dispatcher: Dispatcher, store: RegistryStore) -> None:
+    def test_submit_assigns_to_idle(
+        self, dispatcher: Dispatcher, store: RegistryStore
+    ) -> None:
         _reg(store, "agent-1", caps=["coding", "testing"])
-        assignment = dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["coding"]))
+        assignment = dispatcher.submit(
+            TaskRequest(task_id="t1", required_capabilities=["coding"])
+        )
         assert assignment is not None
         assert assignment.status == TaskStatus.DISPATCHED
 
-    def test_submit_respects_capabilities(self, dispatcher: Dispatcher, store: RegistryStore) -> None:
+    def test_submit_respects_capabilities(
+        self, dispatcher: Dispatcher, store: RegistryStore
+    ) -> None:
         _reg(store, "agent-1", caps=["coding"])
-        assignment = dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["nonexistent"]))
+        assignment = dispatcher.submit(
+            TaskRequest(task_id="t1", required_capabilities=["nonexistent"])
+        )
         assert assignment is None
 
-    def test_submit_selects_lowest_load(self, dispatcher: Dispatcher, store: RegistryStore) -> None:
+    def test_submit_selects_lowest_load(
+        self, dispatcher: Dispatcher, store: RegistryStore
+    ) -> None:
         _reg(store, "agent-1", caps=["coding"], active=1, status=AgentStatus.BUSY)
         _reg(store, "agent-2", caps=["coding"], active=0)
-        assignment = dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["coding"]))
-        assert assignment.agent_id == "agent-2"
+        assignment = dispatcher.submit(
+            TaskRequest(task_id="t1", required_capabilities=["coding"])
+        )
+        assert assignment.agent_id == "agent-2"  # type: ignore[reportOptionalMemberAccess]
 
 
 # ── Dispatcher.dispatch_pending ─────────────────────────────────────────────
@@ -85,7 +116,9 @@ class TestDispatchPending:
     def test_dispatch_pending_empty(self, dispatcher: Dispatcher) -> None:
         assert dispatcher.dispatch_pending() == []
 
-    def test_dispatch_pending_later_agents(self, dispatcher: Dispatcher, store: RegistryStore) -> None:
+    def test_dispatch_pending_later_agents(
+        self, dispatcher: Dispatcher, store: RegistryStore
+    ) -> None:
         dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["coding"]))
         assert len(dispatcher.get_pending()) == 1
         _reg(store, "a1", caps=["coding"])
@@ -123,7 +156,9 @@ class TestDispatcherFail:
 
 
 class TestDispatcherFailoverNode:
-    def test_failover_requeues(self, dispatcher: Dispatcher, store: RegistryStore) -> None:
+    def test_failover_requeues(
+        self, dispatcher: Dispatcher, store: RegistryStore
+    ) -> None:
         _reg(store, "a1", caps=["coding"])
         store.update_agent("a1", node_id="node1")
         dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["coding"]))
@@ -140,10 +175,14 @@ class TestDispatcherStats:
         assert s["total_submitted"] == 0
         assert s["pending"] == 0
 
-    def test_stats_with_tasks(self, dispatcher: Dispatcher, store: RegistryStore) -> None:
+    def test_stats_with_tasks(
+        self, dispatcher: Dispatcher, store: RegistryStore
+    ) -> None:
         _reg(store, "a1", caps=["coding"])
         dispatcher.submit(TaskRequest(task_id="t1", required_capabilities=["coding"]))
-        dispatcher.submit(TaskRequest(task_id="t2", required_capabilities=["nonexistent"]))
+        dispatcher.submit(
+            TaskRequest(task_id="t2", required_capabilities=["nonexistent"])
+        )
         s = dispatcher.stats()
         assert s["total_submitted"] == 2
         assert s["pending"] == 1

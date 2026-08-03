@@ -182,10 +182,14 @@ def _compensation_from_record(
 class WorkflowEffectStore:
     """Append-only effect journal with process-safe replay and compensation."""
 
-    def __init__(self, path: str | Path, *, lock_path: str | Path | None = None) -> None:
+    def __init__(
+        self, path: str | Path, *, lock_path: str | Path | None = None
+    ) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.lock_path = Path(lock_path) if lock_path else self.path.with_suffix(".lock")
+        self.lock_path = (
+            Path(lock_path) if lock_path else self.path.with_suffix(".lock")
+        )
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         self._log = AppendOnlyLog(self.path)
         self._thread_lock = threading.RLock()
@@ -193,9 +197,10 @@ class WorkflowEffectStore:
     @contextmanager
     def _exclusive(self) -> Iterator[None]:
         """Hold one lock across read/check/append, including other processes."""
-        with self._thread_lock, self.lock_path.open(
-            "a+", encoding="utf-8"
-        ) as lock_file:
+        with (
+            self._thread_lock,
+            self.lock_path.open("a+", encoding="utf-8") as lock_file,
+        ):
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
             try:
                 yield

@@ -29,17 +29,19 @@ def _action_agent_list(args: dict[str, Any]) -> dict[str, Any]:
     from runtime.executor.agent_hub import AgentHub  # type: ignore[import-not-found]
 
     hub = AgentHub()
-    agents = [a.to_dict() for a in hub.list_all()]
+    agents = [a.to_dict() for a in hub.list_all()]  # type: ignore[reportAttributeAccessIssue]
     return {"status": "ok", "result": {"agents": agents, "args_echo": args}}
 
 
 def _action_chat(args: dict[str, Any]) -> dict[str, Any]:
     """P49-W1: 真调 AgentRunner, 替代 P48-W0 stub."""
-    from runtime.executor.core.agent_runner import AgentRunner  # type: ignore[import-not-found]
+    from runtime.executor.core.agent_runner import (
+        AgentRunner,  # type: ignore[import-not-found]
+    )
 
     runner = AgentRunner()
     query = args.get("query", args.get("message", ""))
-    response = runner.run(query) if hasattr(runner, "run") else f"[runner-stub] {query}"
+    response = runner.run(query) if hasattr(runner, "run") else f"[runner-stub] {query}"  # type: ignore[reportAttributeAccessIssue]
     return {
         "status": "ok",
         "result": {"query": query, "response": response},
@@ -48,14 +50,16 @@ def _action_chat(args: dict[str, Any]) -> dict[str, Any]:
 
 def _action_run_task(args: dict[str, Any]) -> dict[str, Any]:
     """P49-W1: 真调 AgentExecutor + 持久 task state."""
-    from runtime.executor.core.agent_executor import AgentExecutor  # type: ignore[import-not-found]
+    from runtime.executor.core.agent_executor import (
+        AgentExecutor,  # type: ignore[import-not-found]
+    )
 
-    executor = AgentExecutor()
+    executor = AgentExecutor()  # type: ignore[reportCallIssue]
     task = args.get("task", args.get("name", ""))
     task_id = f"task-{uuid.uuid4().hex[:8]}"
     try:
         result = (
-            executor.execute(task) if hasattr(executor, "execute") else {"echo": task}
+            executor.execute(task) if hasattr(executor, "execute") else {"echo": task}  # type: ignore[reportCallIssue]
         )
     except Exception as exc:  # noqa: BLE001  # defensive fallback
         result = {"_execute_error": f"{type(exc).__name__}: {exc}"}
@@ -85,7 +89,7 @@ def _action_task_status(args: dict[str, Any]) -> dict[str, Any]:
         "result": {
             "task": None,
             "all_tasks": list(_TASK_STATE.values()),
-            "agents": [a.to_dict() for a in hub.list_all()],
+            "agents": [a.to_dict() for a in hub.list_all()],  # type: ignore[reportAttributeAccessIssue]
         },
     }
 
@@ -114,4 +118,4 @@ def serve() -> int:
     return run_stdio_dispatch(_call_action)
 
 
-__all__ = ["serve", "_call_action"]
+__all__ = ["_call_action", "serve"]

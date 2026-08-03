@@ -1,27 +1,17 @@
 import os
-
+import subprocess
+import sys
 import tempfile
-
 from datetime import UTC, datetime, timedelta
-
 from pathlib import Path
-
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from runtime.cron_service.scheduler import _is_due, _next_cron_ts, _parse_interval
-
-from runtime.cron_service.executor import _resolve_script
-
-from runtime.cron_service.classify import classify, should_bridge
-
-from runtime.cron_service.config import CONFIG_FILE, _get, _load_config
-
-from runtime.cron_service.models import Job, JobCreate, JobUpdate
-
 import runtime.cron_service.db as db_module
-
+from fastapi.testclient import TestClient
+from runtime.cron_service import delivery
+from runtime.cron_service.classify import classify, should_bridge
+from runtime.cron_service.config import CONFIG_FILE, _get, _load_config
 from runtime.cron_service.db import (
     create_job,
     delete_job,
@@ -31,25 +21,17 @@ from runtime.cron_service.db import (
     record_run,
     update_job,
 )
-
-import runtime.cron_service.delivery as delivery
-
-import subprocess
-
-import sys
-
 from runtime.cron_service.executor import (
     ExecutionResult,
     _get_interpreter,
     _kill_process,
     _read_shebang,
+    _resolve_script,
     execute,
 )
-
 from runtime.cron_service.mcp_server import _fmt_job, _register_tools
-
-from fastapi.testclient import TestClient
-
+from runtime.cron_service.models import Job, JobCreate, JobUpdate
+from runtime.cron_service.scheduler import _is_due, _next_cron_ts, _parse_interval
 
 "Tests for cron-service core logic — scheduler, executor, classify, config, models."
 
@@ -392,7 +374,7 @@ class TestDbCRUD:
         tables = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
-        assert any((r["name"] == "jobs" for r in tables))
+        assert any(r["name"] == "jobs" for r in tables)
 
     def test_create_and_list_job(self, tmp_path):
         db_path = tmp_path / "cron.db"
@@ -471,9 +453,9 @@ class TestDbCRUD:
             job = create_job(data)
             record_run(job.id, "ok", "output text", "")
             updated = get_job(job.id)
-            assert updated.last_status == "ok"
-            assert updated.last_output == "output text"
-            assert updated.run_count == 1
+            assert updated.last_status == "ok"  # type: ignore[reportOptionalMemberAccess]
+            assert updated.last_output == "output text"  # type: ignore[reportOptionalMemberAccess]
+            assert updated.run_count == 1  # type: ignore[reportOptionalMemberAccess]
 
     def test_list_enabled_only(self, tmp_path):
         db_path = tmp_path / "cron.db"

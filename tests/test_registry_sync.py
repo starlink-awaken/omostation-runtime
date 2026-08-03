@@ -88,7 +88,13 @@ class TestSyncResult:
         assert r.errors == []
 
     def test_to_dict(self):
-        r = SyncResult(pulled=5, pushed=3, conflicts_resolved=2, peers_unreachable=1, duration_ms=123.4)
+        r = SyncResult(
+            pulled=5,
+            pushed=3,
+            conflicts_resolved=2,
+            peers_unreachable=1,
+            duration_ms=123.4,
+        )
         d = r.to_dict()
         assert d["pulled"] == 5
         assert d["pushed"] == 3
@@ -236,7 +242,7 @@ class TestGossipSyncOnce:
 class TestGossipSyncLifecycle:
     @pytest.mark.asyncio
     async def test_start_and_stop(self, mock_store):
-        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)
+        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)  # type: ignore[reportArgumentType]
         await sync.start()
         assert sync._running is True
         await sync.stop()
@@ -244,7 +250,7 @@ class TestGossipSyncLifecycle:
 
     @pytest.mark.asyncio
     async def test_double_start_is_noop(self, mock_store):
-        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)
+        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)  # type: ignore[reportArgumentType]
         await sync.start()
         task1 = sync._task
         await sync.start()  # Should not create new task

@@ -55,12 +55,12 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
                     if part.get_content_type() == "text/plain":
                         payload = part.get_payload(decode=True)
                         if payload:
-                            body_text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")
+                            body_text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")  # type: ignore[reportAttributeAccessIssue]
                             break
             else:
                 payload = msg.get_payload(decode=True)
                 if payload:
-                    body_text = payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")
+                    body_text = payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")  # type: ignore[reportAttributeAccessIssue]
 
             clean_body = " ".join(body_text.split()[:80])
             if not clean_body:

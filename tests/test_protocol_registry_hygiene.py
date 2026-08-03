@@ -2,7 +2,6 @@
 
 from runtime.protocol import L0_PROTOCOLS, registry_path
 
-
 VOLATILE_TOKENS = (
     "pid ",
     "docker container",

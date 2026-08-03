@@ -93,7 +93,12 @@ def test_runtime_retries_llm_error_when_policy_allows() -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
-            return {"content": "", "tool_calls": [], "finish_reason": "error", "error": "timeout"}
+            return {
+                "content": "",
+                "tool_calls": [],
+                "finish_reason": "error",
+                "error": "timeout",
+            }
         return {
             "content": "recovered",
             "tool_calls": [],

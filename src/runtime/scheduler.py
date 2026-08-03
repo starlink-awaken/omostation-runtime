@@ -1,22 +1,22 @@
 """L1 Runtime Matrix Scheduler — continuous health monitoring and lifecycle manager."""
 
-import time
+import hashlib
 import json
-import subprocess
-from pathlib import Path
 import os
+import subprocess
 import sys
+import time
 from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
 
 from runtime.adapters.omo import (
     archive_resolved_debt_items,
     summarize_system_health_snapshot,
 )
-from runtime.matrix import list_services, health_check_url
+from runtime.matrix import health_check_url, list_services
 from runtime.state_schema import validate_runtime_health_snapshot
-
-import yaml
-import hashlib
 
 STATE_FILE = (
     Path(os.environ.get("RUNTIME_HOME", Path.home() / "runtime")) / "matrix_state.json"
@@ -54,7 +54,11 @@ class MatrixScheduler:
             return {"status": "unknown"}
         try:
             r = subprocess.run(
-                ["launchctl", "list", label], capture_output=True, text=True, check=False)
+                ["launchctl", "list", label],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             if r.returncode != 0:
                 return {"status": "failed", "exit_code": r.returncode}
 
@@ -91,9 +95,17 @@ class MatrixScheduler:
         try:
             print(f"🔧 [launchd repair] {label}: unloading/loading {cfg}")
             subprocess.run(
-                ["launchctl", "unload", str(cfg)], capture_output=True, timeout=10, check=False)
+                ["launchctl", "unload", str(cfg)],
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
             subprocess.run(
-                ["launchctl", "load", str(cfg)], capture_output=True, timeout=10, check=False)
+                ["launchctl", "load", str(cfg)],
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
             time.sleep(0.5)
             status = self._check_launchd(label)
             return status.get("status") == "running"
@@ -115,7 +127,9 @@ class MatrixScheduler:
                     "{{.Status}}",
                 ],
                 capture_output=True,
-                text=True, check=False)
+                text=True,
+                check=False,
+            )
             status = r.stdout.strip()
             if status:
                 return {"status": "running", "details": status}
@@ -129,7 +143,10 @@ class MatrixScheduler:
             return False
         try:
             r = subprocess.run(
-                ["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-P"], capture_output=True, check=False)
+                ["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-P"],
+                capture_output=True,
+                check=False,
+            )
             return r.returncode == 0
         except Exception:  # noqa: BLE001  # defensive fallback
             return False
@@ -169,8 +186,8 @@ class MatrixScheduler:
             try:
                 with open(state_file, "r") as f:
                     state = json.load(f)
-            except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-                pass  # noqa: S110, BLE001, S112  # defensive fallback
+            except Exception:  # noqa: BLE001, S110  # defensive fallback
+                pass  # defensive fallback
 
         # Heartbeat & run statistics
         run_count = state.get("run_count", 0) + 1
@@ -292,10 +309,14 @@ class MatrixScheduler:
                             )
                             subprocess.run(
                                 ["launchctl", "stop", svc.launchd_label],
-                                capture_output=True, check=False)
+                                capture_output=True,
+                                check=False,
+                            )
                             subprocess.run(
                                 ["launchctl", "start", svc.launchd_label],
-                                capture_output=True, check=False)
+                                capture_output=True,
+                                check=False,
+                            )
                             svc_history.append(current_time)
                             result["runtime"]["self_heal_attempted"] = True
                         else:
@@ -316,7 +337,9 @@ class MatrixScheduler:
                         )
                         subprocess.run(
                             ["docker", "restart", svc.docker_container],
-                            capture_output=True, check=False)
+                            capture_output=True,
+                            check=False,
+                        )
                         svc_history.append(current_time)
                         result["runtime"]["self_heal_attempted"] = True
                     else:
@@ -403,7 +426,7 @@ class MatrixScheduler:
                     running_since[svc.name] = current_time
                     if current_pid:
                         running_pid[svc.name] = current_pid
-                result["runtime"]["uptime_seconds"] = int(
+                result["runtime"]["uptime_seconds"] = int(  # type: ignore[reportArgumentType]
                     current_time - running_since[svc.name]
                 )
                 # freshness_seconds: time since last confirmed healthy
@@ -414,16 +437,16 @@ class MatrixScheduler:
                     freshness = int(
                         current_time - running_since.get(svc.name, current_time)
                     )
-                result["runtime"]["freshness_seconds"] = freshness
+                result["runtime"]["freshness_seconds"] = freshness  # type: ignore[reportArgumentType]
             # Track last healthy time — runs for both running and idle services
             if rt in ("running", "idle") or hc == "healthy":
                 last_healthy[svc.name] = current_time
-                result["runtime"]["last_healthy_seconds"] = 0
+                result["runtime"]["last_healthy_seconds"] = 0  # type: ignore[reportArgumentType]
             else:
                 running_since.pop(svc.name, None)
                 running_pid.pop(svc.name, None)  # Bug A: 连带清 pid tracking
                 # Report staleness: time since last seen healthy
-                result["runtime"]["last_healthy_seconds"] = int(
+                result["runtime"]["last_healthy_seconds"] = int(  # type: ignore[reportArgumentType]
                     current_time - last_healthy.get(svc.name, current_time)
                 )
 
@@ -450,8 +473,8 @@ class MatrixScheduler:
         try:
             with open(state_file, "w") as f:
                 json.dump(state, f)
-        except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-            pass  # noqa: S110, BLE001, S112  # defensive fallback
+        except Exception:  # noqa: BLE001, S110  # defensive fallback
+            pass  # defensive fallback
 
         self.state = {"last_scan": current_time, "services": scan_results}
 
@@ -501,7 +524,9 @@ class MatrixScheduler:
                         ],
                         capture_output=True,
                         text=True,
-                        timeout=10, check=False)
+                        timeout=10,
+                        check=False,
+                    )
                 except Exception as e:  # noqa: BLE001  # defensive fallback
                     print(f"Failed to run notify script for {svc_name}: {e}")
             self._prev_health[svc_name] = current_hc
@@ -559,7 +584,9 @@ class MatrixScheduler:
                 ["bash", str(autoheal_script), svc_name],
                 capture_output=True,
                 text=True,
-                timeout=30, check=False)
+                timeout=30,
+                check=False,
+            )
             if r.returncode == 0:
                 print(f"✅ [P1-AUTO_HEAL] {svc_name}: autoheal succeeded")
             else:

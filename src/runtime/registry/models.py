@@ -44,7 +44,9 @@ class Capability:
 
     @classmethod
     def from_dict(cls, d: dict) -> Capability:
-        return cls(name=d["name"], tags=d.get("tags", []), cost_eu=d.get("cost_eu", 0.0))
+        return cls(
+            name=d["name"], tags=d.get("tags", []), cost_eu=d.get("cost_eu", 0.0)
+        )
 
 
 @dataclass

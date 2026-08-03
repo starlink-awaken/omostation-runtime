@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from reach_gateway.kems import dispatch_manifest
+from reach_gateway.kems import dispatch_manifest  # type: ignore[reportMissingImports]
 
 
 def main() -> int:

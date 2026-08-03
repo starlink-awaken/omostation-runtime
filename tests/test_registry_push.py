@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from runtime.registry.push import PushResult, PushTrigger
 
 
@@ -82,6 +81,7 @@ class TestPushTriggerRetry:
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
             import httpx as _httpx
+
             mock_client.post = AsyncMock(side_effect=_httpx.ConnectError("network"))
             mock_cls.return_value = mock_client
 

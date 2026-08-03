@@ -23,7 +23,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 DEFAULT_PATH = (
     Path(os.environ.get("RUNTIME_HOME", str(Path.home() / "runtime")))
     / "data"

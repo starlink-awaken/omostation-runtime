@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from runtime.kei_probe import count_last_24h, last_age_hours, main
 from runtime.state_schema import validate_runtime_health_snapshot
 

@@ -51,14 +51,17 @@ def test_effect_outcome_and_receipt_are_safe_and_stable_on_replay(tmp_path) -> N
         policy_digest="policy/v1",
         decision_factors={"health": "healthy"},
     )
-    assert second.external_receipt(
-        trace_id="trace-1",
-        resource_id="source:test",
-        operation="search",
-        provenance_ref="test://source",
-        policy_digest="policy/v1",
-        decision_factors={"health": "healthy"},
-    ) == receipt
+    assert (
+        second.external_receipt(
+            trace_id="trace-1",
+            resource_id="source:test",
+            operation="search",
+            provenance_ref="test://source",
+            policy_digest="policy/v1",
+            decision_factors={"health": "healthy"},
+        )
+        == receipt
+    )
     assert receipt["output_digest"] == first.result_digest
     assert "content" not in str(receipt)
 
@@ -83,7 +86,7 @@ def test_compensation_is_explicit_idempotent_and_safe(tmp_path) -> None:
 
     first = store.compensate(
         "run-1:effect:compensate",
-        lambda: (calls.append("compensated") or {"remote_id": "obj-1"}),
+        lambda: calls.append("compensated") or {"remote_id": "obj-1"},
     )
     second = store.compensate(
         "run-1:effect:compensate", lambda: {"remote_id": "must-not-run"}

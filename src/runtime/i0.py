@@ -11,15 +11,15 @@ Usage:
 """
 
 from __future__ import annotations
+
 import json
 import os
 import socket
 import subprocess
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -94,7 +94,7 @@ def _health_check(url: str, timeout: float = 3.0) -> str:
         return "unreachable"
 
 
-def _get_pid_for_port(port: int) -> Optional[int]:
+def _get_pid_for_port(port: int) -> int | None:
     """Try to find PID listening on a port using lsof."""
     if not port:
         return None
@@ -103,11 +103,13 @@ def _get_pid_for_port(port: int) -> Optional[int]:
             ["lsof", "-ti", f":{port}"],
             capture_output=True,
             text=True,
-            timeout=5, check=False)
+            timeout=5,
+            check=False,
+        )
         if r.stdout.strip():
             return int(r.stdout.strip().split("\n")[0])
-    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, OSError):  # noqa: S110, S112
-        pass  # noqa: S110, BLE001, S112  # defensive fallback
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, OSError):
+        pass  # defensive fallback
     return None
 
 
@@ -127,10 +129,10 @@ def _fetch_events_from_agora(limit: int = 20) -> list[dict]:
                 try:
                     event = json.loads(line[6:])
                     events.append(event)
-                except json.JSONDecodeError:  # noqa: S110, S112
-                    pass  # noqa: S110, BLE001, S112  # defensive fallback
-    except (urllib.error.URLError, OSError, ConnectionRefusedError):  # noqa: S110, S112
-        pass  # noqa: S110, BLE001, S112  # defensive fallback
+                except json.JSONDecodeError:
+                    pass  # defensive fallback
+    except (urllib.error.URLError, OSError, ConnectionRefusedError):
+        pass  # defensive fallback
     # Return most recent events (last N)
     return events[-limit:] if len(events) > limit else events
 
@@ -191,8 +193,8 @@ def i0_services() -> list[dict]:
             port_listening = True
             pid = None
         elif has_port:
-            port_listening = _probe_port("127.0.0.1", svc.port)
-            pid = _get_pid_for_port(svc.port) if port_listening else None
+            port_listening = _probe_port("127.0.0.1", svc.port)  # type: ignore[reportArgumentType]
+            pid = _get_pid_for_port(svc.port) if port_listening else None  # type: ignore[reportArgumentType]
         else:
             # No port — trust matrix.yaml status (running/active = online)
             port_listening = svc.status in ("running", "active", "idle")

@@ -12,7 +12,6 @@ Wires real RegistryStore + Dispatcher + FailoverManager together
 from __future__ import annotations
 
 import pytest
-
 from runtime.registry.dispatch import Dispatcher, TaskRequest
 from runtime.registry.failover import FailoverManager
 from runtime.registry.models import AgentInfo, AgentStatus, Capability
@@ -88,8 +87,12 @@ class TestFailoverE2E:
 
     def test_dispatcher_failover_node(self, store, dispatcher):
         """Dispatcher.failover_node() requeues tasks from a failed node."""
-        a1 = store.register_agent(_make_agent("node-a-worker", ["coding"], node_id="node-a"))
-        a2 = store.register_agent(_make_agent("node-b-worker", ["coding"], node_id="node-b"))
+        a1 = store.register_agent(
+            _make_agent("node-a-worker", ["coding"], node_id="node-a")
+        )
+        a2 = store.register_agent(
+            _make_agent("node-b-worker", ["coding"], node_id="node-b")
+        )
 
         # Submit task → goes to one agent
         task = TaskRequest(name="critical", required_capabilities=["coding"])
@@ -140,7 +143,9 @@ class TestFailoverE2E:
         assert status["sweep_interval"] == 30
 
     @pytest.mark.asyncio
-    async def test_multiple_offline_agents_emit_multiple_events(self, store, dispatcher, fm):
+    async def test_multiple_offline_agents_emit_multiple_events(
+        self, store, dispatcher, fm
+    ):
         """Multiple offline agents with tasks → multiple events."""
         a1 = store.register_agent(_make_agent("w1", ["coding"]))
         a2 = store.register_agent(_make_agent("w2", ["coding"]))

@@ -63,7 +63,9 @@ class Peer:
             "node_id": self.node_id,
             "host": self.host,
             "port": self.port,
-            "last_contact": self.last_contact.isoformat() if self.last_contact else None,
+            "last_contact": self.last_contact.isoformat()
+            if self.last_contact
+            else None,
             "consecutive_failures": self.consecutive_failures,
             "reachable": self.reachable,
         }
@@ -181,9 +183,7 @@ class GossipSync:
             except Exception:
                 logger.exception("Gossip sync tick failed")
             try:
-                await asyncio.wait_for(
-                    asyncio.Event().wait(), timeout=self._interval
-                )
+                await asyncio.wait_for(asyncio.Event().wait(), timeout=self._interval)
             except TimeoutError:
                 continue
 
@@ -261,7 +261,9 @@ class GossipSync:
                 logger.warning("on_push callback failed", exc_info=True)
         return pushed
 
-    def apply_delta(self, agents: list[dict], source_node_id: str = "", vclock: int = 0) -> int:
+    def apply_delta(
+        self, agents: list[dict], source_node_id: str = "", vclock: int = 0
+    ) -> int:
         """Merge a peer delta and advance the local logical clock."""
         self._vclock = max(self._vclock, vclock) + 1
         merged = 0
@@ -338,7 +340,9 @@ class GossipSync:
             "vclock": self._vclock,
             "running": self._running,
             "peers": [p.to_dict() for p in self._peers.values()],
-            "last_sync": self._last_sync_result.to_dict() if self._last_sync_result else None,
+            "last_sync": self._last_sync_result.to_dict()
+            if self._last_sync_result
+            else None,
         }
 
 

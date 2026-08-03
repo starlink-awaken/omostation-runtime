@@ -44,7 +44,7 @@ def register_cron_job(expr: str, callback: Callable) -> Callable:
     # 空/非法 expr: bus_foundation parse_schedule 可能抛 ValueError,
     # register_cron_job 不应抛 (test_empty_expr: bus_foundation 决定是否拒绝)
     try:
-        bus_control.schedule_callback(expr)(_wrapper)
+        bus_control.schedule_callback(expr)(_wrapper)  # type: ignore[reportOptionalCall]
     except Exception as exc:  # noqa: BLE001
         logger.debug("runtime_cron_register_skipped expr=%r: %s", expr, exc)
 
@@ -56,7 +56,7 @@ def register_board_service() -> None:
     try:
         from .board_engine import dispatch_board_command
 
-        bus_control.register_handler("bos.board.execute", dispatch_board_command)
+        bus_control.register_handler("bos.board.execute", dispatch_board_command)  # type: ignore[reportAttributeAccessIssue]
         logger.info("Registered B.D.S.K. Board handler for 'bos.board.execute'")
     except Exception as exc:  # noqa: BLE001
         logger.debug("runtime_board_register_skipped: %s", exc)

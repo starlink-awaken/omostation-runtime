@@ -50,8 +50,12 @@ def _runtime_required_capabilities(tools: list[dict] | None = None) -> list[str]
 def _resolve_llm_provider_and_model(
     requested_model: str | None, tools: list[dict] | None = None
 ) -> tuple[Any | None, str | None, dict[str, Any]]:
-    from llm_gateway._legacy.detection import detect_backends
-    from llm_gateway._legacy.registry_data_loader import route_role_request
+    from llm_gateway._legacy.detection import (  # type: ignore[reportMissingImports]
+        detect_backends,  # type: ignore[reportMissingImports]
+    )
+    from llm_gateway._legacy.registry_data_loader import (  # type: ignore[reportMissingImports]
+        route_role_request,  # type: ignore[reportMissingImports]
+    )
 
     providers = [
         provider
@@ -113,7 +117,7 @@ def _resolve_llm_provider_and_model(
 
 def _estimate_tokens(text: str) -> int:
     try:
-        import tiktoken
+        import tiktoken  # type: ignore[reportMissingImports]
 
         enc = tiktoken.get_encoding("cl100k_base")
         return len(enc.encode(text))
@@ -258,8 +262,13 @@ class AgentRuntime:
         """调用 LLM API。使用 llm_gateway 统一网关。"""
         import asyncio
 
-        from llm_gateway._legacy.audit import record_llm_audit
-        from llm_gateway._legacy.provider import LLMRequest, ToolSchema
+        from llm_gateway._legacy.audit import (  # type: ignore[reportMissingImports]
+            record_llm_audit,  # type: ignore[reportMissingImports]
+        )
+        from llm_gateway._legacy.provider import (  # type: ignore[reportMissingImports]
+            LLMRequest,
+            ToolSchema,
+        )
 
         provider, requested_model, route_info = _resolve_llm_provider_and_model(
             self.model, tools=tools
@@ -339,7 +348,9 @@ class AgentRuntime:
             task_id = str((request_context or {}).get("task_id") or "runtime-task")
             total_cost_usd = 0.0
             try:
-                from llm_gateway.registry_data_loader import estimate_model_cost
+                from llm_gateway.registry_data_loader import (  # type: ignore[reportMissingImports]
+                    estimate_model_cost,  # type: ignore[reportMissingImports]
+                )
 
                 total_cost_usd = estimate_model_cost(
                     model_id,
@@ -550,7 +561,12 @@ class AgentRuntime:
             run_id = grant.get("workflow_run_id")
         if event_sink is not None and not run_id:
             run_id = f"runtime-{uuid4().hex[:12]}"
-        run_trace_id = trace_id or (context or {}).get("trace_id") or os.environ.get("TRACE_ID") or run_id
+        run_trace_id = (
+            trace_id
+            or (context or {}).get("trace_id")
+            or os.environ.get("TRACE_ID")
+            or run_id
+        )
         base_step_run_id = f"{run_id}:runtime" if run_id else None
         if run_id is not None:
             try:
@@ -567,7 +583,7 @@ class AgentRuntime:
                     "result": "",
                 }
         checkpoint = (
-            checkpoint_store.latest(run_id, base_step_run_id)
+            checkpoint_store.latest(run_id, base_step_run_id)  # type: ignore[reportArgumentType]
             if checkpoint_store is not None and run_id and resume
             else None
         )
@@ -576,9 +592,7 @@ class AgentRuntime:
             cached["resumed"] = True
             return cached
         attempt = int(checkpoint.get("attempt", 0)) + 1 if checkpoint else 1
-        step_run_id = (
-            f"{base_step_run_id}:{attempt}" if base_step_run_id else None
-        )
+        step_run_id = f"{base_step_run_id}:{attempt}" if base_step_run_id else None
         admission_id = grant.get("admission_id") if isinstance(grant, dict) else None
         durable_effects = effect_store
         if durable_effects is None and isinstance(context, dict):
@@ -622,7 +636,10 @@ class AgentRuntime:
             elif not checkpoint:
                 emit(
                     "WorkflowRequested",
-                    {"workflow": "runtime.agent_task", "task_id": (context or {}).get("task_id")},
+                    {
+                        "workflow": "runtime.agent_task",
+                        "task_id": (context or {}).get("task_id"),
+                    },
                     idempotency_key=f"{run_id}:requested",
                 )
                 emit(
@@ -631,28 +648,28 @@ class AgentRuntime:
                         "workflow": "runtime.agent_task",
                         "backend": "runtime",
                         "admission": grant,
-                        **grant,
+                        **grant,  # type: ignore[reportGeneralTypeIssues]
                     },
                     idempotency_key=f"{run_id}:admitted",
                 )
             emit(
                 "StepDispatched",
-                    {
-                        "step_run_id": step_run_id,
-                        "step_name": "runtime.agent_task",
-                        "attempt": attempt,
-                        "admission_id": grant["admission_id"],
-                    },
+                {
+                    "step_run_id": step_run_id,
+                    "step_name": "runtime.agent_task",
+                    "attempt": attempt,
+                    "admission_id": grant["admission_id"],  # type: ignore[reportOptionalSubscript]
+                },
                 idempotency_key=f"{step_run_id}:dispatched",
             )
             emit(
                 "StepStarted",
-                    {
-                        "step_run_id": step_run_id,
-                        "step_name": "runtime.agent_task",
-                        "attempt": attempt,
-                        "admission_id": grant["admission_id"],
-                    },
+                {
+                    "step_run_id": step_run_id,
+                    "step_name": "runtime.agent_task",
+                    "attempt": attempt,
+                    "admission_id": grant["admission_id"],  # type: ignore[reportOptionalSubscript]
+                },
                 idempotency_key=f"{step_run_id}:started",
             )
 
@@ -695,9 +712,7 @@ class AgentRuntime:
         tools = schemas if schemas else None
 
         max_turns = 30
-        retry_max_attempts = max(
-            1, int((retry_policy or {}).get("max_attempts", 1))
-        )
+        retry_max_attempts = max(1, int((retry_policy or {}).get("max_attempts", 1)))
         retry_backoff_seconds = max(
             0.0, float((retry_policy or {}).get("backoff_seconds", 0.0))
         )

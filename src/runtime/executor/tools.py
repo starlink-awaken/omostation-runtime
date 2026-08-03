@@ -96,14 +96,14 @@ def _direct_mcp_call(server: str, tool_name: str, args: dict) -> dict:
         return {"error": f"Unknown MCP server (direct): {server}"}
 
     payload = json.dumps({"name": tool_name, "arguments": args}).encode()
-    req = urllib.request.Request(  # noqa: S310
+    req = urllib.request.Request(
         f"{base}/tools/call",
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read())
         result = data.get("result", {})
         content = result.get("content", [])
@@ -133,7 +133,7 @@ def _is_safe_url(url: str) -> bool:
         return False
 
     # 禁止 localhost / 0.0.0.0
-    if hostname in ("localhost", "0.0.0.0", "127.0.0.1", "127.1", "::1"):  # noqa: S104
+    if hostname in ("localhost", "0.0.0.0", "127.0.0.1", "127.1", "::1"):
         log.warning(f"  ⛔ SSRF blocked: localhost URL {url}")
         return False
 
@@ -150,7 +150,7 @@ def _is_safe_url(url: str) -> bool:
             return False
     except ValueError:
         # 不是 IP 地址（域名），放行
-        pass  # noqa: S110, BLE001, S112  # defensive fallback
+        pass  # defensive fallback
 
     return True
 
@@ -190,7 +190,9 @@ class Tools:
                 capture_output=True,
                 text=True,
                 cwd=cwd or str(ECOS_DIR),
-                timeout=timeout, check=False)
+                timeout=timeout,
+                check=False,
+            )
             return {
                 "exit_code": r.returncode,
                 "stdout": r.stdout[:5000],
@@ -280,14 +282,14 @@ class Tools:
                 "arguments": args or {},
             }
         ).encode()
-        req = urllib.request.Request(  # noqa: S310
+        req = urllib.request.Request(
             f"{base}/tools/call",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read())
             result = data.get("result", {})
             content = result.get("content", [])
@@ -309,7 +311,7 @@ class Tools:
         import urllib.request
 
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(url, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8")[:5000]
                 return {"status": resp.status, "body": body}
         except Exception as e:  # noqa: BLE001  # defensive fallback
@@ -322,13 +324,13 @@ class Tools:
             return {"error": f"URL rejected: {url} (blocked by SSRF protection)"}
         payload = json.dumps(data or {}).encode()
         try:
-            req = urllib.request.Request(  # noqa: S310
+            req = urllib.request.Request(
                 url,
                 data=payload,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8")[:5000]
                 return {"status": resp.status, "body": body}
         except Exception as e:  # noqa: BLE001  # defensive fallback
@@ -351,13 +353,13 @@ class Tools:
             }
         ).encode()
         try:
-            req = urllib.request.Request(  # noqa: S310
+            req = urllib.request.Request(
                 ILINK_SEND_URL,
                 data=payload,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 body = resp.read().decode()[:500]
             return {"status": resp.status, "body": body}
         except Exception as e:  # noqa: BLE001  # defensive fallback

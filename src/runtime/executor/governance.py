@@ -137,7 +137,7 @@ class GovernanceCoordinator:
         self._strategy = self._config.strategy
 
         for agent in self._config.agents:
-            self._agents[agent.id] = GovernanceAgent(**{**agent.__dict__})
+            self._agents[agent.id] = GovernanceAgent(**agent.__dict__)
 
     # -- Agent management ----------------------------------------------------
 

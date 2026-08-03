@@ -26,8 +26,8 @@ def test_cron_emit_uses_bus_foundation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A successful cron run should emit runtime:cron:fired on the bus."""
-    from bus_foundation.backends.eventbus import EventBusBackend
     from bus_foundation import _backends
+    from bus_foundation.backends.eventbus import EventBusBackend
 
     be = EventBusBackend()
     received: list = []
@@ -53,10 +53,9 @@ def test_cron_emit_uses_bus_foundation(
 
 def test_cron_emit_failed_status() -> None:
     """A failed run should emit runtime:cron:failed."""
-    from runtime.cron_service.scheduler import _bus_emit_cron_fired
-
     # Patch bus_event directly
     from bus_foundation.facade import event as bus_event
+    from runtime.cron_service.scheduler import _bus_emit_cron_fired
 
     captured: list = []
     original_publish = bus_event.publish

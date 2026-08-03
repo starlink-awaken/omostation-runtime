@@ -6,7 +6,6 @@ from typing import Literal
 
 import yaml
 
-
 ProtocolCategory = Literal[
     "agent-communication",
     "model-access",
@@ -103,10 +102,10 @@ def active_protocols() -> list[ProtocolEntry]:
 # ── Protocol dispatch registry ──────────────────────────────────────────────
 # Per-protocol handlers are registered here. Each handler receives a
 # validated message dict and returns a (success: bool, result: dict) tuple.
-_PROTOCOL_HANDLERS: dict[str, callable] = {}
+_PROTOCOL_HANDLERS: dict[str, callable] = {}  # type: ignore[reportGeneralTypeIssues]
 
 
-def register_protocol_handler(protocol_name: str, handler: callable) -> None:
+def register_protocol_handler(protocol_name: str, handler: callable) -> None:  # type: ignore[reportGeneralTypeIssues]
     """Register a runtime handler for a protocol.
 
     Example:

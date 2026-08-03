@@ -9,11 +9,12 @@ Usage:
 """
 
 from __future__ import annotations
+
 import json
 import sys
 from typing import Any
 
-from .i0 import i0_status, i0_services, i0_events, i0_protocols, i0_graph
+from .i0 import i0_events, i0_graph, i0_protocols, i0_services, i0_status
 
 
 def _json_dumps(data: Any) -> str:

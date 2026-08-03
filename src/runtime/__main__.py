@@ -12,7 +12,7 @@ P61-W1: re-export _call_action + serve from runtime_serve (供跨仓 import).
 import sys
 
 # P61-W1: re-export 跨仓 import (清账 DEBT-RUNTIME-MAIN-CALL-ACTION-2026-06-08)
-from runtime.runtime_serve import _call_action, serve  # noqa: F401  # re-export
+from runtime.runtime_serve import _call_action, serve  # re-export
 
 
 def main() -> int:
@@ -27,4 +27,4 @@ if __name__ == "__main__":
     sys.exit(main())
 
 
-__all__ = ["main", "_call_action", "serve"]
+__all__ = ["_call_action", "main", "serve"]

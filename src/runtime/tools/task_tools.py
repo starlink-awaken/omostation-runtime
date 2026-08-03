@@ -1,5 +1,6 @@
-from .shared import PROJECT_HOME, _STATS, _summarize_executor_costs
 import json
+
+from .shared import _STATS, PROJECT_HOME, _summarize_executor_costs
 
 
 def _runtime_stats() -> str:
@@ -63,7 +64,7 @@ def _runtime_stats() -> str:
 
 
 def _taskobject_submit(payload: dict) -> str:
-    from runtime.taskobject_adapter import _validate_taskobject, _utc_now
+    from runtime.taskobject_adapter import _utc_now, _validate_taskobject
     from runtime.tools import TOOL_MAP
 
     error = _validate_taskobject(payload)

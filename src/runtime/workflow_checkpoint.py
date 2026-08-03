@@ -38,7 +38,8 @@ class WorkflowCheckpointStore:
     ) -> dict[str, Any]:
         """Persist one resumable boundary and return the durable record."""
         record = {
-            "checkpoint_id": checkpoint_id or f"{workflow_run_id}:{step_run_id}:{next_turn}",
+            "checkpoint_id": checkpoint_id
+            or f"{workflow_run_id}:{step_run_id}:{next_turn}",
             "workflow_run_id": workflow_run_id,
             "step_run_id": step_run_id,
             "attempt": attempt,

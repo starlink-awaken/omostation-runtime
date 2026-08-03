@@ -217,6 +217,7 @@ def _bus_emit_cron_fired(
 
 def _run_job_sync(job_id: str) -> None:
     from pathlib import Path
+
     from .config import SCRIPTS_DIR
     from .db import get_job, record_run
 
@@ -241,11 +242,8 @@ def _run_job_sync(job_id: str) -> None:
 
     try:
         result = subprocess.run(
-            script,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=120, check=False)
+            script, shell=True, capture_output=True, text=True, timeout=120, check=False
+        )
         status = "ok" if result.returncode == 0 else "error"
         record_run(job_id, status, result.stdout or "", result.stderr or "")
         _bus_emit_cron_fired(

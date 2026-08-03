@@ -13,7 +13,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from runtime.kei_sandbox import (
     _load_kei_rules,
     record_audit,

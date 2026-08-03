@@ -15,7 +15,7 @@ class ZTimestampModel(BaseModel):
     """
 
     @model_validator(mode="after")
-    def _check_z_timestamp(self) -> "ZTimestampModel":
+    def _check_z_timestamp(self) -> ZTimestampModel:
         for field_name in ("ts", "timestamp", "recorded_at"):
             v = getattr(self, field_name, None)
             if v and not v.endswith("Z"):

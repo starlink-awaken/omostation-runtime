@@ -45,6 +45,7 @@ class FallbackResult(str, Enum):
 @dataclass
 class TaskFallbackEvent:
     """Record of a fallback action."""
+
     task_id: str
     task_name: str
     result: FallbackResult
@@ -118,7 +119,10 @@ class TaskFallbackManager:
             delay = self._backoff_delay(attempt - 1)
             logger.info(
                 "TaskFallback: task %s (attempt %d/%d) — retrying in %.1fs",
-                request.task_id, attempt, self._max_retries + 1, delay,
+                request.task_id,
+                attempt,
+                self._max_retries + 1,
+                delay,
             )
             await asyncio.sleep(delay)
 
@@ -149,7 +153,9 @@ class TaskFallbackManager:
         self._events.append(event)
         logger.warning(
             "TaskFallback: task %s escalated after %d attempts (%.0fms)",
-            request.task_id, event.attempts, elapsed,
+            request.task_id,
+            event.attempts,
+            elapsed,
         )
         return event
 
@@ -184,7 +190,9 @@ class TaskFallbackManager:
 
     def get_status(self) -> dict:
         total = len(self._events)
-        dispatched = sum(1 for e in self._events if e.result == FallbackResult.DISPATCHED)
+        dispatched = sum(
+            1 for e in self._events if e.result == FallbackResult.DISPATCHED
+        )
         escalated = sum(1 for e in self._events if e.result == FallbackResult.ESCALATED)
         return {
             "total_events": total,

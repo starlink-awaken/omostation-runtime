@@ -17,4 +17,3 @@ __all__ = [
     "PersonaRouter",
     "dispatch_board_command",
 ]
-

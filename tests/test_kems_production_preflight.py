@@ -173,8 +173,8 @@ def test_preflight_blocks_without_external_gates(tmp_path, monkeypatch):
     assert all(
         "private source" not in json.dumps(result, ensure_ascii=False) for _ in [0]
     )
-    assert result["source_scope"]["scope_id"] == "kems.private-source-review.v1"
-    assert result["source_scope"]["excluded_auto_sources"] == [
+    assert result["source_scope"]["scope_id"] == "kems.private-source-review.v1"  # type: ignore[reportIndexIssue]
+    assert result["source_scope"]["excluded_auto_sources"] == [  # type: ignore[reportIndexIssue]
         {"name": "2026-auto-browser-history.md", "reason": "outside_controlled_scope"}
     ]
 
@@ -217,7 +217,8 @@ def test_preflight_blocks_without_model_shadow_acceptance(tmp_path, monkeypatch)
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "model_acceptance" and not item["ok"] for item in result["checks"]
+        item["id"] == "model_acceptance" and not item["ok"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -247,7 +248,7 @@ def test_preflight_blocks_model_acceptance_bound_to_other_manifest(
         item["id"] == "model_acceptance"
         and not item["ok"]
         and "different manifest" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -307,7 +308,7 @@ def test_preflight_requires_persistence_recovery_for_production(tmp_path, monkey
         item["id"] == "persistence_recovery"
         and not item["ok"]
         and "evidence path" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -337,7 +338,7 @@ def test_preflight_rejects_unmatched_restored_graph_snapshot(tmp_path, monkeypat
         item["id"] == "persistence_recovery"
         and not item["ok"]
         and "snapshot" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -363,7 +364,7 @@ def test_preflight_requires_persisted_adjudication_for_production(
         item["id"] == "adjudication_persistence"
         and not item["ok"]
         and "database path" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -390,7 +391,7 @@ def test_production_preflight_rejects_manifest_source_drift(tmp_path, monkeypatc
         item["id"] == "evaluation_manifest"
         and not item["ok"]
         and "current source inventory" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -419,7 +420,7 @@ def test_production_preflight_rejects_manifest_source_not_in_inventory(
         item["id"] == "evaluation_manifest"
         and not item["ok"]
         and "not present" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -445,7 +446,7 @@ def test_preflight_rejects_raw_evaluation_fields(tmp_path, monkeypatch):
     assert result["status"] == "blocked"
     assert any(
         item["id"] == "evaluation_manifest" and not item["ok"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -473,7 +474,7 @@ def test_preflight_blocks_on_invalid_omo_yaml(tmp_path, monkeypatch):
         item["id"] == "omo_approval"
         and not item["ok"]
         and "invalid OMO task metadata" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -503,7 +504,7 @@ def test_preflight_rejects_ungranted_omo_promotion(tmp_path, monkeypatch):
         item["id"] == "omo_approval"
         and not item["ok"]
         and "ungranted" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -532,7 +533,7 @@ def test_preflight_rejects_omo_task_that_is_only_active(tmp_path, monkeypatch):
         item["id"] == "omo_approval"
         and not item["ok"]
         and "not approved" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
@@ -560,5 +561,5 @@ def test_preflight_rejects_incomplete_manifest_identity(tmp_path, monkeypatch):
         item["id"] == "evaluation_manifest"
         and not item["ok"]
         and "dataset_version" in item["detail"]
-        for item in result["checks"]
+        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
     )

@@ -8,9 +8,10 @@ network requests, and sub-process execution, and writes audit records to a JSONL
 import json
 import os
 import sys
-import yaml
 from datetime import datetime, timezone
 from pathlib import Path
+
+import yaml
 
 
 def _load_kei_rules(config_path: str = "kei.yaml", role: str = "default") -> dict:

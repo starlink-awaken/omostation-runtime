@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/Users/xiamingxing/Workspace/projects/runtime/packages/reach/src")
 
-from reach_gateway import ReachGateway, ReachPayload, ScenarioLevel
+from reach_gateway import ReachGateway, ReachPayload, ScenarioLevel  # type: ignore[reportMissingImports]
 
 
 def main() -> int:

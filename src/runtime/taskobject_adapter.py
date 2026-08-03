@@ -5,6 +5,7 @@ L3 Entry Bridge: the canonical task dispatch pipeline.
 """
 
 from __future__ import annotations
+
 import json
 import subprocess
 import sys
@@ -59,7 +60,9 @@ def _mcp_call(tool_name: str, arguments: dict) -> dict:
         input=json.dumps(request),
         capture_output=True,
         text=True,
-        timeout=30, check=False)
+        timeout=30,
+        check=False,
+    )
     if result.returncode != 0 or not result.stdout.strip():
         return {
             "status": "error",

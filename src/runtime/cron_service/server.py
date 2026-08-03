@@ -21,7 +21,7 @@ from fastmcp import FastMCP
 
 from . import config as svc_config
 from . import db, mcp_server, scheduler
-from .health_scan import run_scan_if_due, should_scan, HEALTH_SCAN_INTERVAL
+from .health_scan import HEALTH_SCAN_INTERVAL, run_scan_if_due, should_scan
 from .models import JobCreate
 
 # ── Logging ────────────────────────────────────────────────────────
@@ -99,8 +99,8 @@ async def health():
             broken = sum(
                 1 for f in hermes_scripts.iterdir() if f.is_symlink() and not f.exists()
             )
-        except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-            pass  # noqa: S110, BLE001, S112  # defensive fallback
+        except Exception:  # noqa: BLE001, S110  # defensive fallback
+            pass  # defensive fallback
 
     # Count job errors
     all_jobs = db.list_jobs()
@@ -117,8 +117,8 @@ async def health():
             health_scan_mtime = datetime.fromtimestamp(
                 system_health_path.stat().st_mtime, UTC
             ).isoformat()
-        except Exception:  # noqa: BLE001, S110, S112  # defensive fallback
-            pass  # noqa: S110, BLE001, S112  # defensive fallback
+        except Exception:  # noqa: BLE001, S110  # defensive fallback
+            pass  # defensive fallback
 
     return {
         "status": "ok",
@@ -258,7 +258,7 @@ def _start_sched_in_thread():
     """Run scheduler in a new event loop on a background thread."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(sched.start())
+    loop.run_until_complete(sched.start())  # type: ignore[reportArgumentType]
     loop.run_forever()
 
 

@@ -50,4 +50,4 @@ def run_stdio_dispatch(
     return 0
 
 
-__all__ = ["run_stdio_dispatch", "DispatchFn"]
+__all__ = ["DispatchFn", "run_stdio_dispatch"]
