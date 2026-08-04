@@ -535,27 +535,27 @@ class TestDeliverOrigin:
     """deliver(target='origin'): WeChat iLink delivery"""
 
     def test_no_home_channel_returns_error(self, tmp_path):
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
-            with patch.dict(os.environ, {}, clear=True):
-                err = delivery.deliver(
-                    "test-job", "content", target="origin", job_id="j1"
-                )
-                assert err is not None
-                assert "home channel" in err.lower()
+        with (
+            patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path),
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            err = delivery.deliver("test-job", "content", target="origin", job_id="j1")
+            assert err is not None
+            assert "home channel" in err.lower()
 
     def test_no_credentials_returns_error(self, tmp_path):
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
-            with patch.dict(os.environ, {"WEIXIN_HOME_CHANNEL": "chan1"}, clear=True):
-                err = delivery.deliver(
-                    "test-job", "content", target="origin", job_id="j1"
-                )
-                assert err is not None
-                assert "credential" in err.lower()
+        with (
+            patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path),
+            patch.dict(os.environ, {"WEIXIN_HOME_CHANNEL": "chan1"}, clear=True),
+        ):
+            err = delivery.deliver("test-job", "content", target="origin", job_id="j1")
+            assert err is not None
+            assert "credential" in err.lower()
 
     def test_successful_weixin_send(self, tmp_path):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"errcode": 0}
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117  (multi-line context managers read better nested)
             with patch.dict(
                 os.environ,
                 {
@@ -577,7 +577,7 @@ class TestDeliverOrigin:
     def test_weixin_errcode_nonzero(self, tmp_path):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"errcode": 1001, "errmsg": "rate limited"}
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117  (multi-line context managers read better nested)
             with patch.dict(
                 os.environ,
                 {
@@ -595,7 +595,7 @@ class TestDeliverOrigin:
                     assert "errcode=1001" in err
 
     def test_weixin_timeout(self, tmp_path):
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117  (multi-line context managers read better nested)
             with patch.dict(
                 os.environ,
                 {
@@ -862,96 +862,112 @@ class TestServerEndpoints:
     def test_health_endpoint(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.list_jobs", return_value=[]):
-                with TestClient(app) as client:
-                    resp = client.get("/health")
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["status"] == "ok"
-                    assert data["scheduler_running"] is True
-                    assert data["ticks"] == 42
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.list_jobs", return_value=[]),
+            TestClient(app) as client,
+        ):
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "ok"
+            assert data["scheduler_running"] is True
+            assert data["ticks"] == 42
 
     def test_list_jobs_empty(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.list_jobs", return_value=[]):
-                with TestClient(app) as client:
-                    resp = client.get("/jobs")
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["total"] == 0
-                    assert data["jobs"] == []
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.list_jobs", return_value=[]),
+            TestClient(app) as client,
+        ):
+            resp = client.get("/jobs")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["total"] == 0
+            assert data["jobs"] == []
 
     def test_list_jobs_with_data(self):
         from runtime.cron_service.server import app
 
         job = _make_job()
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.list_jobs", return_value=[job]):
-                with TestClient(app) as client:
-                    resp = client.get("/jobs")
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["total"] == 1
-                    assert data["jobs"][0]["name"] == "test-job"
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.list_jobs", return_value=[job]),
+            TestClient(app) as client,
+        ):
+            resp = client.get("/jobs")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["total"] == 1
+            assert data["jobs"][0]["name"] == "test-job"
 
     def test_get_job_found(self):
         from runtime.cron_service.server import app
 
         job = _make_job()
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.get_job", return_value=job):
-                with TestClient(app) as client:
-                    resp = client.get(f"/jobs/{job.id}")
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["name"] == "test-job"
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.get_job", return_value=job),
+            TestClient(app) as client,
+        ):
+            resp = client.get(f"/jobs/{job.id}")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["name"] == "test-job"
 
     def test_get_job_not_found(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.get_job", return_value=None):
-                with TestClient(app) as client:
-                    resp = client.get("/jobs/nonexistent")
-                    assert resp.status_code == 404
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.get_job", return_value=None),
+            TestClient(app) as client,
+        ):
+            resp = client.get("/jobs/nonexistent")
+            assert resp.status_code == 404
 
     def test_create_job(self):
         from runtime.cron_service.server import app
 
         job = _make_job()
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.create_job", return_value=job):
-                with TestClient(app) as client:
-                    resp = client.post(
-                        "/jobs", json={"name": "test-job", "schedule": "every 5m"}
-                    )
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["success"] is True
-                    assert data["job_id"] == job.id
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.create_job", return_value=job),
+            TestClient(app) as client,
+        ):
+            resp = client.post(
+                "/jobs", json={"name": "test-job", "schedule": "every 5m"}
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["success"] is True
+            assert data["job_id"] == job.id
 
     def test_delete_job(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.delete_job", return_value=True):
-                with TestClient(app) as client:
-                    resp = client.delete("/jobs/test-id")
-                    assert resp.status_code == 200
-                    assert resp.json()["success"] is True
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.delete_job", return_value=True),
+            TestClient(app) as client,
+        ):
+            resp = client.delete("/jobs/test-id")
+            assert resp.status_code == 200
+            assert resp.json()["success"] is True
 
     def test_delete_job_not_found(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
-            with patch("runtime.cron_service.server.db.delete_job", return_value=False):
-                with TestClient(app) as client:
-                    resp = client.delete("/jobs/nonexistent")
-                    assert resp.status_code == 200
-                    assert resp.json()["success"] is False
+        with (
+            patch("runtime.cron_service.server.sched", _MockCronScheduler()),
+            patch("runtime.cron_service.server.db.delete_job", return_value=False),
+            TestClient(app) as client,
+        ):
+            resp = client.delete("/jobs/nonexistent")
+            assert resp.status_code == 200
+            assert resp.json()["success"] is False
 
 
 class TestServerMain:
@@ -960,23 +976,29 @@ class TestServerMain:
     def test_init_db(self):
         from runtime.cron_service.server import main
 
-        with patch("sys.argv", ["cron-service", "--init-db"]):
-            with patch("runtime.cron_service.server.db.init_db") as mock_init:
-                main()
-                mock_init.assert_called_once()
+        with (
+            patch("sys.argv", ["cron-service", "--init-db"]),
+            patch("runtime.cron_service.server.db.init_db") as mock_init,
+        ):
+            main()
+            mock_init.assert_called_once()
 
     def test_mcp_mode(self):
         from runtime.cron_service.server import main
 
-        with patch("sys.argv", ["cron-service"]):
-            with patch("runtime.cron_service.server.run_mcp") as mock_run:
-                main()
-                mock_run.assert_called_once()
+        with (
+            patch("sys.argv", ["cron-service"]),
+            patch("runtime.cron_service.server.run_mcp") as mock_run,
+        ):
+            main()
+            mock_run.assert_called_once()
 
     def test_http_mode(self):
         from runtime.cron_service.server import main
 
-        with patch("sys.argv", ["cron-service", "--http"]):
-            with patch("runtime.cron_service.server.run_http") as mock_run:
-                main()
-                mock_run.assert_called_once()
+        with (
+            patch("sys.argv", ["cron-service", "--http"]),
+            patch("runtime.cron_service.server.run_http") as mock_run,
+        ):
+            main()
+            mock_run.assert_called_once()

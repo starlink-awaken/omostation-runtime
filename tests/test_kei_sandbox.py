@@ -136,7 +136,7 @@ finally:
         import subprocess
         import sys
 
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: PLW1510  (test asserts on stdout)
             [sys.executable, "-c", code],
             capture_output=True,
             text=True,

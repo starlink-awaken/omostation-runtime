@@ -221,8 +221,8 @@ def main():
         except requests.exceptions.RequestException as e:
             logger.error(f"Connection error to Agora stream: {e}")
             time.sleep(5)
-        except Exception as e:  # defensive fallback
-            logger.exception(f"Unexpected error in loop: {e}")
+        except Exception:  # defensive fallback
+            logger.exception("Unexpected error in loop")
             time.sleep(5)
 
 

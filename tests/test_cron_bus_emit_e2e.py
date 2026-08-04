@@ -76,7 +76,7 @@ def test_cron_emit_failed_status() -> None:
         bus_event.publish = original_publish  # type: ignore[assignment]
 
     assert len(captured) == 1
-    args, kwargs = captured[0]
+    _, kwargs = captured[0]
     assert kwargs["topic"] == "runtime:cron:failed"
     assert kwargs["payload"]["status"] == "error"
 

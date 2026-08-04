@@ -36,9 +36,7 @@ def _daemon_is_online(service: dict[str, Any]) -> bool:
         return True
     if hc.startswith("healthy") or hc in {"idle", "ok", "up"}:
         return True
-    if service.get("port_listening") is True:
-        return True
-    return False
+    return service.get("port_listening") is True
 
 
 def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -74,7 +72,7 @@ def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]
         "online_services": online,
         "total_services": total,
         "ratio": round(ratio, 4),
-        "health_score": max(0, int(round(ratio * 100))),
+        "health_score": max(0, round(ratio * 100)),
         "last_scan": str(snapshot.get("last_scan", "")),
         "service_count": len(services),
         "degraded": [

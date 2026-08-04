@@ -283,12 +283,16 @@ class MatrixScheduler:
                     and svc.launchd_config
                 ):
                     exit_code = rt_status.get("exit_code")
-                    if exit_code in ("78", "19968", 78, 19968):
-                        if self._repair_launchd_service(
-                            svc.launchd_label, svc.launchd_config
-                        ):
-                            rt_status = self._check_launchd(svc.launchd_label)
-                            result["runtime"] = rt_status
+                    if exit_code in (
+                        "78",
+                        "19968",
+                        78,
+                        19968,
+                    ) and self._repair_launchd_service(
+                        svc.launchd_label, svc.launchd_config
+                    ):
+                        rt_status = self._check_launchd(svc.launchd_label)
+                        result["runtime"] = rt_status
                 if rt_status.get("status") in ("failed", "error"):
                     # B 治本 (self-heal 死循环防护): 确定性故障 (ImportError/配置错) 重启不可能
                     # 修复, launchctl stop/start 会无限重试. 服务持续未 healthy 超 30 分钟 →
@@ -378,11 +382,13 @@ class MatrixScheduler:
                     )
                 # stdio-only daemon (无 port 无 health_url): 日志新鲜度交叉校验真活,
                 # 揭穿 launcher 僵尸 (uv 保活但子服务死, 无 heartbeat). 仅当配了 log_path 才生效.
-                if not svc.port and not svc.health_url and svc.log_path:
-                    if not self._check_log_freshness(svc.log_path):
-                        _degrade_reasons.append(
-                            f"log {svc.log_path} stale (no heartbeat)"
-                        )
+                if (
+                    not svc.port
+                    and not svc.health_url
+                    and svc.log_path
+                    and not self._check_log_freshness(svc.log_path)
+                ):
+                    _degrade_reasons.append(f"log {svc.log_path} stale (no heartbeat)")
                 if _degrade_reasons:
                     result["runtime"]["status"] = "degraded"
                     result["runtime"]["degraded_reason"] = "; ".join(_degrade_reasons)

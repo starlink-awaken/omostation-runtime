@@ -60,7 +60,7 @@ def _output_path(job_name: str) -> Path:
 
 
 def _timestamp() -> str:
-    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
 
 
 def _random_wechat_uin() -> str:

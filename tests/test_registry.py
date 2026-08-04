@@ -170,7 +170,6 @@ class TestRegistryServer:
             },
         )
         assert r.status_code == 201
-        agent_id = r.json()["agent_id"]
         r = client.get("/agents/find", params={"capability": "code-generation"})
         assert r.status_code == 200
         assert len(r.json()) == 1
