@@ -221,7 +221,8 @@ class TestRegistryServer:
             "/tasks", json={"name": "t1", "required_capabilities": ["code"]}
         )
         assert r.status_code == 201
-        assert r.json()["status"] == "pending"
+        assert r.json()["status"] == "escalated"
+        assert r.json()["attempts"] == 4
 
     def test_sync_delta_merges_remote_agent(self, client):
         remote = AgentInfo(
@@ -280,7 +281,9 @@ class TestRegistryServer:
         task = client.post(
             "/tasks", json={"name": "t1", "required_capabilities": ["code"]}
         ).json()
-        assert task["agent_id"] == failed["agent_id"]
+        assignment = client.get("/tasks").json()[0]
+        assert task["status"] == "dispatched"
+        assert assignment["agent_id"] == failed["agent_id"]
 
         r = client.post("/failover/node-failed")
         assert r.status_code == 200
