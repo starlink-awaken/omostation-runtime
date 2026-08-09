@@ -1044,7 +1044,7 @@ def _get_env(key: str, default: str = "") -> str:
 
 def _resolve_api_key() -> str:
     """Resolve API key using the historical precedence order."""
-    for key in ("AGENT_RUNTIME_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
+    for key in ("AETHERFORGE_URL", "AGENT_RUNTIME_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
         value = _get_env(key).strip()
         if value:
             return value
