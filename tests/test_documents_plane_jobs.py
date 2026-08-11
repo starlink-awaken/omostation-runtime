@@ -66,7 +66,13 @@ def test_dry_run_has_no_process_or_state_side_effects(tmp_path: Path) -> None:
     assert not state_root.exists()
 
 
-def test_run_job_writes_metadata_only_evidence_under_state_root(tmp_path: Path) -> None:
+def test_run_job_writes_metadata_only_evidence_under_state_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _state_root: command,
+    )
     registry = JobRegistry()
     registry.register(_spec(), [sys.executable, "-c", "print('owner output')"])
     documents_root = tmp_path / "Documents"

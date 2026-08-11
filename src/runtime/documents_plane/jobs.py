@@ -178,7 +178,12 @@ def run_job(
     evidence_path = _validate_job_paths(
         spec, documents_root=documents, state_root=ensured_state
     )
-    command_result: CommandResult = run_owner_command(command, timeout=spec.timeout)
+    command_result: CommandResult = run_owner_command(
+        command,
+        timeout=spec.timeout,
+        state_root=ensured_state,
+        documents_root=documents,
+    )
     result = JobResult(
         job_id=spec.job_id,
         owner=spec.owner,
