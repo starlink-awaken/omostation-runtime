@@ -11,6 +11,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .paths import require_disjoint_roots
+
 _ISOLATION_UNAVAILABLE_EXIT = 125
 
 
@@ -40,14 +42,6 @@ def _text(value: str | bytes | None) -> str:
     if value is None:
         return ""
     return value.decode(errors="replace") if isinstance(value, bytes) else value
-
-
-def _is_within(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return True
 
 
 def _sbpl_quote(path: Path) -> str:
@@ -140,17 +134,12 @@ def run_owner_command(
     command = normalize_argv(argv)
     if timeout <= 0:
         raise ValueError("owner command timeout must be positive")
-    state = Path(state_root).expanduser().resolve()
-    documents = (
-        Path(documents_root).expanduser().resolve()
-        if documents_root is not None
-        else (Path.home() / "Documents").resolve()
+    state, documents = require_disjoint_roots(
+        state_root,
+        documents_root if documents_root is not None else Path.home() / "Documents",
     )
-    if _is_within(state, documents):
-        raise ValueError(
-            "OMOSTATION_RUNTIME_STATE_ROOT must not be inside DOCUMENTS_CONTENT_ROOT"
-        )
     state.mkdir(parents=True, exist_ok=True)
+    state, documents = require_disjoint_roots(state, documents)
     sandboxed_argv = _sandbox_argv(command, state)
     if sandboxed_argv is None:
         return CommandResult(

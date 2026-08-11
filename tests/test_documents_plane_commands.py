@@ -76,6 +76,28 @@ def test_sandbox_unavailable_fails_closed_without_executing_owner(
     assert not marker.exists()
 
 
+def test_owner_refuses_documents_root_nested_in_state_before_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _disable_sandbox(monkeypatch)
+    state_root = tmp_path / "state"
+    marker = state_root / "owner-ran"
+
+    with pytest.raises(ValueError, match="overlap"):
+        run_owner_command(
+            [
+                sys.executable,
+                "-c",
+                f"from pathlib import Path; Path({str(marker)!r}).touch()",
+            ],
+            timeout=1,
+            state_root=state_root,
+            documents_root=state_root / "Documents",
+        )
+
+    assert not marker.exists()
+
+
 def test_owner_runs_with_cwd_and_write_related_env_inside_state_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

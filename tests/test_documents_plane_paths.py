@@ -42,3 +42,40 @@ def test_runtime_state_root_is_created_outside_documents(tmp_path: Path) -> None
 
     assert actual == state_root.resolve()
     assert actual.is_dir()
+
+
+@pytest.mark.parametrize(
+    ("state_root", "documents_root"),
+    [
+        ("state", "state/Documents"),
+        ("same-root", "same-root"),
+    ],
+)
+def test_runtime_and_documents_roots_reject_any_overlap(
+    tmp_path: Path, state_root: str, documents_root: str
+) -> None:
+    with pytest.raises(DocumentsPlanePathError, match="overlap"):
+        resolve_runtime_write_path(
+            tmp_path / state_root,
+            "evidence/receipt.json",
+            documents_root=tmp_path / documents_root,
+        )
+    with pytest.raises(DocumentsPlanePathError, match="overlap"):
+        ensure_runtime_state_root(
+            tmp_path / state_root, documents_root=tmp_path / documents_root
+        )
+
+
+def test_runtime_and_documents_sibling_roots_are_allowed(tmp_path: Path) -> None:
+    state_root = tmp_path / "state"
+    documents_root = tmp_path / "Documents"
+
+    actual = ensure_runtime_state_root(state_root, documents_root=documents_root)
+
+    assert actual == state_root.resolve()
+    assert (
+        resolve_runtime_write_path(
+            state_root, "evidence/receipt.json", documents_root=documents_root
+        )
+        == state_root / "evidence/receipt.json"
+    )

@@ -39,6 +39,19 @@ def _is_within(path: Path, root: Path) -> bool:
     return True
 
 
+def require_disjoint_roots(
+    state_root: str | Path, documents_root: str | Path
+) -> tuple[Path, Path]:
+    """Resolve and require strictly separate Runtime-state and Documents roots."""
+    state = Path(state_root).expanduser().resolve()
+    documents = Path(documents_root).expanduser().resolve()
+    if _is_within(state, documents) or _is_within(documents, state):
+        raise DocumentsPlanePathError(
+            "OMOSTATION_RUNTIME_STATE_ROOT and DOCUMENTS_CONTENT_ROOT must not overlap"
+        )
+    return state, documents
+
+
 def _relative_path(value: str | Path, *, label: str) -> Path:
     path = Path(value)
     if path.is_absolute() or ".." in path.parts:
@@ -74,12 +87,7 @@ def resolve_runtime_write_path(
     documents_root: str | Path,
 ) -> Path:
     """Resolve a Runtime write target while refusing Documents and all escapes."""
-    state = Path(state_root).expanduser().resolve()
-    documents = Path(documents_root).expanduser().resolve()
-    if _is_within(state, documents):
-        raise DocumentsPlanePathError(
-            "OMOSTATION_RUNTIME_STATE_ROOT must not be inside DOCUMENTS_CONTENT_ROOT"
-        )
+    state, documents = require_disjoint_roots(state_root, documents_root)
     candidate = (
         state / _relative_path(relative_path, label="Runtime write path")
     ).resolve()
@@ -94,16 +102,7 @@ def ensure_runtime_state_root(
     state_root: str | Path, *, documents_root: str | Path
 ) -> Path:
     """Create the approved Runtime write root after containment validation."""
-    state = Path(state_root).expanduser().resolve()
-    documents = Path(documents_root).expanduser().resolve()
-    if _is_within(state, documents):
-        raise DocumentsPlanePathError(
-            "OMOSTATION_RUNTIME_STATE_ROOT must not be inside DOCUMENTS_CONTENT_ROOT"
-        )
+    state, documents = require_disjoint_roots(state_root, documents_root)
     state.mkdir(parents=True, exist_ok=True)
-    resolved = state.resolve()
-    if _is_within(resolved, documents):
-        raise DocumentsPlanePathError(
-            "OMOSTATION_RUNTIME_STATE_ROOT resolves inside DOCUMENTS_CONTENT_ROOT"
-        )
+    resolved, _ = require_disjoint_roots(state, documents)
     return resolved
