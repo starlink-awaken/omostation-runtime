@@ -1,11 +1,12 @@
-"""Explicit job registry and execution framework for Documents-plane owners."""
+"""Explicit, private execution registry for Documents-plane owners."""
 
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from .commands import CommandResult, normalize_argv, run_owner_command
@@ -18,12 +19,12 @@ from .paths import (
 )
 
 _JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_RUNTIME_IO_FAILURE = 74
+_DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
 
 
 @dataclass(frozen=True)
 class JobSpec:
-    """Contract for an owner-owned command; Runtime does not define real jobs."""
-
     job_id: str
     reads: tuple[str, ...]
     writes: tuple[str, ...]
@@ -36,8 +37,6 @@ class JobSpec:
 
 @dataclass(frozen=True)
 class JobResult:
-    """Execution outcome suitable for direct CLI serialization."""
-
     job_id: str
     owner: str
     dry_run: bool
@@ -46,6 +45,7 @@ class JobResult:
     stderr: str
     timed_out: bool
     evidence_path: Path | None
+    evidence_error: str | None = None
 
     @property
     def status(self) -> str:
@@ -64,8 +64,19 @@ class JobResult:
         return result
 
 
+@dataclass
+class _PrivateLayout:
+    output_root: Path
+    evidence_path: Path
+    evidence_parent_fd: int
+    evidence_name: str
+
+    def close(self) -> None:
+        os.close(self.evidence_parent_fd)
+
+
 class JobRegistry:
-    """Injectable, in-memory registry. Owners must register their own commands."""
+    """Injectable registry; owners must register their own command argv."""
 
     def __init__(self) -> None:
         self._jobs: dict[str, tuple[JobSpec, tuple[str, ...]]] = {}
@@ -113,31 +124,130 @@ def _validate_declared_relative_path(value: object) -> None:
         raise ValueError("job paths must be relative and non-traversing")
 
 
+def _owner_output_root(state_root: Path, spec: JobSpec) -> Path:
+    return state_root / "owner-output" / spec.job_id
+
+
+def _evidence_path(state_root: Path, spec: JobSpec) -> Path:
+    return state_root / "control" / "evidence" / spec.job_id / spec.evidence_path
+
+
 def _validate_job_paths(
     spec: JobSpec, *, documents_root: Path, state_root: Path
-) -> Path:
+) -> None:
     for read_path in spec.reads:
         resolve_documents_read_path(documents_root, read_path)
+    resolve_runtime_write_path(state_root, "control", documents_root=documents_root)
     for write_path in spec.writes:
         resolve_runtime_write_path(
-            state_root, write_path, documents_root=documents_root
+            _owner_output_root(state_root, spec),
+            write_path,
+            documents_root=documents_root,
         )
-    return resolve_runtime_write_path(
-        state_root, spec.evidence_path, documents_root=documents_root
+
+
+def _open_child_directory(parent_fd: int, name: str) -> int:
+    try:
+        os.mkdir(name, 0o700, dir_fd=parent_fd)
+    except FileExistsError:
+        pass
+    return os.open(name, _DIR_FLAGS, dir_fd=parent_fd)
+
+
+def _open_relative_parent(root_fd: int, relative: Path) -> tuple[int, str]:
+    current_fd = os.dup(root_fd)
+    try:
+        for part in relative.parts[:-1]:
+            child_fd = _open_child_directory(current_fd, part)
+            os.close(current_fd)
+            current_fd = child_fd
+        return current_fd, relative.name
+    except BaseException:
+        os.close(current_fd)
+        raise
+
+
+def _prepare_private_layout(state_root: Path, spec: JobSpec) -> _PrivateLayout:
+    """Create private control/output roots with descriptor-anchored traversal."""
+    state_fd = os.open(state_root, _DIR_FLAGS)
+    try:
+        control_fd = _open_child_directory(state_fd, "control")
+        try:
+            evidence_fd = _open_child_directory(control_fd, "evidence")
+        finally:
+            os.close(control_fd)
+        try:
+            job_evidence_fd = _open_child_directory(evidence_fd, spec.job_id)
+        finally:
+            os.close(evidence_fd)
+        evidence_parent_fd, evidence_name = _open_relative_parent(
+            job_evidence_fd, Path(spec.evidence_path)
+        )
+        os.close(job_evidence_fd)
+
+        owner_fd = _open_child_directory(state_fd, "owner-output")
+        try:
+            output_fd = _open_child_directory(owner_fd, spec.job_id)
+        finally:
+            os.close(owner_fd)
+        try:
+            for write_path in spec.writes:
+                parent_fd, _ = _open_relative_parent(output_fd, Path(write_path))
+                os.close(parent_fd)
+        finally:
+            os.close(output_fd)
+    finally:
+        os.close(state_fd)
+    return _PrivateLayout(
+        output_root=_owner_output_root(state_root, spec),
+        evidence_path=_evidence_path(state_root, spec),
+        evidence_parent_fd=evidence_parent_fd,
+        evidence_name=evidence_name,
     )
 
 
-def _write_evidence(path: Path, result: JobResult) -> None:
-    """Persist metadata only; owner stdout/stderr may contain Documents content."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
+    """Publish metadata using an O_NOFOLLOW/O_EXCL descriptor, never a path write."""
     payload = {
         "job_id": result.job_id,
         "owner": result.owner,
         "status": result.status,
         "exit_code": result.exit_code,
         "timed_out": result.timed_out,
+        "evidence_error": result.evidence_error,
     }
-    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(layout.evidence_name, flags, 0o600, dir_fd=layout.evidence_parent_fd)
+    try:
+        encoded = (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8")
+        total = 0
+        while total < len(encoded):
+            total += os.write(fd, encoded[total:])
+    finally:
+        os.close(fd)
+
+
+def _failure_result(
+    spec: JobSpec, error: OSError, *, owner_result: JobResult | None = None
+) -> JobResult:
+    message = str(error)
+    if owner_result is not None and owner_result.exit_code != 0:
+        return replace(owner_result, evidence_error=message)
+    if owner_result is not None:
+        return replace(
+            owner_result, exit_code=_RUNTIME_IO_FAILURE, evidence_error=message
+        )
+    return JobResult(
+        spec.job_id,
+        spec.owner,
+        False,
+        _RUNTIME_IO_FAILURE,
+        "",
+        message + "\n",
+        False,
+        None,
+        message,
+    )
 
 
 def run_job(
@@ -148,7 +258,7 @@ def run_job(
     documents_root: str | Path | None = None,
     state_root: str | Path | None = None,
 ) -> JobResult:
-    """Validate and invoke a registered owner command without reading Documents."""
+    """Validate and invoke a registered owner without exposing Runtime control paths."""
     spec, command = registry.resolve(job_id)
     _validate_spec(spec)
     documents = (
@@ -159,40 +269,40 @@ def run_job(
     state = (
         Path(state_root).expanduser().resolve() if state_root else runtime_state_root()
     )
-    evidence_path = _validate_job_paths(
-        spec, documents_root=documents, state_root=state
-    )
+    _validate_job_paths(spec, documents_root=documents, state_root=state)
     if dry_run:
-        return JobResult(
-            job_id=spec.job_id,
-            owner=spec.owner,
-            dry_run=True,
-            exit_code=0,
-            stdout="",
-            stderr="",
-            timed_out=False,
-            evidence_path=None,
-        )
+        return JobResult(spec.job_id, spec.owner, True, 0, "", "", False, None)
+    try:
+        ensured_state = ensure_runtime_state_root(state, documents_root=documents)
+        _validate_job_paths(spec, documents_root=documents, state_root=ensured_state)
+        layout = _prepare_private_layout(ensured_state, spec)
+    except OSError as exc:
+        return _failure_result(spec, exc)
 
-    ensured_state = ensure_runtime_state_root(state, documents_root=documents)
-    evidence_path = _validate_job_paths(
-        spec, documents_root=documents, state_root=ensured_state
-    )
-    command_result: CommandResult = run_owner_command(
-        command,
-        timeout=spec.timeout,
-        state_root=ensured_state,
-        documents_root=documents,
-    )
-    result = JobResult(
-        job_id=spec.job_id,
-        owner=spec.owner,
-        dry_run=False,
-        exit_code=command_result.exit_code,
-        stdout=command_result.stdout,
-        stderr=command_result.stderr,
-        timed_out=command_result.timed_out,
-        evidence_path=evidence_path,
-    )
-    _write_evidence(evidence_path, result)
-    return result
+    try:
+        allowed_paths = [layout.output_root / path for path in spec.writes]
+        command_result: CommandResult = run_owner_command(
+            command,
+            timeout=spec.timeout,
+            state_root=layout.output_root,
+            documents_root=documents,
+            allowed_write_roots=allowed_paths,
+        )
+        result = JobResult(
+            spec.job_id,
+            spec.owner,
+            False,
+            command_result.exit_code,
+            command_result.stdout,
+            command_result.stderr,
+            command_result.timed_out,
+            layout.evidence_path,
+            command_result.setup_error,
+        )
+        try:
+            _persist_evidence(layout, result)
+        except OSError as exc:
+            result = _failure_result(spec, exc, owner_result=result)
+        return result
+    finally:
+        layout.close()

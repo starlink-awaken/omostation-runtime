@@ -79,3 +79,23 @@ def test_runtime_and_documents_sibling_roots_are_allowed(tmp_path: Path) -> None
         )
         == state_root / "evidence/receipt.json"
     )
+
+
+@pytest.mark.parametrize(
+    ("documents_name", "state_parent_name"),
+    [
+        ("Documents", "documents"),
+        ("Docum\u00e9nts", "Docume\u0301nts"),
+    ],
+)
+def test_runtime_root_rejects_casefold_and_unicode_documents_alias_before_mkdir(
+    tmp_path: Path, documents_name: str, state_parent_name: str
+) -> None:
+    documents_root = tmp_path / documents_name
+    documents_root.mkdir()
+    state_root = tmp_path / state_parent_name / "runtime"
+
+    with pytest.raises(DocumentsPlanePathError, match="overlap"):
+        ensure_runtime_state_root(state_root, documents_root=documents_root)
+
+    assert not state_root.exists()

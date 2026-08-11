@@ -1,9 +1,8 @@
-"""Narrow, isolated subprocess adapter for explicitly registered Documents jobs."""
+"""Isolated subprocess adapter for explicitly registered Documents jobs."""
 
 from __future__ import annotations
 
 import os
-import shutil
 import signal
 import subprocess
 import sys
@@ -14,17 +13,19 @@ from pathlib import Path
 from .paths import require_disjoint_roots
 
 _ISOLATION_UNAVAILABLE_EXIT = 125
+_REAP_GRACE_SECONDS = 0.25
 
 
 @dataclass(frozen=True)
 class CommandResult:
-    """Stable, lossless process outcome returned to the Runtime adapter."""
+    """Stable process outcome returned to the Runtime adapter."""
 
     argv: tuple[str, ...]
     exit_code: int
     stdout: str
     stderr: str
     timed_out: bool
+    setup_error: str | None = None
 
 
 def normalize_argv(argv: Sequence[str]) -> tuple[str, ...]:
@@ -38,46 +39,41 @@ def normalize_argv(argv: Sequence[str]) -> tuple[str, ...]:
     return tuple(argv)
 
 
-def _text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    return value.decode(errors="replace") if isinstance(value, bytes) else value
+def _decode(value: bytes | None) -> str:
+    return (value or b"").decode("utf-8", errors="replace")
 
 
 def _sbpl_quote(path: Path) -> str:
     return str(path).replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _sandbox_argv(command: tuple[str, ...], state_root: Path) -> tuple[str, ...] | None:
-    """Build the macOS-only write-restricted argv, or fail closed elsewhere."""
-    if sys.platform != "darwin":
+def _sandbox_argv(
+    command: tuple[str, ...], allowed_write_roots: Sequence[Path]
+) -> tuple[str, ...] | None:
+    """Build a macOS-only no-shell argv; other platforms must fail closed."""
+    sandbox_exec = "/usr/bin/sandbox-exec"
+    if sys.platform != "darwin" or not os.path.isfile(sandbox_exec):
         return None
-    sandbox_exec = shutil.which("sandbox-exec")
-    if sandbox_exec is None:
-        return None
-    profile = "\n".join(
-        (
-            "(version 1)",
-            "(allow default)",
-            "(deny file-write*)",
-            f'(allow file-write* (subpath "{_sbpl_quote(state_root)}"))',
-        )
+    profile_rules = ["(version 1)", "(allow default)", "(deny file-write*)"]
+    profile_rules.extend(
+        f'(allow file-write* (subpath "{_sbpl_quote(root)}"))'
+        for root in allowed_write_roots
     )
-    return (sandbox_exec, "-p", profile, *command)
+    return (sandbox_exec, "-p", "\n".join(profile_rules), *command)
 
 
 def _execution_environment(
-    state_root: Path, documents_root: Path, environ: Mapping[str, str] | None
-) -> tuple[Path, dict[str, str]]:
-    """Make every conventional runtime write location live below state_root."""
-    state = state_root.resolve()
+    output_root: Path, documents_root: Path, environ: Mapping[str, str] | None
+) -> tuple[Path, Path, dict[str, str]]:
+    """Keep conventional owner writes inside its private output subtree."""
+    runtime_root = output_root / ".runtime"
     directories = {
-        "home": state / "home",
-        "work": state / "work",
-        "tmp": state / "tmp",
-        "cache": state / "xdg" / "cache",
-        "config": state / "xdg" / "config",
-        "xdg_state": state / "xdg" / "state",
+        "home": runtime_root / "home",
+        "work": runtime_root / "work",
+        "tmp": runtime_root / "tmp",
+        "cache": runtime_root / "xdg" / "cache",
+        "config": runtime_root / "xdg" / "config",
+        "xdg_state": runtime_root / "xdg" / "state",
     }
     for directory in directories.values():
         directory.mkdir(parents=True, exist_ok=True)
@@ -93,31 +89,60 @@ def _execution_environment(
             "XDG_CONFIG_HOME": str(directories["config"]),
             "XDG_STATE_HOME": str(directories["xdg_state"]),
             "DOCUMENTS_CONTENT_ROOT": str(documents_root),
-            "OMOSTATION_RUNTIME_STATE_ROOT": str(state),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(output_root),
             "PYTHONDONTWRITEBYTECODE": "1",
         }
     )
-    return directories["work"], environment
+    return directories["work"], runtime_root, environment
+
+
+def _terminate_direct_children(parent_pid: int) -> None:
+    """Best-effort cleanup for children that may have escaped the process group."""
+    try:
+        listed = subprocess.run(
+            ["/usr/bin/pgrep", "-P", str(parent_pid)],
+            check=False,
+            capture_output=True,
+            timeout=_REAP_GRACE_SECONDS,
+        )
+    except OSError:
+        return
+    for token in listed.stdout.split():
+        try:
+            os.kill(int(token), signal.SIGKILL)
+        except (ProcessLookupError, ValueError, OSError):
+            pass
 
 
 def _timeout_result(
-    process: subprocess.Popen[str], *, command: tuple[str, ...], timeout: float
+    process: subprocess.Popen[bytes], *, command: tuple[str, ...], timeout: float
 ) -> CommandResult:
-    """Kill the session/process-group, then reap it and preserve captured output."""
+    """Bounded kill/reap path; detached pipe holders cannot stall Runtime forever."""
+    _terminate_direct_children(process.pid)
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         pass
     except OSError:
-        process.kill()
-    stdout, stderr = process.communicate()
-    if stderr and not stderr.endswith("\n"):
-        stderr += "\n"
+        try:
+            process.kill()
+        except OSError:
+            pass
+    try:
+        stdout, stderr = process.communicate(timeout=_REAP_GRACE_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        stdout, stderr = exc.output, exc.stderr
+        for pipe in (process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
+    stderr_text = _decode(stderr)
+    if stderr_text and not stderr_text.endswith("\n"):
+        stderr_text += "\n"
     return CommandResult(
         argv=command,
         exit_code=124,
-        stdout=stdout,
-        stderr=f"{stderr}owner command timed out after {timeout:g}s\n",
+        stdout=_decode(stdout),
+        stderr=f"{stderr_text}owner command timed out after {timeout:g}s\n",
         timed_out=True,
     )
 
@@ -128,19 +153,40 @@ def run_owner_command(
     timeout: float,
     state_root: str | Path,
     documents_root: str | Path | None = None,
+    allowed_write_roots: Sequence[str | Path] | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> CommandResult:
-    """Run an owner command in a write-restricted process group, never bare."""
+    """Run an owner in its private output subtree, never as a bare process."""
     command = normalize_argv(argv)
     if timeout <= 0:
         raise ValueError("owner command timeout must be positive")
-    state, documents = require_disjoint_roots(
+    output_root, documents = require_disjoint_roots(
         state_root,
         documents_root if documents_root is not None else Path.home() / "Documents",
     )
-    state.mkdir(parents=True, exist_ok=True)
-    state, documents = require_disjoint_roots(state, documents)
-    sandboxed_argv = _sandbox_argv(command, state)
+    try:
+        output_root.mkdir(parents=True, exist_ok=True)
+        output_root, documents = require_disjoint_roots(output_root, documents)
+        cwd, runtime_root, environment = _execution_environment(
+            output_root, documents, environ
+        )
+    except OSError as exc:
+        return CommandResult(
+            argv=command,
+            exit_code=74,
+            stdout="",
+            stderr=f"owner state setup failed: {exc}\n",
+            timed_out=False,
+            setup_error=str(exc),
+        )
+    roots = (
+        [output_root]
+        if allowed_write_roots is None
+        else [Path(root).expanduser().resolve() for root in allowed_write_roots]
+    )
+    if any(not root.is_relative_to(output_root) for root in roots):
+        raise ValueError("owner write permission escapes its output root")
+    sandboxed_argv = _sandbox_argv(command, (*roots, runtime_root))
     if sandboxed_argv is None:
         return CommandResult(
             argv=command,
@@ -149,14 +195,13 @@ def run_owner_command(
             stderr="Documents execution isolation unavailable; owner command was not started\n",
             timed_out=False,
         )
-    cwd, environment = _execution_environment(state, documents, environ)
     try:
         process = subprocess.Popen(
             sandboxed_argv,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            text=False,
             shell=False,
             cwd=cwd,
             env=environment,
@@ -164,19 +209,11 @@ def run_owner_command(
         )
     except FileNotFoundError:
         return CommandResult(
-            argv=command,
-            exit_code=127,
-            stdout="",
-            stderr=f"owner command not found: {command[0]}\n",
-            timed_out=False,
+            command, 127, "", f"owner command not found: {command[0]}\n", False
         )
     except OSError as exc:
         return CommandResult(
-            argv=command,
-            exit_code=126,
-            stdout="",
-            stderr=f"owner command could not run: {exc}\n",
-            timed_out=False,
+            command, 74, "", f"owner process setup failed: {exc}\n", False, str(exc)
         )
     try:
         stdout, stderr = process.communicate(timeout=timeout)
@@ -185,7 +222,7 @@ def run_owner_command(
     return CommandResult(
         argv=command,
         exit_code=process.returncode,
-        stdout=stdout,
-        stderr=stderr,
+        stdout=_decode(stdout),
+        stderr=_decode(stderr),
         timed_out=False,
     )

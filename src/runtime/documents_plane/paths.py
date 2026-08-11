@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import unicodedata
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -39,13 +40,46 @@ def _is_within(path: Path, root: Path) -> bool:
     return True
 
 
+def _identity_parts(path: Path) -> tuple[str, ...]:
+    """Conservative APFS-style identity spelling for not-yet-created paths."""
+    return tuple(unicodedata.normalize("NFC", part).casefold() for part in path.parts)
+
+
+def _identity_within(path: Path, root: Path) -> bool:
+    path_parts = _identity_parts(path)
+    root_parts = _identity_parts(root)
+    return (
+        len(path_parts) >= len(root_parts)
+        and path_parts[: len(root_parts)] == root_parts
+    )
+
+
+def _nearest_existing_ancestor(path: Path) -> Path:
+    current = path
+    while not current.exists() and current != current.parent:
+        current = current.parent
+    return current
+
+
 def require_disjoint_roots(
     state_root: str | Path, documents_root: str | Path
 ) -> tuple[Path, Path]:
     """Resolve and require strictly separate Runtime-state and Documents roots."""
     state = Path(state_root).expanduser().resolve()
     documents = Path(documents_root).expanduser().resolve()
-    if _is_within(state, documents) or _is_within(documents, state):
+    state_anchor = _nearest_existing_ancestor(state)
+    documents_anchor = _nearest_existing_ancestor(documents)
+    same_anchor = False
+    if state_anchor == state or documents_anchor == documents:
+        try:
+            same_anchor = os.path.samefile(state_anchor, documents_anchor)
+        except OSError:
+            same_anchor = True
+    if (
+        _identity_within(state, documents)
+        or _identity_within(documents, state)
+        or same_anchor
+    ):
         raise DocumentsPlanePathError(
             "OMOSTATION_RUNTIME_STATE_ROOT and DOCUMENTS_CONTENT_ROOT must not overlap"
         )
