@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
+import stat
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -67,6 +69,7 @@ class JobResult:
 @dataclass
 class _PrivateLayout:
     output_root: Path
+    work_parent: Path
     evidence_path: Path
     evidence_parent_fd: int
     evidence_name: str
@@ -170,36 +173,51 @@ def _open_relative_parent(root_fd: int, relative: Path) -> tuple[int, str]:
 def _prepare_private_layout(state_root: Path, spec: JobSpec) -> _PrivateLayout:
     """Create private control/output roots with descriptor-anchored traversal."""
     state_fd = os.open(state_root, _DIR_FLAGS)
+    evidence_parent_fd: int | None = None
+    job_evidence_fd: int | None = None
     try:
-        control_fd = _open_child_directory(state_fd, "control")
         try:
-            evidence_fd = _open_child_directory(control_fd, "evidence")
-        finally:
-            os.close(control_fd)
-        try:
-            job_evidence_fd = _open_child_directory(evidence_fd, spec.job_id)
-        finally:
-            os.close(evidence_fd)
-        evidence_parent_fd, evidence_name = _open_relative_parent(
-            job_evidence_fd, Path(spec.evidence_path)
-        )
-        os.close(job_evidence_fd)
+            control_fd = _open_child_directory(state_fd, "control")
+            try:
+                evidence_fd = _open_child_directory(control_fd, "evidence")
+                try:
+                    job_evidence_fd = _open_child_directory(evidence_fd, spec.job_id)
+                finally:
+                    os.close(evidence_fd)
+                runs_fd = _open_child_directory(control_fd, "runs")
+                os.close(runs_fd)
+            finally:
+                os.close(control_fd)
+            evidence_parent_fd, evidence_name = _open_relative_parent(
+                job_evidence_fd, Path(spec.evidence_path)
+            )
+            os.close(job_evidence_fd)
+            job_evidence_fd = None
 
-        owner_fd = _open_child_directory(state_fd, "owner-output")
-        try:
-            output_fd = _open_child_directory(owner_fd, spec.job_id)
-        finally:
-            os.close(owner_fd)
-        try:
-            for write_path in spec.writes:
-                parent_fd, _ = _open_relative_parent(output_fd, Path(write_path))
-                os.close(parent_fd)
-        finally:
-            os.close(output_fd)
+            owner_fd = _open_child_directory(state_fd, "owner-output")
+            try:
+                output_fd = _open_child_directory(owner_fd, spec.job_id)
+            finally:
+                os.close(owner_fd)
+            try:
+                for write_path in spec.writes:
+                    parent_fd, _ = _open_relative_parent(output_fd, Path(write_path))
+                    os.close(parent_fd)
+            finally:
+                os.close(output_fd)
+        except BaseException:
+            if job_evidence_fd is not None:
+                os.close(job_evidence_fd)
+            if evidence_parent_fd is not None:
+                os.close(evidence_parent_fd)
+            raise
     finally:
         os.close(state_fd)
+    if evidence_parent_fd is None:  # pragma: no cover - defensive
+        raise RuntimeError("evidence layout completed without a parent descriptor")
     return _PrivateLayout(
         output_root=_owner_output_root(state_root, spec),
+        work_parent=state_root / "control" / "runs",
         evidence_path=_evidence_path(state_root, spec),
         evidence_parent_fd=evidence_parent_fd,
         evidence_name=evidence_name,
@@ -207,7 +225,7 @@ def _prepare_private_layout(state_root: Path, spec: JobSpec) -> _PrivateLayout:
 
 
 def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
-    """Publish metadata using an O_NOFOLLOW/O_EXCL descriptor, never a path write."""
+    """Atomically publish a receipt through an anchored no-follow directory FD."""
     payload = {
         "job_id": result.job_id,
         "owner": result.owner,
@@ -216,15 +234,44 @@ def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
         "timed_out": result.timed_out,
         "evidence_error": result.evidence_error,
     }
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(layout.evidence_name, flags, 0o600, dir_fd=layout.evidence_parent_fd)
     try:
-        encoded = (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8")
-        total = 0
-        while total < len(encoded):
-            total += os.write(fd, encoded[total:])
-    finally:
-        os.close(fd)
+        existing = os.stat(
+            layout.evidence_name,
+            dir_fd=layout.evidence_parent_fd,
+            follow_symlinks=False,
+        )
+    except FileNotFoundError:
+        existing = None
+    if existing is not None and not stat.S_ISREG(existing.st_mode):
+        raise OSError("evidence target is not a regular file")
+    temporary_name = f".receipt-{secrets.token_hex(16)}.tmp"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(temporary_name, flags, 0o600, dir_fd=layout.evidence_parent_fd)
+    try:
+        try:
+            encoded = (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8")
+            total = 0
+            while total < len(encoded):
+                written = os.write(fd, encoded[total:])
+                if written <= 0:
+                    raise OSError("evidence write made no progress")
+                total += written
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(
+            temporary_name,
+            layout.evidence_name,
+            src_dir_fd=layout.evidence_parent_fd,
+            dst_dir_fd=layout.evidence_parent_fd,
+        )
+        os.fsync(layout.evidence_parent_fd)
+    except BaseException:
+        try:
+            os.unlink(temporary_name, dir_fd=layout.evidence_parent_fd)
+        except OSError:
+            pass
+        raise
 
 
 def _failure_result(
@@ -279,6 +326,8 @@ def run_job(
     except OSError as exc:
         return _failure_result(spec, exc)
 
+    result: JobResult | None = None
+    close_error: OSError | None = None
     try:
         allowed_paths = [layout.output_root / path for path in spec.writes]
         command_result: CommandResult = run_owner_command(
@@ -287,6 +336,7 @@ def run_job(
             state_root=layout.output_root,
             documents_root=documents,
             allowed_write_roots=allowed_paths,
+            work_root=layout.work_parent,
         )
         result = JobResult(
             spec.job_id,
@@ -303,6 +353,15 @@ def run_job(
             _persist_evidence(layout, result)
         except OSError as exc:
             result = _failure_result(spec, exc, owner_result=result)
-        return result
     finally:
-        layout.close()
+        try:
+            layout.close()
+        except OSError as exc:
+            close_error = exc
+    if close_error is not None:
+        return _failure_result(spec, close_error, owner_result=result)
+    if (
+        result is None
+    ):  # pragma: no cover - defensive; unexpected errors propagate above
+        raise RuntimeError("owner execution completed without a result")
+    return result

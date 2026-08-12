@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -150,6 +151,28 @@ payload['cwd'] = os.getcwd()
         assert Path(value).resolve().is_relative_to(state_root.resolve())
 
 
+def test_owner_refuses_symlink_work_parent_without_writing_documents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _disable_sandbox(monkeypatch)
+    documents_root = tmp_path / "Documents"
+    documents_root.mkdir()
+    work_parent = tmp_path / "runs"
+    work_parent.symlink_to(documents_root, target_is_directory=True)
+
+    result = run_owner_command(
+        [sys.executable, "-c", "pass"],
+        timeout=1,
+        state_root=tmp_path / "state",
+        documents_root=documents_root,
+        work_root=work_parent,
+    )
+
+    assert result.exit_code == 74
+    assert result.setup_error
+    assert list(documents_root.iterdir()) == []
+
+
 def test_timeout_kills_entire_owner_process_group(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -173,6 +196,44 @@ def test_timeout_kills_entire_owner_process_group(
     assert result.exit_code == 124
     assert result.timed_out is True
     assert not delayed_write.exists()
+
+
+def test_descendant_cleanup_swallows_probe_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runtime.documents_plane import commands
+
+    monkeypatch.setattr(
+        commands.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired("pgrep", 0.01)
+        ),
+    )
+
+    commands._terminate_direct_children(12345)
+
+
+def test_timeout_cleanup_swallows_reap_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
+    from runtime.documents_plane import commands
+
+    class BrokenProcess:
+        pid = 12345
+        stdout = None
+        stderr = None
+
+        def communicate(self, **_kwargs: object) -> tuple[bytes, bytes]:
+            raise OSError("broken pipe")
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr(commands, "_terminate_direct_children", lambda _pid: None)
+    monkeypatch.setattr(commands.os, "killpg", lambda *_args: None)
+
+    result = commands._timeout_result(BrokenProcess(), command=("owner",), timeout=1)
+
+    assert result.exit_code == 124
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="sandbox-exec is macOS-only")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import signal
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from .paths import require_disjoint_roots
 
 _ISOLATION_UNAVAILABLE_EXIT = 125
 _REAP_GRACE_SECONDS = 0.25
+_DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
 
 
 @dataclass(frozen=True)
@@ -63,10 +65,13 @@ def _sandbox_argv(
 
 
 def _execution_environment(
-    output_root: Path, documents_root: Path, environ: Mapping[str, str] | None
-) -> tuple[Path, Path, dict[str, str]]:
-    """Keep conventional owner writes inside its private output subtree."""
-    runtime_root = output_root / ".runtime"
+    work_root: Path,
+    output_root: Path,
+    documents_root: Path,
+    environ: Mapping[str, str] | None,
+) -> tuple[Path, dict[str, str]]:
+    """Keep conventional owner writes inside a fresh, private run work root."""
+    runtime_root = work_root
     directories = {
         "home": runtime_root / "home",
         "work": runtime_root / "work",
@@ -93,7 +98,53 @@ def _execution_environment(
             "PYTHONDONTWRITEBYTECODE": "1",
         }
     )
-    return directories["work"], runtime_root, environment
+    return directories["work"], environment
+
+
+def _open_directory_nofollow(path: Path) -> int:
+    """Open every component without following an owner-controlled symlink."""
+    absolute = Path(os.path.abspath(path))
+    current_fd = os.open(absolute.anchor, _DIR_FLAGS)
+    try:
+        for part in absolute.parts[1:]:
+            child_fd = os.open(part, _DIR_FLAGS, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = child_fd
+        return current_fd
+    except BaseException:
+        os.close(current_fd)
+        raise
+
+
+def _create_fresh_work_root(output_root: Path, work_root: str | Path | None) -> Path:
+    """Create one unpredictable run directory below an anchored no-follow parent."""
+    if work_root is None:
+        parent_path = output_root / ".runtime-runs"
+        output_fd = _open_directory_nofollow(output_root)
+        try:
+            try:
+                os.mkdir(parent_path.name, 0o700, dir_fd=output_fd)
+            except FileExistsError:
+                pass
+            parent_fd = os.open(parent_path.name, _DIR_FLAGS, dir_fd=output_fd)
+        finally:
+            os.close(output_fd)
+    else:
+        parent_path = Path(os.path.abspath(Path(work_root).expanduser()))
+        parent_fd = _open_directory_nofollow(parent_path)
+    try:
+        for _ in range(16):
+            name = secrets.token_hex(16)
+            try:
+                os.mkdir(name, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            fresh_fd = os.open(name, _DIR_FLAGS, dir_fd=parent_fd)
+            os.close(fresh_fd)
+            return parent_path / name
+    finally:
+        os.close(parent_fd)
+    raise OSError("could not allocate a unique owner work root")
 
 
 def _terminate_direct_children(parent_pid: int) -> None:
@@ -105,7 +156,7 @@ def _terminate_direct_children(parent_pid: int) -> None:
             capture_output=True,
             timeout=_REAP_GRACE_SECONDS,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return
     for token in listed.stdout.split():
         try:
@@ -134,7 +185,12 @@ def _timeout_result(
         stdout, stderr = exc.output, exc.stderr
         for pipe in (process.stdout, process.stderr):
             if pipe is not None:
-                pipe.close()
+                try:
+                    pipe.close()
+                except OSError:
+                    pass
+    except OSError:
+        stdout, stderr = b"", b""
     stderr_text = _decode(stderr)
     if stderr_text and not stderr_text.endswith("\n"):
         stderr_text += "\n"
@@ -154,6 +210,7 @@ def run_owner_command(
     state_root: str | Path,
     documents_root: str | Path | None = None,
     allowed_write_roots: Sequence[str | Path] | None = None,
+    work_root: str | Path | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> CommandResult:
     """Run an owner in its private output subtree, never as a bare process."""
@@ -167,8 +224,9 @@ def run_owner_command(
     try:
         output_root.mkdir(parents=True, exist_ok=True)
         output_root, documents = require_disjoint_roots(output_root, documents)
-        cwd, runtime_root, environment = _execution_environment(
-            output_root, documents, environ
+        fresh_work = _create_fresh_work_root(output_root, work_root)
+        cwd, environment = _execution_environment(
+            fresh_work, output_root, documents, environ
         )
     except OSError as exc:
         return CommandResult(
@@ -186,7 +244,7 @@ def run_owner_command(
     )
     if any(not root.is_relative_to(output_root) for root in roots):
         raise ValueError("owner write permission escapes its output root")
-    sandboxed_argv = _sandbox_argv(command, (*roots, runtime_root))
+    sandboxed_argv = _sandbox_argv(command, (*roots, fresh_work))
     if sandboxed_argv is None:
         return CommandResult(
             argv=command,
