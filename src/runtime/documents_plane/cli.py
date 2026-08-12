@@ -7,11 +7,68 @@ import json
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
-from .jobs import JobRegistry, run_job
-from .paths import documents_content_root, runtime_state_root
+from .jobs import JobRegistry, JobSpec, run_job
+from .paths import (
+    DocumentsPlanePathError,
+    documents_content_root,
+    resolve_documents_read_path,
+    runtime_state_root,
+)
 
-DEFAULT_REGISTRY = JobRegistry()
+
+def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
+    """Build the small, explicit owner set shipped with Runtime.
+
+    Owner commands stay outside Documents.  Each job declares its Documents
+    read scope; Runtime state remains the only write root.
+    """
+    documents_root = documents_content_root(environ)
+    registry_path = environ.get(
+        "L4_DOMAIN_REGISTRY",
+        str(documents_root / "@公共" / "_control" / "L4-DOMAIN-REGISTRY.yaml"),
+    )
+    try:
+        registry_path = str(
+            resolve_documents_read_path(
+                documents_root,
+                Path(registry_path).expanduser().resolve().relative_to(documents_root),
+            )
+        )
+    except ValueError as exc:
+        raise DocumentsPlanePathError(
+            "L4_DOMAIN_REGISTRY must be inside DOCUMENTS_CONTENT_ROOT"
+        ) from exc
+    l4_command = environ.get("L4_KERNEL_COMMAND", "l4-kernel")
+    registry = JobRegistry()
+    registry.register(
+        JobSpec(
+            job_id="l4-registry-list",
+            reads=("@公共/_control/L4-DOMAIN-REGISTRY.yaml",),
+            writes=(),
+            owner="l4-kernel",
+            schedule="manual",
+            timeout=30,
+            evidence_path="l4-registry-list.json",
+            fail_closed=True,
+        ),
+        [l4_command, "registry", "list", "--registry", registry_path, "--json"],
+    )
+    registry.register(
+        JobSpec(
+            job_id="l4-content-audit",
+            reads=(".",),
+            writes=(),
+            owner="l4-kernel",
+            schedule="manual",
+            timeout=300,
+            evidence_path="l4-content-audit.json",
+            fail_closed=True,
+        ),
+        [l4_command, "content", "audit", str(documents_root), "--json"],
+    )
+    return registry
 
 
 def _documents_main(
@@ -71,8 +128,14 @@ def main(
         from runtime.cli import main as legacy_main
 
         return legacy_main(arguments)
+    environment = os.environ if environ is None else environ
+    try:
+        selected_registry = (
+            _default_registry(environment) if registry is None else registry
+        )
+    except DocumentsPlanePathError as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        return 2
     return _documents_main(
-        arguments[1:],
-        registry=DEFAULT_REGISTRY if registry is None else registry,
-        environ=os.environ if environ is None else environ,
+        arguments[1:], registry=selected_registry, environ=environment
     )

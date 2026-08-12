@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -64,6 +65,155 @@ def test_dry_run_has_no_process_or_state_side_effects(tmp_path: Path) -> None:
     assert result.dry_run is True
     assert result.exit_code == 0
     assert not state_root.exists()
+
+
+def test_default_cli_registry_job_delegates_to_configured_l4_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The first shipped Documents job must be useful without caller injection."""
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    documents_root = tmp_path / "Documents"
+    registry_path = documents_root / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("kind: registry\n", encoding="utf-8")
+    owner = tmp_path / "fake-l4-kernel"
+    owner.write_text(
+        "#!/bin/sh\n"
+        'test "$1" = registry\n'
+        'test "$2" = list\n'
+        'test "$3" = --registry\n'
+        f'test "$4" = {shlex.quote(str(registry_path))}\n'
+        'test "$5" = --json\n'
+        "printf '{\\\"ok\\\":true}\\n'\n",
+        encoding="utf-8",
+    )
+    owner.chmod(0o755)
+    exit_code = main(
+        ["documents", "run", "l4-registry-list", "--json"],
+        environ={
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+            "L4_KERNEL_COMMAND": str(owner),
+            "L4_DOMAIN_REGISTRY": str(registry_path),
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["job_id"] == "l4-registry-list"
+    assert payload["owner"] == "l4-kernel"
+    assert payload["status"] == "succeeded"
+    assert payload["stdout"] == '{"ok":true}\n'
+
+
+def test_default_cli_registry_job_preserves_owner_nonzero_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    documents_root = tmp_path / "Documents"
+    registry_path = documents_root / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("broken: [\n", encoding="utf-8")
+    owner = tmp_path / "fake-l4-kernel"
+    owner.write_text(
+        "#!/bin/sh\nprintf 'invalid registry\\n' >&2\nexit 2\n", encoding="utf-8"
+    )
+    owner.chmod(0o755)
+
+    exit_code = main(
+        ["documents", "run", "l4-registry-list", "--json"],
+        environ={
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+            "L4_KERNEL_COMMAND": str(owner),
+            "L4_DOMAIN_REGISTRY": str(registry_path),
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert payload["status"] == "failed"
+    assert payload["exit_code"] == 2
+    assert payload["stderr"] == "invalid registry\n"
+    assert payload["evidence_path"]
+
+
+def test_default_cli_rejects_registry_path_outside_documents_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    documents_root = tmp_path / "Documents"
+    documents_root.mkdir()
+    outside_registry = tmp_path / "outside-registry.yaml"
+    outside_registry.write_text("kind: registry\n", encoding="utf-8")
+
+    exit_code = main(
+        ["documents", "run", "l4-registry-list", "--json"],
+        environ={
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+            "L4_DOMAIN_REGISTRY": str(outside_registry),
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert payload["status"] == "failed"
+    assert "must be inside DOCUMENTS_CONTENT_ROOT" in payload["error"]
+    assert not (tmp_path / "state").exists()
+
+
+def test_default_cli_content_audit_delegates_documents_root_to_l4_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    documents_root = tmp_path / "Documents"
+    documents_root.mkdir()
+    owner = tmp_path / "fake-l4-kernel"
+    owner.write_text(
+        "#!/bin/sh\n"
+        'test "$1" = content\n'
+        'test "$2" = audit\n'
+        'test "$3" = "$DOCUMENTS_CONTENT_ROOT"\n'
+        'test "$4" = --json\n'
+        "printf '{\\\"ok\\\":false}\\n'\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    owner.chmod(0o755)
+
+    exit_code = main(
+        ["documents", "run", "l4-content-audit", "--json"],
+        environ={
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+            "L4_KERNEL_COMMAND": str(owner),
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert payload["job_id"] == "l4-content-audit"
+    assert payload["owner"] == "l4-kernel"
+    assert payload["status"] == "failed"
+    assert payload["stdout"] == '{"ok":false}\n'
+    assert payload["evidence_path"]
 
 
 def test_run_job_writes_metadata_only_evidence_under_state_root(

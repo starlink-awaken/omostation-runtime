@@ -111,11 +111,15 @@ def _validate_spec(spec: JobSpec) -> None:
         raise ValueError("job timeout must be positive")
     if not isinstance(spec.fail_closed, bool) or not spec.fail_closed:
         raise ValueError("Documents-plane jobs must be fail_closed")
-    for paths in (spec.reads, spec.writes):
-        if isinstance(paths, str):
-            raise TypeError("job paths must be relative path sequences")
-        for path in paths:
+    if isinstance(spec.reads, str) or isinstance(spec.writes, str):
+        raise TypeError("job paths must be relative path sequences")
+    for path in spec.reads:
+        # A complete content-plane audit is an explicitly declared read of the
+        # Documents root.  It is never valid for writes or evidence paths.
+        if path != ".":
             _validate_declared_relative_path(path)
+    for path in spec.writes:
+        _validate_declared_relative_path(path)
     _validate_declared_relative_path(spec.evidence_path)
 
 
@@ -139,7 +143,8 @@ def _validate_job_paths(
     spec: JobSpec, *, documents_root: Path, state_root: Path
 ) -> None:
     for read_path in spec.reads:
-        resolve_documents_read_path(documents_root, read_path)
+        if read_path != ".":
+            resolve_documents_read_path(documents_root, read_path)
     resolve_runtime_write_path(state_root, "control", documents_root=documents_root)
     for write_path in spec.writes:
         resolve_runtime_write_path(
