@@ -30,11 +30,11 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
         str(documents_root / "@公共" / "_control" / "L4-DOMAIN-REGISTRY.yaml"),
     )
     try:
+        registry_relative_path = (
+            Path(registry_path).expanduser().resolve().relative_to(documents_root)
+        )
         registry_path = str(
-            resolve_documents_read_path(
-                documents_root,
-                Path(registry_path).expanduser().resolve().relative_to(documents_root),
-            )
+            resolve_documents_read_path(documents_root, registry_relative_path)
         )
     except ValueError as exc:
         raise DocumentsPlanePathError(
@@ -45,7 +45,7 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     registry.register(
         JobSpec(
             job_id="l4-registry-list",
-            reads=("@公共/_control/L4-DOMAIN-REGISTRY.yaml",),
+            reads=(str(registry_relative_path),),
             writes=(),
             owner="l4-kernel",
             schedule="manual",

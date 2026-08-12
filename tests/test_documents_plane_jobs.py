@@ -111,6 +111,26 @@ def test_default_cli_registry_job_delegates_to_configured_l4_owner(
     assert payload["stdout"] == '{"ok":true}\n'
 
 
+def test_default_registry_declares_configured_registry_read_scope(
+    tmp_path: Path,
+) -> None:
+    from runtime.documents_plane.cli import _default_registry
+
+    documents_root = tmp_path / "Documents"
+    registry_path = documents_root / "registries" / "custom.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("kind: registry\n", encoding="utf-8")
+
+    spec, _ = _default_registry(
+        {
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "L4_DOMAIN_REGISTRY": str(registry_path),
+        }
+    ).resolve("l4-registry-list")
+
+    assert spec.reads == ("registries/custom.yaml",)
+
+
 def test_default_cli_registry_job_preserves_owner_nonzero_exit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
