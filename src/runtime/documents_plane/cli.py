@@ -68,6 +68,26 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
         ),
         [l4_command, "content", "audit", str(documents_root), "--json"],
     )
+    registry.register(
+        JobSpec(
+            job_id="documents-weijian-facts-audit",
+            reads=("@工作文档/卫健委",),
+            writes=(),
+            owner="runtime-facts",
+            schedule="manual",
+            timeout=60,
+            evidence_path="documents-weijian-facts-audit.json",
+            fail_closed=True,
+        ),
+        [
+            sys.executable,
+            "-m",
+            "runtime.documents_plane.facts",
+            "audit",
+            "--domain-relative",
+            "@工作文档/卫健委",
+        ],
+    )
     return registry
 
 
