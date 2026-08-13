@@ -1043,3 +1043,103 @@ def test_model_freshness_projection_rejects_successful_malformed_owner_output(
     assert receipt["exit_code"] == 74
     assert receipt["evidence_error"] == result.evidence_error
     assert "owner_evidence" not in receipt
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "schema": "runtime.documents-model-freshness.v1",
+            "status": "unavailable",
+            "checked_on": "2026-08-14",
+            "facts_last_reviewed": "2026-08-13",
+            "model_markdown_count": 1,
+            "fresh_model_count": 0,
+            "stale_model_count": 0,
+            "invalid_reviewed_count": 0,
+            "unreadable_regular_file_count": 0,
+            "error": "facts_file_missing",
+        },
+        {
+            "schema": "runtime.documents-model-freshness.v1",
+            "status": "unavailable",
+            "checked_on": "2026-08-14",
+            "facts_last_reviewed": None,
+            "model_markdown_count": 0,
+            "fresh_model_count": 0,
+            "stale_model_count": 0,
+            "invalid_reviewed_count": 0,
+            "unreadable_regular_file_count": 0,
+            "error": "models_directory_missing",
+        },
+        {
+            "schema": "runtime.documents-model-freshness.v1",
+            "status": "unavailable",
+            "checked_on": "2026-08-14",
+            "facts_last_reviewed": "2026-08-13",
+            "model_markdown_count": 0,
+            "fresh_model_count": 0,
+            "stale_model_count": 0,
+            "invalid_reviewed_count": 0,
+            "unreadable_regular_file_count": 0,
+            "error": "model_file_not_regular",
+        },
+        {
+            "schema": "runtime.documents-model-freshness.v1",
+            "status": "unavailable",
+            "checked_on": "2026-08-14",
+            "facts_last_reviewed": "2026-08-13",
+            "model_markdown_count": 1,
+            "fresh_model_count": 0,
+            "stale_model_count": 0,
+            "invalid_reviewed_count": 0,
+            "unreadable_regular_file_count": 0,
+            "error": "model_file_unreadable",
+        },
+        {
+            "schema": "runtime.documents-model-freshness.v1",
+            "status": "unavailable",
+            "checked_on": "2026-08-14",
+            "facts_last_reviewed": "2026-08-13",
+            "model_markdown_count": 1,
+            "fresh_model_count": 0,
+            "stale_model_count": 0,
+            "invalid_reviewed_count": 0,
+            "unreadable_regular_file_count": 0,
+            "error": "model_last_reviewed_invalid",
+        },
+    ],
+)
+def test_model_freshness_projection_rejects_unavailable_error_state_conflicts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: dict[str, object]
+) -> None:
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    registry = JobRegistry()
+    registry.register(
+        replace(_spec(), writes=(), evidence_projection="model-freshness-v1"),
+        [
+            sys.executable,
+            "-c",
+            f"import json; print(json.dumps({payload!r}))",
+        ],
+    )
+    documents_root = tmp_path / "Documents"
+    documents_root.mkdir()
+
+    result = run_job(
+        registry,
+        "contract-check",
+        state_root=tmp_path / "state",
+        documents_root=documents_root,
+    )
+
+    assert result.exit_code == 74
+    assert result.evidence_error == "model-freshness evidence has an invalid schema"
+    assert result.evidence_path is not None
+    receipt = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+    assert receipt["exit_code"] == 74
+    assert receipt["evidence_error"] == result.evidence_error
+    assert "owner_evidence" not in receipt
