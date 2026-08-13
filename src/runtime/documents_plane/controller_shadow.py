@@ -18,10 +18,25 @@ from .paths import (
     resolve_documents_read_path,
 )
 
-_SCHEMA = "runtime.documents-controller-shadow.v1"
+_SCHEMA = "runtime.documents-controller-shadow.v2"
 _PLANES = ("_control", "_entities", "_meta", "_runtime", "_storage", "_knowledge")
-_COVERED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
-_UNMIGRATED_RULE_IDS = ("CR08", "CR23", "CR24", "CR25", "CR26", "CR29", "CR30")
+_LEGACY_RULE_IDS = (
+    "CR01",
+    "CR02",
+    "CR03",
+    "CR05",
+    "CR08",
+    "CR23",
+    "CR24",
+    "CR25",
+    "CR26",
+    "CR29",
+    "CR30",
+)
+_OBSERVED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
+_UNOBSERVED_RULE_IDS = tuple(
+    rule_id for rule_id in _LEGACY_RULE_IDS if rule_id not in _OBSERVED_RULE_IDS
+)
 _SIGNAL_TYPE = re.compile(r"(?m)^\s*(?:-\s*)?type:\s*(🔴|⚠️|✅)\s*$")
 _LAST_REVIEWED = re.compile(r"(?mi)^last-reviewed:\s*(\d{4}-\d{2}-\d{2})\s*$")
 
@@ -39,19 +54,22 @@ class FreshnessSummary:
 
 @dataclass(frozen=True)
 class ControllerShadow:
-    """A non-replacement comparison boundary for the legacy controller."""
+    """A non-replacement observation boundary for the legacy controller."""
 
     status: str
     legacy_controller_replaced: bool
-    covered_rule_ids: tuple[str, ...]
-    unmigrated_rule_ids: tuple[str, ...]
+    cutover_ready: bool
+    legacy_rule_ids: tuple[str, ...]
+    observed_rule_ids: tuple[str, ...]
+    unobserved_rule_ids: tuple[str, ...]
     signal_counts: dict[str, int]
     freshness: FreshnessSummary
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
-        payload["covered_rule_ids"] = list(self.covered_rule_ids)
-        payload["unmigrated_rule_ids"] = list(self.unmigrated_rule_ids)
+        payload["legacy_rule_ids"] = list(self.legacy_rule_ids)
+        payload["observed_rule_ids"] = list(self.observed_rule_ids)
+        payload["unobserved_rule_ids"] = list(self.unobserved_rule_ids)
         payload["schema"] = _SCHEMA
         return dict(sorted(payload.items()))
 
@@ -127,7 +145,7 @@ def _signal_counts(domain_root: Path) -> dict[str, int]:
 def inspect_controller_shadow(
     domain_root: Path, *, today: date | None = None
 ) -> ControllerShadow:
-    """Measure only migrated controller inputs; never invoke legacy scripts."""
+    """Observe four safe inputs and inventory every legacy rule without execution."""
     try:
         domain_mode = domain_root.lstat().st_mode
     except OSError as exc:
@@ -136,10 +154,12 @@ def inspect_controller_shadow(
         raise ValueError("domain root is missing")
     observed_on = datetime.now(UTC).date() if today is None else today
     return ControllerShadow(
-        status="shadow_incomplete",
+        status="shadow_observed",
         legacy_controller_replaced=False,
-        covered_rule_ids=_COVERED_RULE_IDS,
-        unmigrated_rule_ids=_UNMIGRATED_RULE_IDS,
+        cutover_ready=False,
+        legacy_rule_ids=_LEGACY_RULE_IDS,
+        observed_rule_ids=_OBSERVED_RULE_IDS,
+        unobserved_rule_ids=_UNOBSERVED_RULE_IDS,
         signal_counts=_signal_counts(domain_root),
         freshness=_freshness(domain_root, today=observed_on),
     )

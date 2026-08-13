@@ -29,7 +29,7 @@ _EVIDENCE_PROJECTIONS = frozenset(
         "facts-audit-v1",
         "kems-check-v1",
         "control-health-v1",
-        "controller-shadow-v1",
+        "controller-shadow-v2",
     }
 )
 _KEMS_CHECK_SCOPES = frozenset(
@@ -39,8 +39,11 @@ _CONTROL_HEALTH_STATUSES = frozenset({"ok", "attention", "critical", "invalid"})
 _FACTS_VIEW_STATUSES = frozenset(
     {"current", "stale_30d", "stale_60d", "missing", "invalid"}
 )
-_CONTROLLER_SHADOW_COVERED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
-_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS = (
+_CONTROLLER_SHADOW_LEGACY_RULE_IDS = (
+    "CR01",
+    "CR02",
+    "CR03",
+    "CR05",
     "CR08",
     "CR23",
     "CR24",
@@ -48,6 +51,12 @@ _CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS = (
     "CR26",
     "CR29",
     "CR30",
+)
+_CONTROLLER_SHADOW_OBSERVED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
+_CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS = tuple(
+    rule_id
+    for rule_id in _CONTROLLER_SHADOW_LEGACY_RULE_IDS
+    if rule_id not in _CONTROLLER_SHADOW_OBSERVED_RULE_IDS
 )
 
 
@@ -371,7 +380,7 @@ def _control_health_evidence(stdout: str) -> dict[str, object]:
 
 
 def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
-    """Keep the incomplete migration boundary explicit in Runtime evidence."""
+    """Keep the observed-but-not-cut-over controller boundary explicit."""
     try:
         payload = json.loads(stdout)
     except json.JSONDecodeError as exc:
@@ -381,12 +390,15 @@ def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
     freshness = payload.get("freshness")
     counts = payload.get("signal_counts")
     if (
-        payload.get("schema") != "runtime.documents-controller-shadow.v1"
-        or payload.get("status") != "shadow_incomplete"
+        payload.get("schema") != "runtime.documents-controller-shadow.v2"
+        or payload.get("status") != "shadow_observed"
         or payload.get("legacy_controller_replaced") is not False
-        or payload.get("covered_rule_ids") != list(_CONTROLLER_SHADOW_COVERED_RULE_IDS)
-        or payload.get("unmigrated_rule_ids")
-        != list(_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS)
+        or payload.get("cutover_ready") is not False
+        or payload.get("legacy_rule_ids") != list(_CONTROLLER_SHADOW_LEGACY_RULE_IDS)
+        or payload.get("observed_rule_ids")
+        != list(_CONTROLLER_SHADOW_OBSERVED_RULE_IDS)
+        or payload.get("unobserved_rule_ids")
+        != list(_CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS)
         or not isinstance(counts, dict)
         or set(counts) != {"red", "warning", "ok"}
         or not all(
@@ -409,13 +421,16 @@ def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
     ):
         raise ValueError("controller shadow evidence has an invalid schema")
     return {
-        "schema": "runtime.documents-controller-shadow.evidence.v1",
-        "status": "shadow_incomplete",
+        "schema": "runtime.documents-controller-shadow.evidence.v2",
+        "status": "shadow_observed",
         "legacy_controller_replaced": False,
-        "covered_rule_ids": list(_CONTROLLER_SHADOW_COVERED_RULE_IDS),
-        "covered_rule_count": len(_CONTROLLER_SHADOW_COVERED_RULE_IDS),
-        "unmigrated_rule_ids": list(_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS),
-        "unmigrated_rule_count": len(_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS),
+        "cutover_ready": False,
+        "legacy_rule_ids": list(_CONTROLLER_SHADOW_LEGACY_RULE_IDS),
+        "legacy_rule_count": len(_CONTROLLER_SHADOW_LEGACY_RULE_IDS),
+        "observed_rule_ids": list(_CONTROLLER_SHADOW_OBSERVED_RULE_IDS),
+        "observed_rule_count": len(_CONTROLLER_SHADOW_OBSERVED_RULE_IDS),
+        "unobserved_rule_ids": list(_CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS),
+        "unobserved_rule_count": len(_CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS),
     }
 
 
@@ -428,7 +443,7 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _kems_check_evidence(stdout)
     if spec.evidence_projection == "control-health-v1":
         return _control_health_evidence(stdout)
-    if spec.evidence_projection == "controller-shadow-v1":
+    if spec.evidence_projection == "controller-shadow-v2":
         return _controller_shadow_evidence(stdout)
     raise ValueError(
         "job evidence projection is not supported"

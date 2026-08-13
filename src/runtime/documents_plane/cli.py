@@ -20,7 +20,7 @@ from .paths import (
 )
 
 _CONTROLLER_SHADOW_ACTION = "shadow_legacy_controller"
-_CONTROLLER_SHADOW_SCHEMA = "runtime.documents-controller-shadow.evidence.v1"
+_CONTROLLER_SHADOW_SCHEMA = "runtime.documents-controller-shadow.evidence.v2"
 _CONTROLLER_SHADOW_READS = (
     "@工作文档/卫健委/_control",
     "@工作文档/卫健委/_entities",
@@ -111,7 +111,7 @@ def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
             _CONTROLLER_SHADOW_EVIDENCE_PREFIX
         ),
         fail_closed=True,
-        evidence_projection="controller-shadow-v1",
+        evidence_projection="controller-shadow-v2",
     )
 
 

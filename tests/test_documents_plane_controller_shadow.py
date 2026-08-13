@@ -31,7 +31,7 @@ def _domain(documents_root: Path) -> Path:
     return domain
 
 
-def test_controller_shadow_reports_covered_and_unmigrated_legacy_rules(
+def test_controller_shadow_inventories_legacy_rules_and_marks_the_safe_subset_observed(
     tmp_path: Path,
 ) -> None:
     from runtime.documents_plane.controller_shadow import inspect_controller_shadow
@@ -41,7 +41,7 @@ def test_controller_shadow_reports_covered_and_unmigrated_legacy_rules(
     result = inspect_controller_shadow(domain, today=date(2026, 8, 13))
 
     assert result.as_dict() == {
-        "covered_rule_ids": ["CR01", "CR02", "CR03", "CR05"],
+        "cutover_ready": False,
         "freshness": {
             "invalid_reviewed_count": 0,
             "scanned_markdown_count": 5,
@@ -50,10 +50,32 @@ def test_controller_shadow_reports_covered_and_unmigrated_legacy_rules(
             "unreadable_regular_file_count": 0,
         },
         "legacy_controller_replaced": False,
-        "schema": "runtime.documents-controller-shadow.v1",
+        "legacy_rule_ids": [
+            "CR01",
+            "CR02",
+            "CR03",
+            "CR05",
+            "CR08",
+            "CR23",
+            "CR24",
+            "CR25",
+            "CR26",
+            "CR29",
+            "CR30",
+        ],
+        "observed_rule_ids": ["CR01", "CR02", "CR03", "CR05"],
+        "schema": "runtime.documents-controller-shadow.v2",
         "signal_counts": {"ok": 0, "red": 1, "warning": 3},
-        "status": "shadow_incomplete",
-        "unmigrated_rule_ids": ["CR08", "CR23", "CR24", "CR25", "CR26", "CR29", "CR30"],
+        "status": "shadow_observed",
+        "unobserved_rule_ids": [
+            "CR08",
+            "CR23",
+            "CR24",
+            "CR25",
+            "CR26",
+            "CR29",
+            "CR30",
+        ],
     }
 
 
@@ -100,7 +122,7 @@ def test_controller_shadow_job_refuses_binding_contract_drift(tmp_path: Path) ->
         )
 
 
-def test_controller_shadow_job_records_incomplete_parity_outside_documents(
+def test_controller_shadow_job_records_observation_without_cutover_outside_documents(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
     from runtime.documents_plane.cli import main
@@ -138,7 +160,7 @@ def test_controller_shadow_job_records_incomplete_parity_outside_documents(
       - \"@工作文档/卫健委/_knowledge\"
     writes: []
     evidence_relative_path: control/evidence/documents-weijian-controller-shadow/documents-weijian-controller-shadow.json
-    evidence_schema: runtime.documents-controller-shadow.evidence.v1
+    evidence_schema: runtime.documents-controller-shadow.evidence.v2
     fail_closed: true
 """,
         encoding="utf-8",
@@ -169,14 +191,15 @@ def test_controller_shadow_job_records_incomplete_parity_outside_documents(
         / "documents-weijian-controller-shadow"
         / "documents-weijian-controller-shadow.json"
     )
-    assert json.loads(result["stdout"])["status"] == "shadow_incomplete"
+    assert json.loads(result["stdout"])["status"] == "shadow_observed"
     assert receipt["owner_evidence"] == {
-        "covered_rule_ids": ["CR01", "CR02", "CR03", "CR05"],
-        "covered_rule_count": 4,
+        "cutover_ready": False,
         "legacy_controller_replaced": False,
-        "schema": "runtime.documents-controller-shadow.evidence.v1",
-        "status": "shadow_incomplete",
-        "unmigrated_rule_ids": [
+        "legacy_rule_ids": [
+            "CR01",
+            "CR02",
+            "CR03",
+            "CR05",
             "CR08",
             "CR23",
             "CR24",
@@ -185,7 +208,21 @@ def test_controller_shadow_job_records_incomplete_parity_outside_documents(
             "CR29",
             "CR30",
         ],
-        "unmigrated_rule_count": 7,
+        "legacy_rule_count": 11,
+        "observed_rule_ids": ["CR01", "CR02", "CR03", "CR05"],
+        "observed_rule_count": 4,
+        "schema": "runtime.documents-controller-shadow.evidence.v2",
+        "status": "shadow_observed",
+        "unobserved_rule_ids": [
+            "CR08",
+            "CR23",
+            "CR24",
+            "CR25",
+            "CR26",
+            "CR29",
+            "CR30",
+        ],
+        "unobserved_rule_count": 7,
     }
     assert not (domain / "_runtime" / "巡检报告").exists()
     assert "signals.md" not in json.dumps(receipt, ensure_ascii=False)
