@@ -7,7 +7,6 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-
 from runtime.documents_plane.jobs import JobRegistry, JobSpec, run_job
 
 
@@ -141,7 +140,7 @@ def test_default_registry_declares_read_only_weijian_facts_audit(
         {"DOCUMENTS_CONTENT_ROOT": str(tmp_path / "Documents")}
     ).resolve("documents-weijian-facts-audit")
 
-    assert spec.reads == ("@工作文档/卫健委",)
+    assert spec.reads == ("@工作文档/卫健委/_entities/facts",)
     assert spec.writes == ()
     assert spec.owner == "runtime-facts"
     assert spec.schedule == "manual"
