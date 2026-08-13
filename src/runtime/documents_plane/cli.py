@@ -71,7 +71,7 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     registry.register(
         JobSpec(
             job_id="documents-weijian-facts-audit",
-            reads=("@工作文档/卫健委",),
+            reads=("@工作文档/卫健委/_entities/facts",),
             writes=(),
             owner="runtime-facts",
             schedule="manual",
