@@ -131,6 +131,74 @@ def test_default_registry_declares_configured_registry_read_scope(
     assert spec.reads == ("registries/custom.yaml",)
 
 
+def test_default_registry_declares_read_only_weijian_facts_audit(
+    tmp_path: Path,
+) -> None:
+    from runtime.documents_plane.cli import _default_registry
+
+    spec, command = _default_registry(
+        {"DOCUMENTS_CONTENT_ROOT": str(tmp_path / "Documents")}
+    ).resolve("documents-weijian-facts-audit")
+
+    assert spec.reads == ("@工作文档/卫健委",)
+    assert spec.writes == ()
+    assert spec.owner == "runtime-facts"
+    assert spec.schedule == "manual"
+    assert command[-2:] == ("--domain-relative", "@工作文档/卫健委")
+
+
+def test_default_cli_runs_weijian_facts_audit_read_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    documents_root = tmp_path / "Documents"
+    facts_dir = documents_root / "@工作文档" / "卫健委" / "_entities" / "facts"
+    facts_dir.mkdir(parents=True)
+    facts_dir.joinpath("00-info.yaml").write_text(
+        "facts:\n"
+        "  - fid: fact-20260813-001\n"
+        "    type: info\n"
+        "    trust: confirmed\n"
+        "    importance: medium\n"
+        "    statement: 事实样本\n"
+        "    summary: 样本\n"
+        "    verified_at: '2026-08-13'\n"
+        "    expiry: '2026-11-11'\n"
+        "    entity_ids: [entity-demo]\n"
+        "    status: active\n",
+        encoding="utf-8",
+    )
+    facts_dir.joinpath("_index.yaml").write_text(
+        "facts_total: 1\nby_type: {info: 1}\n", encoding="utf-8"
+    )
+    source_root = Path(__file__).parents[1] / "src"
+    monkeypatch.setenv("PYTHONPATH", str(source_root))
+
+    exit_code = main(
+        ["documents", "run", "documents-weijian-facts-audit", "--json"],
+        environ={
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+            "PYTHONPATH": str(source_root),
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["job_id"] == "documents-weijian-facts-audit"
+    assert payload["status"] == "succeeded"
+    assert json.loads(payload["stdout"])["facts_total"] == 1
+    assert sorted(path.name for path in facts_dir.iterdir()) == [
+        "00-info.yaml",
+        "_index.yaml",
+    ]
+
+
 def test_default_cli_registry_job_preserves_owner_nonzero_exit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
