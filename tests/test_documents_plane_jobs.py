@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
 from runtime.documents_plane.jobs import JobRegistry, JobSpec, run_job
 
 
@@ -89,7 +90,7 @@ def test_default_cli_registry_job_delegates_to_configured_l4_owner(
         'test "$3" = --registry\n'
         f'test "$4" = {shlex.quote(str(registry_path))}\n'
         'test "$5" = --json\n'
-        "printf '{\\\"ok\\\":true}\\n'\n",
+        "printf '%s\\n' '{\"ok\":true}'\n",
         encoding="utf-8",
     )
     owner.chmod(0o755)
@@ -367,7 +368,7 @@ def test_default_cli_content_audit_delegates_documents_root_to_l4_owner(
         'test "$2" = audit\n'
         'test "$3" = "$DOCUMENTS_CONTENT_ROOT"\n'
         'test "$4" = --json\n'
-        "printf '{\\\"ok\\\":false}\\n'\n"
+        "printf '%s\\n' '{\"ok\":false}'\n"
         "exit 1\n",
         encoding="utf-8",
     )
