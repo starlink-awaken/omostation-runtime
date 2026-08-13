@@ -89,6 +89,31 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             "@工作文档/卫健委",
         ],
     )
+    registry.register(
+        JobSpec(
+            job_id="documents-weijian-kems-check",
+            reads=("@工作文档/卫健委", "_inbox"),
+            writes=("kems",),
+            owner="runtime-kems",
+            schedule="manual",
+            timeout=60,
+            evidence_path="documents-weijian-kems-check.json",
+            fail_closed=True,
+            evidence_projection="kems-check-v1",
+        ),
+        [
+            sys.executable,
+            "-m",
+            "runtime.documents_plane.kems",
+            "check",
+            "--domain-relative",
+            "@工作文档/卫健委",
+            "--extra-inbox-relative",
+            "_inbox",
+            "--state-relative",
+            "kems/weijian-check.json",
+        ],
+    )
     return registry
 
 

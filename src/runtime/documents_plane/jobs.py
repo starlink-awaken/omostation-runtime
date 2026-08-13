@@ -23,7 +23,10 @@ from .paths import (
 _JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _RUNTIME_IO_FAILURE = 74
 _DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-_EVIDENCE_PROJECTIONS = frozenset({"metadata", "facts-audit-v1"})
+_EVIDENCE_PROJECTIONS = frozenset({"metadata", "facts-audit-v1", "kems-check-v1"})
+_KEMS_CHECK_SCOPES = frozenset(
+    {"inbox", "knowledge", "entities", "control", "buffer_inbox"}
+)
 
 
 @dataclass(frozen=True)
@@ -282,11 +285,46 @@ def _facts_audit_evidence(stdout: str) -> dict[str, object]:
     }
 
 
+def _kems_check_evidence(stdout: str) -> dict[str, object]:
+    """Project KEMS state without persisting Documents paths or source metadata."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("KEMS check evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("KEMS check evidence must be a JSON object")
+    status = payload.get("status")
+    baseline = payload.get("baseline")
+    changed_scopes = payload.get("changed_scopes")
+    if (
+        payload.get("schema") != "runtime.documents-kems-check.v1"
+        or status not in {"ok", "changed"}
+        or baseline not in {"initialized", "existing"}
+        or not isinstance(changed_scopes, list)
+        or not all(
+            isinstance(scope, str) and scope in _KEMS_CHECK_SCOPES
+            for scope in changed_scopes
+        )
+        or len(set(changed_scopes)) != len(changed_scopes)
+    ):
+        raise ValueError("KEMS check evidence has an invalid schema")
+    if (status == "ok") != (not changed_scopes):
+        raise ValueError("KEMS check evidence has an invalid schema")
+    return {
+        "schema": "runtime.documents-kems-check.evidence.v1",
+        "status": status,
+        "baseline": baseline,
+        "changed_scope_count": len(changed_scopes),
+    }
+
+
 def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
     if spec.evidence_projection == "metadata":
         return None
     if spec.evidence_projection == "facts-audit-v1":
         return _facts_audit_evidence(stdout)
+    if spec.evidence_projection == "kems-check-v1":
+        return _kems_check_evidence(stdout)
     raise ValueError(
         "job evidence projection is not supported"
     )  # pragma: no cover - validated at registration
