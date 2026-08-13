@@ -78,6 +78,7 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             timeout=60,
             evidence_path="documents-weijian-facts-audit.json",
             fail_closed=True,
+            evidence_projection="facts-audit-v1",
         ),
         [
             sys.executable,

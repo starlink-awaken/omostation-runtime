@@ -23,6 +23,7 @@ from .paths import (
 _JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _RUNTIME_IO_FAILURE = 74
 _DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+_EVIDENCE_PROJECTIONS = frozenset({"metadata", "facts-audit-v1"})
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class JobSpec:
     timeout: float
     evidence_path: str
     fail_closed: bool
+    evidence_projection: str = "metadata"
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,7 @@ class JobResult:
     timed_out: bool
     evidence_path: Path | None
     evidence_error: str | None = None
+    evidence_summary: dict[str, object] | None = None
 
     @property
     def status(self) -> str:
@@ -111,6 +114,8 @@ def _validate_spec(spec: JobSpec) -> None:
         raise ValueError("job timeout must be positive")
     if not isinstance(spec.fail_closed, bool) or not spec.fail_closed:
         raise ValueError("Documents-plane jobs must be fail_closed")
+    if spec.evidence_projection not in _EVIDENCE_PROJECTIONS:
+        raise ValueError("job evidence projection is not supported")
     if isinstance(spec.reads, str) or isinstance(spec.writes, str):
         raise TypeError("job paths must be relative path sequences")
     for path in spec.reads:
@@ -229,6 +234,64 @@ def _prepare_private_layout(state_root: Path, spec: JobSpec) -> _PrivateLayout:
     )
 
 
+def _facts_audit_evidence(stdout: str) -> dict[str, object]:
+    """Keep the Facts contract observable without storing source facts in Runtime state."""
+
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("facts-audit evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("facts-audit evidence must be a JSON object")
+
+    status = payload.get("status")
+    facts_total = payload.get("facts_total")
+    by_type = payload.get("by_type")
+    errors = payload.get("errors")
+    warnings = payload.get("warnings")
+    if (
+        status not in {"ok", "invalid"}
+        or not isinstance(facts_total, int)
+        or isinstance(facts_total, bool)
+        or facts_total < 0
+        or not isinstance(by_type, dict)
+        or not isinstance(errors, list)
+        or not isinstance(warnings, list)
+    ):
+        raise ValueError("facts-audit evidence has an invalid schema")
+
+    normalized_types: dict[str, int] = {}
+    for fact_type, count in by_type.items():
+        if (
+            not isinstance(fact_type, str)
+            or not isinstance(count, int)
+            or isinstance(count, bool)
+            or count < 0
+        ):
+            raise ValueError("facts-audit evidence has an invalid schema")
+        normalized_types[fact_type] = count
+    if sum(normalized_types.values()) != facts_total:
+        raise ValueError("facts-audit evidence has an invalid schema")
+    return {
+        "schema": "runtime.documents-facts-audit.evidence.v1",
+        "status": status,
+        "facts_total": facts_total,
+        "by_type": dict(sorted(normalized_types.items())),
+        "error_count": len(errors),
+        "warning_count": len(warnings),
+    }
+
+
+def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
+    if spec.evidence_projection == "metadata":
+        return None
+    if spec.evidence_projection == "facts-audit-v1":
+        return _facts_audit_evidence(stdout)
+    raise ValueError(
+        "job evidence projection is not supported"
+    )  # pragma: no cover - validated at registration
+
+
 def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
     """Atomically publish a receipt through an anchored no-follow directory FD."""
     payload = {
@@ -239,6 +302,8 @@ def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
         "timed_out": result.timed_out,
         "evidence_error": result.evidence_error,
     }
+    if result.evidence_summary is not None:
+        payload["owner_evidence"] = result.evidence_summary
     try:
         existing = os.stat(
             layout.evidence_name,
@@ -354,6 +419,17 @@ def run_job(
             layout.evidence_path,
             command_result.setup_error,
         )
+        if command_result.setup_error is None:
+            try:
+                evidence_summary = _project_owner_evidence(spec, command_result.stdout)
+            except (TypeError, ValueError) as exc:
+                result = replace(result, evidence_error=str(exc))
+                if command_result.exit_code == 0:
+                    result = _failure_result(
+                        spec, OSError(str(exc)), owner_result=result
+                    )
+            else:
+                result = replace(result, evidence_summary=evidence_summary)
         try:
             _persist_evidence(layout, result)
         except OSError as exc:
