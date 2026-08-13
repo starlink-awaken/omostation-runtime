@@ -9,6 +9,8 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+import yaml
+
 from .jobs import JobRegistry, JobSpec, run_job
 from .paths import (
     DocumentsPlanePathError,
@@ -16,6 +18,101 @@ from .paths import (
     resolve_documents_read_path,
     runtime_state_root,
 )
+
+_CONTROLLER_SHADOW_ACTION = "shadow_legacy_controller"
+_CONTROLLER_SHADOW_SCHEMA = "runtime.documents-controller-shadow.evidence.v1"
+_CONTROLLER_SHADOW_READS = (
+    "@工作文档/卫健委/_control",
+    "@工作文档/卫健委/_entities",
+    "@工作文档/卫健委/_meta",
+    "@工作文档/卫健委/_runtime",
+    "@工作文档/卫健委/_storage",
+    "@工作文档/卫健委/_knowledge",
+)
+_CONTROLLER_SHADOW_EVIDENCE = (
+    "control/evidence/documents-weijian-controller-shadow/"
+    "documents-weijian-controller-shadow.json"
+)
+_CONTROLLER_SHADOW_EVIDENCE_PREFIX = (
+    "control/evidence/documents-weijian-controller-shadow/"
+)
+
+
+def _workspace_binding_registry_path(environ: Mapping[str, str]) -> Path:
+    configured = environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY")
+    if configured:
+        return Path(configured).expanduser()
+    workspace_root = environ.get("WORKSPACE_ROOT")
+    if workspace_root:
+        return (
+            Path(workspace_root).expanduser()
+            / ".omo"
+            / "_truth"
+            / "registry"
+            / "documents-domain-projects.yaml"
+        )
+    raise DocumentsPlanePathError(
+        "DOCUMENTS_DOMAIN_PROJECTS_REGISTRY or WORKSPACE_ROOT is required for Workspace-owned Documents jobs"
+    )
+
+
+def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
+    """Load the one controller-shadow declaration from the Workspace binding SSOT."""
+
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    matches = [
+        item
+        for item in raw["runtime_jobs"]
+        if isinstance(item, dict)
+        and item.get("id") == "documents-weijian-controller-shadow"
+        and item.get("action") == _CONTROLLER_SHADOW_ACTION
+    ]
+    if len(matches) != 1:
+        raise DocumentsPlanePathError(
+            "Workspace controller shadow job must be declared exactly once"
+        )
+    job = matches[0]
+    reads = job.get("reads")
+    timeout = job.get("timeout_seconds")
+    if (
+        job.get("domain_id") != "work-weijian"
+        or job.get("owner") != "runtime-control"
+        or job.get("schedule") != "manual"
+        or job.get("writes") != []
+        or job.get("fail_closed") is not True
+        or job.get("evidence_schema") != _CONTROLLER_SHADOW_SCHEMA
+        or reads != list(_CONTROLLER_SHADOW_READS)
+        or job.get("evidence_relative_path") != _CONTROLLER_SHADOW_EVIDENCE
+        or isinstance(timeout, bool)
+        or not isinstance(timeout, int)
+        or timeout <= 0
+    ):
+        raise DocumentsPlanePathError(
+            "Workspace controller shadow job has an invalid contract"
+        )
+    return JobSpec(
+        job_id="documents-weijian-controller-shadow",
+        reads=tuple(reads),
+        writes=(),
+        owner="runtime-control",
+        schedule="manual",
+        timeout=timeout,
+        evidence_path=_CONTROLLER_SHADOW_EVIDENCE.removeprefix(
+            _CONTROLLER_SHADOW_EVIDENCE_PREFIX
+        ),
+        fail_closed=True,
+        evidence_projection="controller-shadow-v1",
+    )
 
 
 def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
@@ -138,6 +235,20 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             "@工作文档/卫健委",
         ],
     )
+    if environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY") or environ.get(
+        "WORKSPACE_ROOT"
+    ):
+        registry.register(
+            _controller_shadow_job_spec(environ),
+            [
+                sys.executable,
+                "-m",
+                "runtime.documents_plane.controller_shadow",
+                "inspect",
+                "--domain-relative",
+                "@工作文档/卫健委",
+            ],
+        )
     return registry
 
 
