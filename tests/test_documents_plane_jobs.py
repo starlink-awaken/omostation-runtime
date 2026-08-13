@@ -8,6 +8,8 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+
+# isort: split
 from runtime.documents_plane.jobs import JobRegistry, JobSpec, run_job
 
 
