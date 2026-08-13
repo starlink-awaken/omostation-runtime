@@ -36,6 +36,17 @@ _CONTROLLER_SHADOW_EVIDENCE = (
 _CONTROLLER_SHADOW_EVIDENCE_PREFIX = (
     "control/evidence/documents-weijian-controller-shadow/"
 )
+_MODEL_FRESHNESS_ACTION = "audit_model_freshness"
+_MODEL_FRESHNESS_SCHEMA = "runtime.documents-model-freshness.evidence.v1"
+_MODEL_FRESHNESS_READS = (
+    "@工作文档/卫健委/_entities/facts.md",
+    "@工作文档/卫健委/_entities/models",
+)
+_MODEL_FRESHNESS_EVIDENCE = (
+    "control/evidence/documents-weijian-model-freshness/"
+    "documents-weijian-model-freshness.json"
+)
+_MODEL_FRESHNESS_EVIDENCE_PREFIX = "control/evidence/documents-weijian-model-freshness/"
 
 
 def _workspace_binding_registry_path(environ: Mapping[str, str]) -> Path:
@@ -112,6 +123,81 @@ def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
         ),
         fail_closed=True,
         evidence_projection="controller-shadow-v2",
+    )
+
+
+def _model_freshness_job_spec(environ: Mapping[str, str]) -> JobSpec:
+    """Load the one CR24 declaration from the Workspace binding SSOT."""
+
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    matches = [
+        item
+        for item in raw["runtime_jobs"]
+        if isinstance(item, dict)
+        and item.get("id") == "documents-weijian-model-freshness"
+        and item.get("action") == _MODEL_FRESHNESS_ACTION
+    ]
+    if len(matches) != 1:
+        raise DocumentsPlanePathError(
+            "Workspace model freshness job must be declared exactly once"
+        )
+    job = matches[0]
+    if (
+        job.get("domain_id") != "work-weijian"
+        or job.get("owner") != "runtime-control"
+        or job.get("schedule") != "manual"
+        or job.get("timeout_seconds") != 30
+        or isinstance(job.get("timeout_seconds"), bool)
+        or job.get("reads") != list(_MODEL_FRESHNESS_READS)
+        or job.get("writes") != []
+        or job.get("evidence_relative_path") != _MODEL_FRESHNESS_EVIDENCE
+        or job.get("evidence_schema") != _MODEL_FRESHNESS_SCHEMA
+        or job.get("fail_closed") is not True
+    ):
+        raise DocumentsPlanePathError(
+            "Workspace model freshness job has an invalid contract"
+        )
+    return JobSpec(
+        job_id="documents-weijian-model-freshness",
+        reads=_MODEL_FRESHNESS_READS,
+        writes=(),
+        owner="runtime-control",
+        schedule="manual",
+        timeout=30,
+        evidence_path=_MODEL_FRESHNESS_EVIDENCE.removeprefix(
+            _MODEL_FRESHNESS_EVIDENCE_PREFIX
+        ),
+        fail_closed=True,
+        evidence_projection="model-freshness-v1",
+    )
+
+
+def _binding_declares_model_freshness(environ: Mapping[str, str]) -> bool:
+    """Allow older bindings to omit CR24 while validating any declaration strictly."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    return any(
+        isinstance(item, dict) and item.get("id") == "documents-weijian-model-freshness"
+        for item in raw["runtime_jobs"]
     )
 
 
@@ -249,6 +335,18 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
                 "@工作文档/卫健委",
             ],
         )
+        if _binding_declares_model_freshness(environ):
+            registry.register(
+                _model_freshness_job_spec(environ),
+                [
+                    sys.executable,
+                    "-m",
+                    "runtime.documents_plane.model_freshness",
+                    "inspect",
+                    "--domain-relative",
+                    "@工作文档/卫健委",
+                ],
+            )
     return registry
 
 

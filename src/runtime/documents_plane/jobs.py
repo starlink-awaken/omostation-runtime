@@ -9,6 +9,7 @@ import secrets
 import stat
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
+from datetime import date
 from pathlib import Path
 
 from .commands import CommandResult, normalize_argv, run_owner_command
@@ -30,6 +31,7 @@ _EVIDENCE_PROJECTIONS = frozenset(
         "kems-check-v1",
         "control-health-v1",
         "controller-shadow-v2",
+        "model-freshness-v1",
     }
 )
 _KEMS_CHECK_SCOPES = frozenset(
@@ -38,6 +40,28 @@ _KEMS_CHECK_SCOPES = frozenset(
 _CONTROL_HEALTH_STATUSES = frozenset({"ok", "attention", "critical", "invalid"})
 _FACTS_VIEW_STATUSES = frozenset(
     {"current", "stale_30d", "stale_60d", "missing", "invalid"}
+)
+_MODEL_FRESHNESS_STATUSES = frozenset({"ok", "attention", "unavailable"})
+_MODEL_FRESHNESS_ERRORS = frozenset(
+    {
+        "domain_root_missing",
+        "domain_root_unreadable",
+        "domain_root_not_direct",
+        "domain_path_invalid",
+        "facts_file_missing",
+        "facts_file_not_regular",
+        "facts_file_unreadable",
+        "facts_last_reviewed_missing",
+        "facts_last_reviewed_invalid",
+        "models_directory_missing",
+        "models_directory_unreadable",
+        "models_directory_not_direct",
+        "models_directory_empty",
+        "model_file_not_regular",
+        "model_file_unreadable",
+        "model_last_reviewed_missing",
+        "model_last_reviewed_invalid",
+    }
 )
 _CONTROLLER_SHADOW_LEGACY_RULE_IDS = (
     "CR01",
@@ -434,6 +458,107 @@ def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
     }
 
 
+def _valid_iso_date(value: object, *, optional: bool = False) -> bool:
+    if value is None:
+        return optional
+    if not isinstance(value, str):
+        return False
+    try:
+        return date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        return False
+
+
+def _model_freshness_evidence(stdout: str) -> dict[str, object]:
+    """Persist only the aggregate CR24 result, never owner stdout or identity."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("model-freshness evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("model-freshness evidence must be a JSON object")
+    fields = {
+        "schema",
+        "status",
+        "checked_on",
+        "facts_last_reviewed",
+        "model_markdown_count",
+        "fresh_model_count",
+        "stale_model_count",
+        "invalid_reviewed_count",
+        "unreadable_regular_file_count",
+        "error",
+    }
+    count_fields = {
+        "model_markdown_count",
+        "fresh_model_count",
+        "stale_model_count",
+        "invalid_reviewed_count",
+        "unreadable_regular_file_count",
+    }
+    status = payload.get("status")
+    error = payload.get("error")
+    if (
+        set(payload) != fields
+        or payload.get("schema") != "runtime.documents-model-freshness.v1"
+        or status not in _MODEL_FRESHNESS_STATUSES
+        or not _valid_iso_date(payload.get("checked_on"))
+        or not _valid_iso_date(payload.get("facts_last_reviewed"), optional=True)
+        or not all(
+            isinstance(payload.get(field), int)
+            and not isinstance(payload.get(field), bool)
+            and payload[field] >= 0
+            for field in count_fields
+        )
+        or (status == "unavailable") != (error in _MODEL_FRESHNESS_ERRORS)
+        or (status != "unavailable" and error is not None)
+    ):
+        raise ValueError("model-freshness evidence has an invalid schema")
+    model_count = payload["model_markdown_count"]
+    fresh_count = payload["fresh_model_count"]
+    stale_count = payload["stale_model_count"]
+    invalid_count = payload["invalid_reviewed_count"]
+    unreadable_count = payload["unreadable_regular_file_count"]
+    if (
+        fresh_count + stale_count > model_count
+        or (
+            status == "ok"
+            and (
+                model_count == 0
+                or fresh_count != model_count
+                or stale_count != 0
+                or invalid_count != 0
+                or unreadable_count != 0
+                or payload["facts_last_reviewed"] is None
+            )
+        )
+        or (
+            status == "attention"
+            and (
+                model_count == 0
+                or fresh_count + stale_count != model_count
+                or stale_count == 0
+                or invalid_count != 0
+                or unreadable_count != 0
+                or payload["facts_last_reviewed"] is None
+            )
+        )
+    ):
+        raise ValueError("model-freshness evidence has an invalid schema")
+    return {
+        "schema": "runtime.documents-model-freshness.evidence.v1",
+        "status": status,
+        "checked_on": payload["checked_on"],
+        "facts_last_reviewed": payload["facts_last_reviewed"],
+        "model_markdown_count": model_count,
+        "fresh_model_count": fresh_count,
+        "stale_model_count": stale_count,
+        "invalid_reviewed_count": invalid_count,
+        "unreadable_regular_file_count": unreadable_count,
+        "error": error,
+    }
+
+
 def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
     if spec.evidence_projection == "metadata":
         return None
@@ -445,6 +570,8 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _control_health_evidence(stdout)
     if spec.evidence_projection == "controller-shadow-v2":
         return _controller_shadow_evidence(stdout)
+    if spec.evidence_projection == "model-freshness-v1":
+        return _model_freshness_evidence(stdout)
     raise ValueError(
         "job evidence projection is not supported"
     )  # pragma: no cover - validated at registration

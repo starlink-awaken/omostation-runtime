@@ -4,10 +4,12 @@ import json
 import shlex
 import sys
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import pytest
 
+# isort: split
 from runtime.documents_plane.jobs import JobRegistry, JobSpec, run_job
 
 
@@ -21,6 +23,67 @@ def _spec() -> JobSpec:
         timeout=1,
         evidence_path="evidence/contract-check.json",
         fail_closed=True,
+    )
+
+
+def _model_freshness_binding_environ(tmp_path: Path) -> dict[str, str]:
+    documents_root = tmp_path / "Documents"
+    registry_path = tmp_path / "documents-domain-projects.yaml"
+    registry_path.write_text(
+        """runtime_jobs:
+  - id: documents-weijian-controller-shadow
+    domain_id: work-weijian
+    owner: runtime-control
+    action: shadow_legacy_controller
+    schedule: manual
+    timeout_seconds: 30
+    reads:
+      - "@工作文档/卫健委/_control"
+      - "@工作文档/卫健委/_entities"
+      - "@工作文档/卫健委/_meta"
+      - "@工作文档/卫健委/_runtime"
+      - "@工作文档/卫健委/_storage"
+      - "@工作文档/卫健委/_knowledge"
+    writes: []
+    evidence_relative_path: control/evidence/documents-weijian-controller-shadow/documents-weijian-controller-shadow.json
+    evidence_schema: runtime.documents-controller-shadow.evidence.v2
+    fail_closed: true
+  - id: documents-weijian-model-freshness
+    domain_id: work-weijian
+    owner: runtime-control
+    action: audit_model_freshness
+    schedule: manual
+    timeout_seconds: 30
+    reads:
+      - "@工作文档/卫健委/_entities/facts.md"
+      - "@工作文档/卫健委/_entities/models"
+    writes: []
+    evidence_relative_path: control/evidence/documents-weijian-model-freshness/documents-weijian-model-freshness.json
+    evidence_schema: runtime.documents-model-freshness.evidence.v1
+    fail_closed: true
+""",
+        encoding="utf-8",
+    )
+    return {
+        "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+        "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+        "DOCUMENTS_DOMAIN_PROJECTS_REGISTRY": str(registry_path),
+        "PYTHONPATH": str(Path(__file__).parents[1] / "src"),
+    }
+
+
+def _write_model_freshness_fixture(
+    documents_root: Path, *, facts_reviewed: str, model_reviewed: str
+) -> None:
+    entities = documents_root / "@工作文档" / "卫健委" / "_entities"
+    models = entities / "models"
+    models.mkdir(parents=True)
+    entities.joinpath("facts.md").write_text(
+        f"last-reviewed: {facts_reviewed}\nfixture facts body\n", encoding="utf-8"
+    )
+    models.joinpath("fixture-private-model.md").write_text(
+        f"last-reviewed: {model_reviewed}\nfixture private model body\n",
+        encoding="utf-8",
     )
 
 
@@ -802,3 +865,181 @@ def test_documents_cli_runs_registered_job_as_json_dry_run(
     assert exit_code == 0
     assert json.loads(capsys.readouterr().out)["dry_run"] is True
     assert not (tmp_path / "state").exists()
+
+
+def test_default_registry_loads_exact_model_freshness_binding(tmp_path: Path) -> None:
+    from runtime.documents_plane.cli import _default_registry
+
+    environ = _model_freshness_binding_environ(tmp_path)
+    registry_path = (
+        Path(environ["DOCUMENTS_CONTENT_ROOT"])
+        / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
+    )
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("kind: registry\n", encoding="utf-8")
+
+    spec, command = _default_registry(environ).resolve(
+        "documents-weijian-model-freshness"
+    )
+
+    assert spec == JobSpec(
+        job_id="documents-weijian-model-freshness",
+        reads=(
+            "@工作文档/卫健委/_entities/facts.md",
+            "@工作文档/卫健委/_entities/models",
+        ),
+        writes=(),
+        owner="runtime-control",
+        schedule="manual",
+        timeout=30,
+        evidence_path="documents-weijian-model-freshness.json",
+        fail_closed=True,
+        evidence_projection="model-freshness-v1",
+    )
+    assert command[-2:] == ("--domain-relative", "@工作文档/卫健委")
+
+
+@pytest.mark.parametrize(
+    ("facts_reviewed", "model_reviewed", "expected_exit", "expected_status"),
+    [
+        ("2026-08-13", "2026-08-13", 0, "ok"),
+        ("2026-08-13", "2026-08-12", 1, "attention"),
+    ],
+)
+def test_model_freshness_job_persists_only_bounded_owner_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    facts_reviewed: str,
+    model_reviewed: str,
+    expected_exit: int,
+    expected_status: str,
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    environ = _model_freshness_binding_environ(tmp_path)
+    documents_root = Path(environ["DOCUMENTS_CONTENT_ROOT"])
+    _write_model_freshness_fixture(
+        documents_root,
+        facts_reviewed=facts_reviewed,
+        model_reviewed=model_reviewed,
+    )
+    registry_path = documents_root / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("kind: registry\n", encoding="utf-8")
+    monkeypatch.setenv("PYTHONPATH", environ["PYTHONPATH"])
+
+    exit_code = main(
+        ["documents", "run", "documents-weijian-model-freshness", "--json"],
+        environ=environ,
+    )
+
+    result = json.loads(capsys.readouterr().out)
+    receipt = json.loads(Path(result["evidence_path"]).read_text(encoding="utf-8"))
+    checked_on = receipt["owner_evidence"]["checked_on"]
+    assert date.fromisoformat(checked_on).isoformat() == checked_on
+    assert exit_code == expected_exit
+    assert receipt["exit_code"] == expected_exit
+    assert receipt["evidence_error"] is None
+    assert receipt["owner_evidence"] == {
+        "schema": "runtime.documents-model-freshness.evidence.v1",
+        "status": expected_status,
+        "checked_on": checked_on,
+        "facts_last_reviewed": facts_reviewed,
+        "model_markdown_count": 1,
+        "fresh_model_count": int(expected_status == "ok"),
+        "stale_model_count": int(expected_status == "attention"),
+        "invalid_reviewed_count": 0,
+        "unreadable_regular_file_count": 0,
+        "error": None,
+    }
+    encoded_receipt = json.dumps(receipt, ensure_ascii=False)
+    assert "stdout" not in receipt
+    assert "@工作文档" not in encoded_receipt
+    assert "fixture-private-model.md" not in encoded_receipt
+    assert "fixture private model body" not in encoded_receipt
+
+
+def test_model_freshness_unavailable_exit_two_still_persists_valid_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    environ = _model_freshness_binding_environ(tmp_path)
+    documents_root = Path(environ["DOCUMENTS_CONTENT_ROOT"])
+    models = documents_root / "@工作文档" / "卫健委" / "_entities" / "models"
+    models.mkdir(parents=True)
+    models.joinpath("fixture-private-model.md").write_text(
+        "last-reviewed: 2026-08-13\nfixture private model body\n",
+        encoding="utf-8",
+    )
+    registry_path = documents_root / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("kind: registry\n", encoding="utf-8")
+    monkeypatch.setenv("PYTHONPATH", environ["PYTHONPATH"])
+
+    exit_code = main(
+        ["documents", "run", "documents-weijian-model-freshness", "--json"],
+        environ=environ,
+    )
+
+    result = json.loads(capsys.readouterr().out)
+    receipt = json.loads(Path(result["evidence_path"]).read_text(encoding="utf-8"))
+    assert exit_code == 2
+    assert receipt["exit_code"] == 2
+    assert receipt["evidence_error"] is None
+    assert receipt["owner_evidence"]["status"] == "unavailable"
+    assert receipt["owner_evidence"]["error"] == "facts_file_missing"
+    encoded_receipt = json.dumps(receipt, ensure_ascii=False)
+    assert "@工作文档" not in encoded_receipt
+    assert "fixture-private-model.md" not in encoded_receipt
+    assert "fixture private model body" not in encoded_receipt
+
+
+def test_model_freshness_projection_rejects_successful_malformed_owner_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    registry = JobRegistry()
+    registry.register(
+        replace(
+            _spec(),
+            writes=(),
+            evidence_projection="model-freshness-v1",
+        ),
+        [
+            sys.executable,
+            "-c",
+            "import json; print(json.dumps({'schema': 'runtime.documents-model-freshness.v1', 'status': 'ok'}))",
+        ],
+    )
+    documents_root = tmp_path / "Documents"
+    documents_root.mkdir()
+
+    result = run_job(
+        registry,
+        "contract-check",
+        state_root=tmp_path / "state",
+        documents_root=documents_root,
+    )
+
+    assert result.exit_code == 74
+    assert result.evidence_error == "model-freshness evidence has an invalid schema"
+    assert result.evidence_path is not None
+    receipt = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+    assert receipt["exit_code"] == 74
+    assert receipt["evidence_error"] == result.evidence_error
+    assert "owner_evidence" not in receipt
