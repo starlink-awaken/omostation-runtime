@@ -48,6 +48,9 @@ _MODEL_FRESHNESS_ERRORS = frozenset(
         "domain_root_unreadable",
         "domain_root_not_direct",
         "domain_path_invalid",
+        "entities_directory_missing",
+        "entities_directory_unreadable",
+        "entities_directory_not_direct",
         "facts_file_missing",
         "facts_file_not_regular",
         "facts_file_unreadable",
@@ -62,6 +65,33 @@ _MODEL_FRESHNESS_ERRORS = frozenset(
         "model_last_reviewed_missing",
         "model_last_reviewed_invalid",
     }
+)
+_MODEL_FRESHNESS_PRE_FACTS_ERRORS = frozenset(
+    {
+        "domain_root_missing",
+        "domain_root_unreadable",
+        "domain_root_not_direct",
+        "domain_path_invalid",
+        "entities_directory_missing",
+        "entities_directory_unreadable",
+        "entities_directory_not_direct",
+        "facts_file_missing",
+        "facts_file_not_regular",
+        "facts_file_unreadable",
+        "facts_last_reviewed_missing",
+        "facts_last_reviewed_invalid",
+    }
+)
+_MODEL_FRESHNESS_DIRECTORY_ERRORS = frozenset(
+    {
+        "models_directory_missing",
+        "models_directory_unreadable",
+        "models_directory_not_direct",
+        "models_directory_empty",
+    }
+)
+_MODEL_FRESHNESS_REVIEWED_ERRORS = frozenset(
+    {"model_last_reviewed_missing", "model_last_reviewed_invalid"}
 )
 _CONTROLLER_SHADOW_LEGACY_RULE_IDS = (
     "CR01",
@@ -469,6 +499,56 @@ def _valid_iso_date(value: object, *, optional: bool = False) -> bool:
         return False
 
 
+def _unavailable_model_freshness_is_consistent(
+    payload: dict[str, object], error: object
+) -> bool:
+    facts_reviewed = payload["facts_last_reviewed"]
+    model_count = payload["model_markdown_count"]
+    fresh_count = payload["fresh_model_count"]
+    stale_count = payload["stale_model_count"]
+    invalid_count = payload["invalid_reviewed_count"]
+    unreadable_count = payload["unreadable_regular_file_count"]
+    no_model_observation = (
+        model_count == 0
+        and fresh_count == 0
+        and stale_count == 0
+        and invalid_count == 0
+        and unreadable_count == 0
+    )
+    if error in _MODEL_FRESHNESS_PRE_FACTS_ERRORS:
+        return facts_reviewed is None and no_model_observation
+    if error in _MODEL_FRESHNESS_DIRECTORY_ERRORS:
+        return facts_reviewed is not None and no_model_observation
+    if error == "model_file_not_regular":
+        return (
+            facts_reviewed is not None
+            and model_count > 0
+            and fresh_count == 0
+            and stale_count == 0
+            and invalid_count == 0
+            and unreadable_count == 0
+        )
+    if error == "model_file_unreadable":
+        return (
+            facts_reviewed is not None
+            and model_count > 0
+            and fresh_count == 0
+            and stale_count == 0
+            and invalid_count == 0
+            and unreadable_count == 1
+        )
+    if error in _MODEL_FRESHNESS_REVIEWED_ERRORS:
+        return (
+            facts_reviewed is not None
+            and model_count > 0
+            and fresh_count == 0
+            and stale_count == 0
+            and invalid_count == 1
+            and unreadable_count == 0
+        )
+    return False
+
+
 def _model_freshness_evidence(stdout: str) -> dict[str, object]:
     """Persist only the aggregate CR24 result, never owner stdout or identity."""
     try:
@@ -512,6 +592,10 @@ def _model_freshness_evidence(stdout: str) -> dict[str, object]:
         )
         or (status == "unavailable") != (error in _MODEL_FRESHNESS_ERRORS)
         or (status != "unavailable" and error is not None)
+        or (
+            status == "unavailable"
+            and not _unavailable_model_freshness_is_consistent(payload, error)
+        )
     ):
         raise ValueError("model-freshness evidence has an invalid schema")
     model_count = payload["model_markdown_count"]

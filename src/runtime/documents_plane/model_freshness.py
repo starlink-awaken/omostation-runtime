@@ -109,8 +109,18 @@ def inspect_model_freshness(
     if not stat.S_ISDIR(domain_mode):
         return _unavailable(checked_on, "domain_root_not_direct")
 
+    entities_dir = domain_root / "_entities"
+    try:
+        entities_mode = entities_dir.lstat().st_mode
+    except FileNotFoundError:
+        return _unavailable(checked_on, "entities_directory_missing")
+    except OSError:
+        return _unavailable(checked_on, "entities_directory_unreadable")
+    if not stat.S_ISDIR(entities_mode):
+        return _unavailable(checked_on, "entities_directory_not_direct")
+
     facts_text, facts_error = _read_regular_file(
-        domain_root / "_entities" / "facts.md",
+        entities_dir / "facts.md",
         missing_error="facts_file_missing",
         not_regular_error="facts_file_not_regular",
         unreadable_error="facts_file_unreadable",
@@ -124,7 +134,7 @@ def inspect_model_freshness(
         return _unavailable(checked_on, "facts_last_reviewed_invalid")
     facts_reviewed_text = facts_reviewed.isoformat()
 
-    models_dir = domain_root / "_entities" / "models"
+    models_dir = entities_dir / "models"
     try:
         models_mode = models_dir.lstat().st_mode
     except FileNotFoundError:

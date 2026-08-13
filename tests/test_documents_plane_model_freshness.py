@@ -151,6 +151,33 @@ def test_models_directory_contract_failures_are_unavailable(
     _assert_bounded_unavailable(result, expected_error)
 
 
+def test_entities_symlink_cannot_read_valid_content_outside_domain(
+    tmp_path: Path,
+) -> None:
+    documents_root = tmp_path / "Documents"
+    domain = documents_root / "@工作文档" / "卫健委"
+    external = tmp_path / "external-private-content"
+    external_models = external / "models"
+    external_models.mkdir(parents=True)
+    external.joinpath("facts.md").write_text(
+        "last-reviewed: 2026-08-13\nexternal facts body\n", encoding="utf-8"
+    )
+    external_models.joinpath("external-private-model.md").write_text(
+        "last-reviewed: 2026-08-14\nexternal model body\n", encoding="utf-8"
+    )
+    domain.mkdir(parents=True)
+    domain.joinpath("_entities").symlink_to(external, target_is_directory=True)
+
+    result = inspect_model_freshness(domain, today=date(2026, 8, 14))
+
+    _assert_bounded_unavailable(result, "entities_directory_not_direct")
+    encoded = json.dumps(result.as_dict(), ensure_ascii=False)
+    assert "external-private-content" not in encoded
+    assert "external-private-model.md" not in encoded
+    assert "external facts body" not in encoded
+    assert "external model body" not in encoded
+
+
 @pytest.mark.parametrize(
     ("mutation", "expected_error", "invalid_count", "unreadable_count"),
     [
