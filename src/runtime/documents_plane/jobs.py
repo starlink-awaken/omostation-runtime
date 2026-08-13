@@ -24,7 +24,13 @@ _JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _RUNTIME_IO_FAILURE = 74
 _DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
 _EVIDENCE_PROJECTIONS = frozenset(
-    {"metadata", "facts-audit-v1", "kems-check-v1", "control-health-v1"}
+    {
+        "metadata",
+        "facts-audit-v1",
+        "kems-check-v1",
+        "control-health-v1",
+        "controller-shadow-v1",
+    }
 )
 _KEMS_CHECK_SCOPES = frozenset(
     {"inbox", "knowledge", "entities", "control", "buffer_inbox"}
@@ -32,6 +38,16 @@ _KEMS_CHECK_SCOPES = frozenset(
 _CONTROL_HEALTH_STATUSES = frozenset({"ok", "attention", "critical", "invalid"})
 _FACTS_VIEW_STATUSES = frozenset(
     {"current", "stale_30d", "stale_60d", "missing", "invalid"}
+)
+_CONTROLLER_SHADOW_COVERED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
+_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS = (
+    "CR08",
+    "CR23",
+    "CR24",
+    "CR25",
+    "CR26",
+    "CR29",
+    "CR30",
 )
 
 
@@ -354,6 +370,55 @@ def _control_health_evidence(stdout: str) -> dict[str, object]:
     }
 
 
+def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
+    """Keep the incomplete migration boundary explicit in Runtime evidence."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("controller shadow evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("controller shadow evidence must be a JSON object")
+    freshness = payload.get("freshness")
+    counts = payload.get("signal_counts")
+    if (
+        payload.get("schema") != "runtime.documents-controller-shadow.v1"
+        or payload.get("status") != "shadow_incomplete"
+        or payload.get("legacy_controller_replaced") is not False
+        or payload.get("covered_rule_ids") != list(_CONTROLLER_SHADOW_COVERED_RULE_IDS)
+        or payload.get("unmigrated_rule_ids")
+        != list(_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS)
+        or not isinstance(counts, dict)
+        or set(counts) != {"red", "warning", "ok"}
+        or not all(
+            isinstance(count, int) and not isinstance(count, bool) and count >= 0
+            for count in counts.values()
+        )
+        or not isinstance(freshness, dict)
+        or set(freshness)
+        != {
+            "scanned_markdown_count",
+            "stale_30_60_count",
+            "stale_60_count",
+            "invalid_reviewed_count",
+            "unreadable_regular_file_count",
+        }
+        or not all(
+            isinstance(count, int) and not isinstance(count, bool) and count >= 0
+            for count in freshness.values()
+        )
+    ):
+        raise ValueError("controller shadow evidence has an invalid schema")
+    return {
+        "schema": "runtime.documents-controller-shadow.evidence.v1",
+        "status": "shadow_incomplete",
+        "legacy_controller_replaced": False,
+        "covered_rule_ids": list(_CONTROLLER_SHADOW_COVERED_RULE_IDS),
+        "covered_rule_count": len(_CONTROLLER_SHADOW_COVERED_RULE_IDS),
+        "unmigrated_rule_ids": list(_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS),
+        "unmigrated_rule_count": len(_CONTROLLER_SHADOW_UNMIGRATED_RULE_IDS),
+    }
+
+
 def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
     if spec.evidence_projection == "metadata":
         return None
@@ -363,6 +428,8 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _kems_check_evidence(stdout)
     if spec.evidence_projection == "control-health-v1":
         return _control_health_evidence(stdout)
+    if spec.evidence_projection == "controller-shadow-v1":
+        return _controller_shadow_evidence(stdout)
     raise ValueError(
         "job evidence projection is not supported"
     )  # pragma: no cover - validated at registration
