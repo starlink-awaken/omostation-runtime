@@ -23,9 +23,15 @@ from .paths import (
 _JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _RUNTIME_IO_FAILURE = 74
 _DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-_EVIDENCE_PROJECTIONS = frozenset({"metadata", "facts-audit-v1", "kems-check-v1"})
+_EVIDENCE_PROJECTIONS = frozenset(
+    {"metadata", "facts-audit-v1", "kems-check-v1", "control-health-v1"}
+)
 _KEMS_CHECK_SCOPES = frozenset(
     {"inbox", "knowledge", "entities", "control", "buffer_inbox"}
+)
+_CONTROL_HEALTH_STATUSES = frozenset({"ok", "attention", "critical", "invalid"})
+_FACTS_VIEW_STATUSES = frozenset(
+    {"current", "stale_30d", "stale_60d", "missing", "invalid"}
 )
 
 
@@ -318,6 +324,36 @@ def _kems_check_evidence(stdout: str) -> dict[str, object]:
     }
 
 
+def _control_health_evidence(stdout: str) -> dict[str, object]:
+    """Persist only the control summary, never its Documents source text."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("control-health evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("control-health evidence must be a JSON object")
+    counts = payload.get("signal_counts")
+    if (
+        payload.get("schema") != "runtime.documents-control-health.v1"
+        or payload.get("status") not in _CONTROL_HEALTH_STATUSES
+        or payload.get("facts_view_status") not in _FACTS_VIEW_STATUSES
+        or not isinstance(counts, dict)
+        or set(counts) != {"red", "warning", "ok"}
+        or not all(
+            isinstance(count, int) and not isinstance(count, bool) and count >= 0
+            for count in counts.values()
+        )
+    ):
+        raise ValueError("control-health evidence has an invalid schema")
+    return {
+        "schema": "runtime.documents-control-health.evidence.v1",
+        "status": payload["status"],
+        "facts_view_status": payload["facts_view_status"],
+        "red_signal_count": counts["red"],
+        "warning_signal_count": counts["warning"],
+    }
+
+
 def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
     if spec.evidence_projection == "metadata":
         return None
@@ -325,6 +361,8 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _facts_audit_evidence(stdout)
     if spec.evidence_projection == "kems-check-v1":
         return _kems_check_evidence(stdout)
+    if spec.evidence_projection == "control-health-v1":
+        return _control_health_evidence(stdout)
     raise ValueError(
         "job evidence projection is not supported"
     )  # pragma: no cover - validated at registration

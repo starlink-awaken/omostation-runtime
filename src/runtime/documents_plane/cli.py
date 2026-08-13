@@ -114,6 +114,30 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             "kems/weijian-check.json",
         ],
     )
+    registry.register(
+        JobSpec(
+            job_id="documents-weijian-control-health",
+            reads=(
+                "@工作文档/卫健委/_control/signals.md",
+                "@工作文档/卫健委/_entities/facts.md",
+            ),
+            writes=(),
+            owner="runtime-control",
+            schedule="manual",
+            timeout=30,
+            evidence_path="documents-weijian-control-health.json",
+            fail_closed=True,
+            evidence_projection="control-health-v1",
+        ),
+        [
+            sys.executable,
+            "-m",
+            "runtime.documents_plane.control_health",
+            "inspect",
+            "--domain-relative",
+            "@工作文档/卫健委",
+        ],
+    )
     return registry
 
 
