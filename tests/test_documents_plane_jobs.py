@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
 from runtime.documents_plane.jobs import JobRegistry, JobSpec, run_job
 
 
@@ -197,6 +198,93 @@ def test_default_cli_runs_weijian_facts_audit_read_only(
         "00-info.yaml",
         "_index.yaml",
     ]
+
+
+def test_weijian_facts_audit_persists_bounded_semantic_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Cockpit must be able to project validation without reading Documents facts."""
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    documents_root = tmp_path / "Documents"
+    facts_dir = documents_root / "@工作文档" / "卫健委" / "_entities" / "facts"
+    facts_dir.mkdir(parents=True)
+    facts_dir.joinpath("00-info.yaml").write_text(
+        "facts:\n"
+        "  - fid: fact-20260813-001\n"
+        "    type: info\n"
+        "    trust: confirmed\n"
+        "    importance: medium\n"
+        "    statement: 事实样本\n"
+        "    summary: 样本\n"
+        "    verified_at: '2026-08-13'\n"
+        "    expiry: '2026-11-11'\n"
+        "    entity_ids: [entity-demo]\n"
+        "    status: active\n",
+        encoding="utf-8",
+    )
+    facts_dir.joinpath("_index.yaml").write_text(
+        "facts_total: 1\nby_type: {info: 1}\n", encoding="utf-8"
+    )
+    source_root = Path(__file__).parents[1] / "src"
+    monkeypatch.setenv("PYTHONPATH", str(source_root))
+
+    exit_code = main(
+        ["documents", "run", "documents-weijian-facts-audit", "--json"],
+        environ={
+            "DOCUMENTS_CONTENT_ROOT": str(documents_root),
+            "OMOSTATION_RUNTIME_STATE_ROOT": str(tmp_path / "state"),
+            "PYTHONPATH": str(source_root),
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    evidence = json.loads(Path(payload["evidence_path"]).read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert evidence["owner_evidence"] == {
+        "schema": "runtime.documents-facts-audit.evidence.v1",
+        "status": "ok",
+        "facts_total": 1,
+        "by_type": {"info": 1},
+        "error_count": 0,
+        "warning_count": 0,
+    }
+    assert "stdout" not in evidence
+    assert "statement" not in json.dumps(evidence, ensure_ascii=False)
+
+
+def test_facts_evidence_projection_rejects_successful_malformed_owner_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    registry = JobRegistry()
+    registry.register(
+        replace(_spec(), evidence_projection="facts-audit-v1"),
+        [sys.executable, "-c", "print('not-json')"],
+    )
+    documents_root = tmp_path / "Documents"
+    documents_root.mkdir()
+
+    result = run_job(
+        registry,
+        "contract-check",
+        state_root=tmp_path / "state",
+        documents_root=documents_root,
+    )
+
+    assert result.exit_code == 74
+    assert result.evidence_error == "facts-audit evidence must be a JSON object"
+    assert result.evidence_path is not None
+    evidence = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+    assert evidence["evidence_error"] == result.evidence_error
+    assert "owner_evidence" not in evidence
 
 
 def test_default_cli_registry_job_preserves_owner_nonzero_exit(
