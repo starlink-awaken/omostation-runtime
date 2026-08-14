@@ -36,6 +36,15 @@ class _InspectionError(ValueError):
     """An input failure represented by a safe, stable error category."""
 
 
+class _ArgumentParseError(ValueError):
+    """A deliberately detail-free owner CLI parsing failure."""
+
+
+class _RedactingArgumentParser(argparse.ArgumentParser):
+    def error(self, _message: str) -> None:
+        raise _ArgumentParseError
+
+
 @dataclass(frozen=True)
 class SanyiStatusConsistency:
     """Aggregate-only owner result that is safe to persist in Runtime state."""
@@ -207,12 +216,17 @@ def inspect_sanyi_status(
 
 def main(argv: list[str] | None = None) -> int:
     """Run the owner with its single declared Documents read root."""
-    parser = argparse.ArgumentParser(prog="runtime-documents-sanyi-status")
+    parser = _RedactingArgumentParser(prog="runtime-documents-sanyi-status")
     subcommands = parser.add_subparsers(dest="command", required=True)
     inspect_parser = subcommands.add_parser("inspect")
     inspect_parser.add_argument("--domain-relative", required=True)
-    args = parser.parse_args(argv)
     checked_on = datetime.now(UTC).date()
+    try:
+        args = parser.parse_args(argv)
+    except _ArgumentParseError:
+        result = _unavailable(checked_on, "arguments_invalid")
+        print(json.dumps(result.as_dict(), ensure_ascii=False, sort_keys=True))
+        return _EXIT_CODES[result.status]
     result = _unavailable(checked_on, "domain_invalid")
     if args.command == "inspect" and args.domain_relative == _DOMAIN_RELATIVE:
         try:

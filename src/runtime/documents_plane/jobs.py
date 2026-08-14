@@ -70,6 +70,7 @@ _MODEL_FRESHNESS_ERRORS = frozenset(
 _SANYI_STATUS_SCHEMA = "runtime.documents-sanyi-status-consistency.v1"
 _SANYI_STATUS_ERRORS = frozenset(
     {
+        "arguments_invalid",
         "domain_invalid",
         "dashboard_unavailable",
         "dashboard_invalid",

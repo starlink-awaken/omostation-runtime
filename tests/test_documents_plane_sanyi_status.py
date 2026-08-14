@@ -161,3 +161,41 @@ def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_after_lstat(
     assert result.dashboard_last_reviewed is None
     assert result.latest_verified_at is None
     assert "outside-private" not in json.dumps(result.as_dict(), ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        [
+            "inspect",
+            "--domain-relative",
+            "@工作文档/卫健委",
+            "/private/secret-fid.yaml",
+        ],
+        [
+            "inspect",
+            "--domain-relative",
+            "@工作文档/卫健委",
+            "--json",
+            "/private/secret-fid.yaml",
+        ],
+    ],
+)
+def test_owner_main_redacts_untrusted_argument_parse_failures(
+    capsys: pytest.CaptureFixture[str], arguments: list[str]
+) -> None:
+    from runtime.documents_plane.sanyi_status import main
+
+    exit_code = main(arguments)
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert exit_code == 2
+    assert captured.err == ""
+    assert payload["status"] == "unavailable"
+    assert payload["error"] == "arguments_invalid"
+    assert payload["dashboard_last_reviewed"] is None
+    assert payload["latest_verified_at"] is None
+    assert payload["relevant_fact_count"] == 0
+    assert "/private/secret-fid.yaml" not in captured.out
+    assert "/private/secret-fid.yaml" not in captured.err
