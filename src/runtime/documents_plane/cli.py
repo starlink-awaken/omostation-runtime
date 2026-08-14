@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from .jobs import JobRegistry, JobSpec, run_job
+from .jobs import JobRegistry, JobResult, JobSpec, run_job
 from .paths import (
     DocumentsPlanePathError,
     documents_content_root,
@@ -47,6 +47,37 @@ _MODEL_FRESHNESS_EVIDENCE = (
     "documents-weijian-model-freshness.json"
 )
 _MODEL_FRESHNESS_EVIDENCE_PREFIX = "control/evidence/documents-weijian-model-freshness/"
+_SANYI_ACTION = "audit_sanyi_status_consistency"
+_SANYI_JOB_ID = "documents-weijian-sanyi-status-audit"
+_SANYI_SCHEMA = "runtime.documents-sanyi-status-consistency.evidence.v1"
+_SANYI_READS = (
+    "@工作文档/卫健委/_control/三医态势仪表盘.md",
+    "@工作文档/卫健委/_entities/facts/01-progress.yaml",
+)
+_SANYI_SCOPE = ("proj-syld", "proj-jingbao", "proj-emr-quality")
+_SANYI_EVIDENCE = (
+    "control/evidence/documents-weijian-sanyi-status-audit/"
+    "documents-weijian-sanyi-status-audit.json"
+)
+_SANYI_EVIDENCE_PREFIX = "control/evidence/documents-weijian-sanyi-status-audit/"
+_SANYI_COMMAND = (
+    sys.executable,
+    "-m",
+    "runtime.documents_plane.sanyi_status",
+    "inspect",
+    "--domain-relative",
+    "@工作文档/卫健委",
+)
+_SANYI_PROJECTION = "sanyi-status-consistency-v1"
+
+
+class _SanyiArgumentParseError(ValueError):
+    """A deliberately detail-free public CR08 invocation parse failure."""
+
+
+class _RedactingSanyiArgumentParser(argparse.ArgumentParser):
+    def error(self, _message: str) -> None:
+        raise _SanyiArgumentParseError
 
 
 def _workspace_binding_registry_path(environ: Mapping[str, str]) -> Path:
@@ -201,6 +232,78 @@ def _binding_declares_model_freshness(environ: Mapping[str, str]) -> bool:
     )
 
 
+def _binding_declares_job(environ: Mapping[str, str], job_id: str) -> bool:
+    """Check whether an optional Workspace-owned job exists in its binding."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    return any(
+        isinstance(item, dict) and item.get("id") == job_id
+        for item in raw["runtime_jobs"]
+    )
+
+
+def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
+    """Load the one CR08 declaration from the Workspace binding SSOT."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    matches = [
+        item
+        for item in raw["runtime_jobs"]
+        if isinstance(item, dict) and item.get("id") == _SANYI_JOB_ID
+    ]
+    if len(matches) != 1:
+        raise DocumentsPlanePathError(
+            "Workspace sanyi status job must be declared exactly once"
+        )
+    expected = {
+        "id": _SANYI_JOB_ID,
+        "domain_id": "work-weijian",
+        "owner": "runtime-control",
+        "action": _SANYI_ACTION,
+        "schedule": "manual",
+        "timeout_seconds": 30,
+        "reads": list(_SANYI_READS),
+        "scope_entity_ids": list(_SANYI_SCOPE),
+        "writes": [],
+        "evidence_relative_path": _SANYI_EVIDENCE,
+        "evidence_schema": _SANYI_SCHEMA,
+        "fail_closed": True,
+    }
+    if matches[0] != expected:
+        raise DocumentsPlanePathError(
+            "Workspace sanyi status job has an invalid contract"
+        )
+    return JobSpec(
+        job_id=expected["id"],
+        reads=_SANYI_READS,
+        writes=(),
+        owner=expected["owner"],
+        schedule=expected["schedule"],
+        timeout=expected["timeout_seconds"],
+        evidence_path=_SANYI_EVIDENCE.removeprefix(_SANYI_EVIDENCE_PREFIX),
+        fail_closed=True,
+        evidence_projection=_SANYI_PROJECTION,
+    )
+
+
 def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     """Build the small, explicit owner set shipped with Runtime.
 
@@ -347,13 +450,71 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
                     "@工作文档/卫健委",
                 ],
             )
+        if _binding_declares_job(environ, _SANYI_JOB_ID):
+            registry.register(_sanyi_status_job_spec(environ), _SANYI_COMMAND)
     return registry
+
+
+def _sanyi_status_cli_payload(result: JobResult) -> dict[str, object]:
+    """Expose only bounded CR08 outcome data; receipts remain Runtime-internal."""
+    return {
+        "job_id": result.job_id,
+        "owner": result.owner,
+        "dry_run": result.dry_run,
+        "exit_code": result.exit_code,
+        "timed_out": result.timed_out,
+        "status": result.status,
+        "evidence_summary": result.evidence_summary,
+    }
+
+
+def _print_sanyi_status_text_result(result: JobResult) -> None:
+    """Keep CR08 text output aggregate-only when a Runtime failure occurs."""
+    if result.dry_run:
+        print(f"{result.job_id}: dry_run")
+    elif result.evidence_summary is not None:
+        print(json.dumps(result.evidence_summary, ensure_ascii=False, sort_keys=True))
+    else:
+        print(f"{result.job_id}: runtime_error")
+
+
+def _sanyi_status_parse_failure_payload() -> dict[str, object]:
+    return {
+        "job_id": _SANYI_JOB_ID,
+        "owner": "runtime-control",
+        "dry_run": False,
+        "exit_code": 2,
+        "timed_out": False,
+        "status": "unavailable",
+        "error": "arguments_invalid",
+        "evidence_summary": None,
+    }
+
+
+def _emit_sanyi_status_parse_failure(argv: Sequence[str]) -> int:
+    if "--json" in argv:
+        print(
+            json.dumps(
+                _sanyi_status_parse_failure_payload(),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"{_SANYI_JOB_ID}: arguments_invalid")
+    return 2
 
 
 def _documents_main(
     argv: Sequence[str], *, registry: JobRegistry, environ: Mapping[str, str]
 ) -> int:
-    parser = argparse.ArgumentParser(prog="runtime documents")
+    is_sanyi_invocation = _SANYI_JOB_ID in argv
+    parser_class = (
+        _RedactingSanyiArgumentParser
+        if is_sanyi_invocation
+        else argparse.ArgumentParser
+    )
+    parser = parser_class(prog="runtime documents")
     subparsers = parser.add_subparsers(dest="documents_command", required=True)
     run_parser = subparsers.add_parser(
         "run", help="Run an explicitly registered owner job"
@@ -361,7 +522,10 @@ def _documents_main(
     run_parser.add_argument("job_id")
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--json", action="store_true", dest="json_output")
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except _SanyiArgumentParseError:
+        return _emit_sanyi_status_parse_failure(argv)
 
     if (
         args.documents_command != "run"
@@ -385,7 +549,14 @@ def _documents_main(
         return 2
 
     if args.json_output:
-        print(json.dumps(result.as_dict(), ensure_ascii=False, sort_keys=True))
+        payload = (
+            _sanyi_status_cli_payload(result)
+            if result.job_id == _SANYI_JOB_ID
+            else result.as_dict()
+        )
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+    elif result.job_id == _SANYI_JOB_ID:
+        _print_sanyi_status_text_result(result)
     else:
         if result.stdout:
             print(result.stdout, end="")

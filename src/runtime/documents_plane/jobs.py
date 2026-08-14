@@ -32,6 +32,7 @@ _EVIDENCE_PROJECTIONS = frozenset(
         "control-health-v1",
         "controller-shadow-v2",
         "model-freshness-v1",
+        "sanyi-status-consistency-v1",
     }
 )
 _KEMS_CHECK_SCOPES = frozenset(
@@ -64,6 +65,18 @@ _MODEL_FRESHNESS_ERRORS = frozenset(
         "model_file_unreadable",
         "model_last_reviewed_missing",
         "model_last_reviewed_invalid",
+    }
+)
+_SANYI_STATUS_SCHEMA = "runtime.documents-sanyi-status-consistency.v1"
+_SANYI_STATUS_ERRORS = frozenset(
+    {
+        "arguments_invalid",
+        "domain_invalid",
+        "dashboard_unavailable",
+        "dashboard_invalid",
+        "facts_unavailable",
+        "facts_invalid",
+        "facts_scope_empty",
     }
 )
 _MODEL_FRESHNESS_PRE_FACTS_ERRORS = frozenset(
@@ -643,6 +656,66 @@ def _model_freshness_evidence(stdout: str) -> dict[str, object]:
     }
 
 
+def _sanyi_status_evidence(stdout: str) -> dict[str, object]:
+    """Validate the exact, aggregate-only CR08 owner payload."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("sanyi-status evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("sanyi-status evidence must be a JSON object")
+    expected_fields = {
+        "schema",
+        "status",
+        "checked_on",
+        "dashboard_last_reviewed",
+        "latest_verified_at",
+        "relevant_fact_count",
+        "error",
+    }
+    if set(payload) != expected_fields:
+        raise ValueError("sanyi-status evidence has an invalid schema")
+    status = payload["status"]
+    dashboard_last_reviewed = payload["dashboard_last_reviewed"]
+    latest_verified_at = payload["latest_verified_at"]
+    relevant_fact_count = payload["relevant_fact_count"]
+    error = payload["error"]
+    if (
+        payload["schema"] != _SANYI_STATUS_SCHEMA
+        or status not in {"ok", "attention", "unavailable"}
+        or not _valid_iso_date(payload["checked_on"])
+        or not isinstance(relevant_fact_count, int)
+        or isinstance(relevant_fact_count, bool)
+    ):
+        raise ValueError("sanyi-status evidence has an invalid schema")
+    if status in {"ok", "attention"}:
+        if (
+            not _valid_iso_date(dashboard_last_reviewed)
+            or not _valid_iso_date(latest_verified_at)
+            or relevant_fact_count < 1
+            or error is not None
+            or (status == "ok" and latest_verified_at > dashboard_last_reviewed)
+            or (status == "attention" and latest_verified_at <= dashboard_last_reviewed)
+        ):
+            raise ValueError("sanyi-status evidence has an invalid schema")
+    elif (
+        dashboard_last_reviewed is not None
+        or latest_verified_at is not None
+        or relevant_fact_count != 0
+        or error not in _SANYI_STATUS_ERRORS
+    ):
+        raise ValueError("sanyi-status evidence has an invalid schema")
+    return {
+        "schema": _SANYI_STATUS_SCHEMA,
+        "status": status,
+        "checked_on": payload["checked_on"],
+        "dashboard_last_reviewed": dashboard_last_reviewed,
+        "latest_verified_at": latest_verified_at,
+        "relevant_fact_count": relevant_fact_count,
+        "error": error,
+    }
+
+
 def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
     if spec.evidence_projection == "metadata":
         return None
@@ -656,6 +729,8 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _controller_shadow_evidence(stdout)
     if spec.evidence_projection == "model-freshness-v1":
         return _model_freshness_evidence(stdout)
+    if spec.evidence_projection == "sanyi-status-consistency-v1":
+        return _sanyi_status_evidence(stdout)
     raise ValueError(
         "job evidence projection is not supported"
     )  # pragma: no cover - validated at registration

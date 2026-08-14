@@ -1143,3 +1143,365 @@ def test_model_freshness_projection_rejects_unavailable_error_state_conflicts(
     assert receipt["exit_code"] == 74
     assert receipt["evidence_error"] == result.evidence_error
     assert "owner_evidence" not in receipt
+
+
+def _write_sanyi_documents(
+    root: Path, *, dashboard: str = "2026-08-05", latest: str = "2026-08-13"
+) -> Path:
+    documents_root = root / "Documents"
+    domain = documents_root / "@工作文档" / "卫健委"
+    dashboard_path = domain / "_control" / "三医态势仪表盘.md"
+    facts_path = domain / "_entities" / "facts" / "01-progress.yaml"
+    dashboard_path.parent.mkdir(parents=True)
+    facts_path.parent.mkdir(parents=True)
+    dashboard_path.write_text(
+        f"---\nlast-reviewed: '{dashboard}'\n---\n# 三医态势\n",
+        encoding="utf-8",
+    )
+    facts_path.write_text(
+        "facts:\n  - fid: fact-private\n    statement: 不得进入收据\n"
+        f"    entity_ids: [proj-syld]\n    verified_at: '{latest}'\n",
+        encoding="utf-8",
+    )
+    return documents_root
+
+
+def _sanyi_environ(root: Path, *, documents_root: Path | None = None) -> dict[str, str]:
+    documents = documents_root or _write_sanyi_documents(root)
+    binding_path = root / "documents-domain-projects.yaml"
+    binding_path.write_text(
+        json.dumps(
+            {
+                "runtime_jobs": [
+                    {
+                        "id": "documents-weijian-controller-shadow",
+                        "domain_id": "work-weijian",
+                        "owner": "runtime-control",
+                        "action": "shadow_legacy_controller",
+                        "schedule": "manual",
+                        "timeout_seconds": 30,
+                        "reads": [
+                            "@工作文档/卫健委/_control",
+                            "@工作文档/卫健委/_entities",
+                            "@工作文档/卫健委/_meta",
+                            "@工作文档/卫健委/_runtime",
+                            "@工作文档/卫健委/_storage",
+                            "@工作文档/卫健委/_knowledge",
+                        ],
+                        "writes": [],
+                        "evidence_relative_path": "control/evidence/documents-weijian-controller-shadow/documents-weijian-controller-shadow.json",
+                        "evidence_schema": "runtime.documents-controller-shadow.evidence.v2",
+                        "fail_closed": True,
+                    },
+                    {
+                        "id": "documents-weijian-sanyi-status-audit",
+                        "domain_id": "work-weijian",
+                        "owner": "runtime-control",
+                        "action": "audit_sanyi_status_consistency",
+                        "schedule": "manual",
+                        "timeout_seconds": 30,
+                        "reads": [
+                            "@工作文档/卫健委/_control/三医态势仪表盘.md",
+                            "@工作文档/卫健委/_entities/facts/01-progress.yaml",
+                        ],
+                        "scope_entity_ids": [
+                            "proj-syld",
+                            "proj-jingbao",
+                            "proj-emr-quality",
+                        ],
+                        "writes": [],
+                        "evidence_relative_path": "control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json",
+                        "evidence_schema": "runtime.documents-sanyi-status-consistency.evidence.v1",
+                        "fail_closed": True,
+                    },
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "DOCUMENTS_CONTENT_ROOT": str(documents),
+        "OMOSTATION_RUNTIME_STATE_ROOT": str(root / "state"),
+        "DOCUMENTS_DOMAIN_PROJECTS_REGISTRY": str(binding_path),
+    }
+
+
+@pytest.mark.parametrize("mutation", ["missing", "drift"])
+def test_default_registry_fails_closed_when_controller_shadow_binding_is_invalid(
+    tmp_path: Path, mutation: str
+) -> None:
+    from runtime.documents_plane.cli import _default_registry
+    from runtime.documents_plane.paths import DocumentsPlanePathError
+
+    environ = _sanyi_environ(tmp_path)
+    binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
+    binding = json.loads(binding_path.read_text(encoding="utf-8"))
+    if mutation == "missing":
+        binding["runtime_jobs"] = binding["runtime_jobs"][1:]
+    else:
+        binding["runtime_jobs"][0]["reads"] = []
+    binding_path.write_text(json.dumps(binding), encoding="utf-8")
+
+    with pytest.raises(DocumentsPlanePathError, match="controller shadow job"):
+        _default_registry(environ)
+
+
+def test_default_registry_registers_controller_model_and_sanyi_bindings(
+    tmp_path: Path,
+) -> None:
+    from runtime.documents_plane.cli import _default_registry
+
+    environ = _model_freshness_binding_environ(tmp_path)
+    binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
+    binding_path.write_text(
+        binding_path.read_text(encoding="utf-8")
+        + """  - id: documents-weijian-sanyi-status-audit
+    domain_id: work-weijian
+    owner: runtime-control
+    action: audit_sanyi_status_consistency
+    schedule: manual
+    timeout_seconds: 30
+    reads:
+      - "@工作文档/卫健委/_control/三医态势仪表盘.md"
+      - "@工作文档/卫健委/_entities/facts/01-progress.yaml"
+    scope_entity_ids:
+      - proj-syld
+      - proj-jingbao
+      - proj-emr-quality
+    writes: []
+    evidence_relative_path: control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json
+    evidence_schema: runtime.documents-sanyi-status-consistency.evidence.v1
+    fail_closed: true
+""",
+        encoding="utf-8",
+    )
+
+    registry = _default_registry(environ)
+
+    assert (
+        registry.resolve("documents-weijian-controller-shadow")[0].owner
+        == "runtime-control"
+    )
+    assert (
+        registry.resolve("documents-weijian-model-freshness")[0].owner
+        == "runtime-control"
+    )
+    assert (
+        registry.resolve("documents-weijian-sanyi-status-audit")[0].owner
+        == "runtime-control"
+    )
+
+
+def _documents_digest(root: Path) -> tuple[tuple[str, bytes], ...]:
+    return tuple(
+        (str(path.relative_to(root)), path.read_bytes())
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    )
+
+
+def test_sanyi_status_job_persists_bounded_attention_evidence(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    monkeypatch.setenv("PYTHONPATH", str(Path(__file__).parents[1] / "src"))
+    environ = _sanyi_environ(tmp_path)
+    assert (
+        main(
+            ["documents", "run", "documents-weijian-sanyi-status-audit", "--json"],
+            environ=environ,
+        )
+        == 1
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    serialized_cli = json.dumps(cli_payload, ensure_ascii=False)
+    assert "evidence_path" not in cli_payload
+    assert str(tmp_path) not in serialized_cli
+    assert "01-progress.yaml" not in serialized_cli
+    assert "三医态势仪表盘.md" not in serialized_cli
+    assert "fact-private" not in serialized_cli
+    assert "不得进入收据" not in serialized_cli
+    receipt_path = (
+        Path(environ["OMOSTATION_RUNTIME_STATE_ROOT"])
+        / "control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json"
+    )
+    assert receipt_path.is_file()
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["owner_evidence"]["status"] == "attention"
+    assert "statement" not in json.dumps(receipt, ensure_ascii=False)
+
+
+def test_sanyi_status_dry_run_and_real_run_never_write_documents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    monkeypatch.setenv("PYTHONPATH", str(Path(__file__).parents[1] / "src"))
+    documents_root = _write_sanyi_documents(tmp_path)
+    environ = _sanyi_environ(tmp_path, documents_root=documents_root)
+    before = _documents_digest(documents_root)
+    assert (
+        main(
+            [
+                "documents",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+                "--dry-run",
+                "--json",
+            ],
+            environ=environ,
+        )
+        == 0
+    )
+    assert main(
+        ["documents", "run", "documents-weijian-sanyi-status-audit", "--json"],
+        environ=environ,
+    ) in {0, 1, 2}
+    assert _documents_digest(documents_root) == before
+
+
+def test_sanyi_text_cli_redacts_runtime_state_io_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    environ = _sanyi_environ(tmp_path)
+    environ["OMOSTATION_RUNTIME_STATE_ROOT"] = "/dev/null"
+    assert (
+        main(
+            ["documents", "run", "documents-weijian-sanyi-status-audit"],
+            environ=environ,
+        )
+        == 74
+    )
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == "documents-weijian-sanyi-status-audit: runtime_error\n"
+    assert "/dev/null" not in captured.out
+    assert "File exists" not in captured.out
+
+
+@pytest.mark.parametrize(
+    ("arguments", "json_output"),
+    [
+        (
+            [
+                "documents",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+            ],
+            False,
+        ),
+        (
+            [
+                "documents",
+                "run",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+                "documents-weijian-sanyi-status-audit",
+            ],
+            False,
+        ),
+        (
+            [
+                "documents",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+            ],
+            False,
+        ),
+        (
+            [
+                "documents",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+                "--json",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+            ],
+            True,
+        ),
+    ],
+)
+def test_documents_cli_redacts_cr08_argument_parse_failures(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    arguments: list[str],
+    json_output: bool,
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    exit_code = main(arguments, environ=_sanyi_environ(tmp_path))
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.err == ""
+    assert "/private/secret-fid.yaml" not in captured.out
+    assert "/private/secret-fid.yaml" not in captured.err
+    if json_output:
+        payload = json.loads(captured.out)
+        assert payload["status"] == "unavailable"
+        assert payload["error"] == "arguments_invalid"
+    else:
+        assert (
+            captured.out == "documents-weijian-sanyi-status-audit: arguments_invalid\n"
+        )
+
+
+def test_sanyi_binding_rejects_unknown_or_reordered_contract_values(
+    tmp_path: Path,
+) -> None:
+    from runtime.documents_plane.cli import _sanyi_status_job_spec
+    from runtime.documents_plane.paths import DocumentsPlanePathError
+
+    environ = _sanyi_environ(tmp_path)
+    binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
+    binding = json.loads(binding_path.read_text(encoding="utf-8"))
+    sanyi_job = next(
+        job
+        for job in binding["runtime_jobs"]
+        if job["id"] == "documents-weijian-sanyi-status-audit"
+    )
+    sanyi_job["scope_entity_ids"].reverse()
+    sanyi_job["unexpected"] = True
+    binding_path.write_text(json.dumps(binding), encoding="utf-8")
+    with pytest.raises(DocumentsPlanePathError, match="invalid contract"):
+        _sanyi_status_job_spec(environ)
+
+
+def test_sanyi_receipt_rejects_malformed_owner_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from runtime.documents_plane.cli import _sanyi_status_job_spec
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv",
+        lambda command, _roots: command,
+    )
+    registry = JobRegistry()
+    registry.register(
+        _sanyi_status_job_spec(_sanyi_environ(tmp_path)),
+        [sys.executable, "-c", "print('{}')"],
+    )
+    result = run_job(
+        registry,
+        "documents-weijian-sanyi-status-audit",
+        state_root=tmp_path / "state",
+        documents_root=tmp_path / "Documents",
+    )
+    assert result.exit_code == 74
+    assert result.evidence_error == "sanyi-status evidence has an invalid schema"
