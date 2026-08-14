@@ -1243,6 +1243,75 @@ def test_sanyi_text_cli_redacts_runtime_state_io_failure(tmp_path: Path, capsys:
     assert captured.out == "documents-weijian-sanyi-status-audit: runtime_error\n"
 
 
+@pytest.mark.parametrize(
+    ("arguments", "json_output"),
+    [
+        (
+            [
+                "documents",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+            ],
+            False,
+        ),
+        (
+            [
+                "documents",
+                "run",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+                "documents-weijian-sanyi-status-audit",
+            ],
+            False,
+        ),
+        (
+            [
+                "documents",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+            ],
+            False,
+        ),
+        (
+            [
+                "documents",
+                "run",
+                "documents-weijian-sanyi-status-audit",
+                "--json",
+                "--untrusted",
+                "/private/secret-fid.yaml",
+            ],
+            True,
+        ),
+    ],
+)
+def test_documents_cli_redacts_cr08_argument_parse_failures(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    arguments: list[str],
+    json_output: bool,
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    exit_code = main(arguments, environ=_sanyi_environ(tmp_path))
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.err == ""
+    assert "/private/secret-fid.yaml" not in captured.out
+    assert "/private/secret-fid.yaml" not in captured.err
+    if json_output:
+        payload = json.loads(captured.out)
+        assert payload["status"] == "unavailable"
+        assert payload["error"] == "arguments_invalid"
+    else:
+        assert captured.out == "documents-weijian-sanyi-status-audit: arguments_invalid\n"
+
+
 def test_sanyi_binding_rejects_unknown_or_reordered_contract_values(tmp_path: Path) -> None:
     from runtime.documents_plane.cli import _sanyi_status_job_spec
     from runtime.documents_plane.paths import DocumentsPlanePathError
@@ -1266,4 +1335,3 @@ def test_sanyi_receipt_rejects_malformed_owner_evidence(tmp_path: Path, monkeypa
     result = run_job(registry, "documents-weijian-sanyi-status-audit", state_root=tmp_path / "state", documents_root=tmp_path / "Documents")
     assert result.exit_code == 74
     assert result.evidence_error == "sanyi-status evidence has an invalid schema"
-

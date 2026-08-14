@@ -71,6 +71,15 @@ _SANYI_COMMAND = (
 _SANYI_PROJECTION = "sanyi-status-consistency-v1"
 
 
+class _SanyiArgumentParseError(ValueError):
+    """A deliberately detail-free public CR08 invocation parse failure."""
+
+
+class _RedactingSanyiArgumentParser(argparse.ArgumentParser):
+    def error(self, _message: str) -> None:
+        raise _SanyiArgumentParseError
+
+
 def _workspace_binding_registry_path(environ: Mapping[str, str]) -> Path:
     configured = environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY")
     if configured:
@@ -449,10 +458,43 @@ def _print_sanyi_status_text_result(result: JobResult) -> None:
         print(f"{result.job_id}: runtime_error")
 
 
+def _sanyi_status_parse_failure_payload() -> dict[str, object]:
+    return {
+        "job_id": _SANYI_JOB_ID,
+        "owner": "runtime-control",
+        "dry_run": False,
+        "exit_code": 2,
+        "timed_out": False,
+        "status": "unavailable",
+        "error": "arguments_invalid",
+        "evidence_summary": None,
+    }
+
+
+def _emit_sanyi_status_parse_failure(argv: Sequence[str]) -> int:
+    if "--json" in argv:
+        print(
+            json.dumps(
+                _sanyi_status_parse_failure_payload(),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"{_SANYI_JOB_ID}: arguments_invalid")
+    return 2
+
+
 def _documents_main(
     argv: Sequence[str], *, registry: JobRegistry, environ: Mapping[str, str]
 ) -> int:
-    parser = argparse.ArgumentParser(prog="runtime documents")
+    is_sanyi_invocation = _SANYI_JOB_ID in argv
+    parser_class = (
+        _RedactingSanyiArgumentParser
+        if is_sanyi_invocation
+        else argparse.ArgumentParser
+    )
+    parser = parser_class(prog="runtime documents")
     subparsers = parser.add_subparsers(dest="documents_command", required=True)
     run_parser = subparsers.add_parser(
         "run", help="Run an explicitly registered owner job"
@@ -460,7 +502,10 @@ def _documents_main(
     run_parser.add_argument("job_id")
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--json", action="store_true", dest="json_output")
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except _SanyiArgumentParseError:
+        return _emit_sanyi_status_parse_failure(argv)
 
     if (
         args.documents_command != "run"
