@@ -1174,6 +1174,26 @@ def _sanyi_environ(root: Path, *, documents_root: Path | None = None) -> dict[st
             {
                 "runtime_jobs": [
                     {
+                        "id": "documents-weijian-controller-shadow",
+                        "domain_id": "work-weijian",
+                        "owner": "runtime-control",
+                        "action": "shadow_legacy_controller",
+                        "schedule": "manual",
+                        "timeout_seconds": 30,
+                        "reads": [
+                            "@工作文档/卫健委/_control",
+                            "@工作文档/卫健委/_entities",
+                            "@工作文档/卫健委/_meta",
+                            "@工作文档/卫健委/_runtime",
+                            "@工作文档/卫健委/_storage",
+                            "@工作文档/卫健委/_knowledge",
+                        ],
+                        "writes": [],
+                        "evidence_relative_path": "control/evidence/documents-weijian-controller-shadow/documents-weijian-controller-shadow.json",
+                        "evidence_schema": "runtime.documents-controller-shadow.evidence.v2",
+                        "fail_closed": True,
+                    },
+                    {
                         "id": "documents-weijian-sanyi-status-audit",
                         "domain_id": "work-weijian",
                         "owner": "runtime-control",
@@ -1193,7 +1213,7 @@ def _sanyi_environ(root: Path, *, documents_root: Path | None = None) -> dict[st
                         "evidence_relative_path": "control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json",
                         "evidence_schema": "runtime.documents-sanyi-status-consistency.evidence.v1",
                         "fail_closed": True,
-                    }
+                    },
                 ]
             },
             ensure_ascii=False,
@@ -1205,6 +1225,72 @@ def _sanyi_environ(root: Path, *, documents_root: Path | None = None) -> dict[st
         "OMOSTATION_RUNTIME_STATE_ROOT": str(root / "state"),
         "DOCUMENTS_DOMAIN_PROJECTS_REGISTRY": str(binding_path),
     }
+
+
+@pytest.mark.parametrize("mutation", ["missing", "drift"])
+def test_default_registry_fails_closed_when_controller_shadow_binding_is_invalid(
+    tmp_path: Path, mutation: str
+) -> None:
+    from runtime.documents_plane.cli import _default_registry
+    from runtime.documents_plane.paths import DocumentsPlanePathError
+
+    environ = _sanyi_environ(tmp_path)
+    binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
+    binding = json.loads(binding_path.read_text(encoding="utf-8"))
+    if mutation == "missing":
+        binding["runtime_jobs"] = binding["runtime_jobs"][1:]
+    else:
+        binding["runtime_jobs"][0]["reads"] = []
+    binding_path.write_text(json.dumps(binding), encoding="utf-8")
+
+    with pytest.raises(DocumentsPlanePathError, match="controller shadow job"):
+        _default_registry(environ)
+
+
+def test_default_registry_registers_controller_model_and_sanyi_bindings(
+    tmp_path: Path,
+) -> None:
+    from runtime.documents_plane.cli import _default_registry
+
+    environ = _model_freshness_binding_environ(tmp_path)
+    binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
+    binding_path.write_text(
+        binding_path.read_text(encoding="utf-8")
+        + """  - id: documents-weijian-sanyi-status-audit
+    domain_id: work-weijian
+    owner: runtime-control
+    action: audit_sanyi_status_consistency
+    schedule: manual
+    timeout_seconds: 30
+    reads:
+      - "@工作文档/卫健委/_control/三医态势仪表盘.md"
+      - "@工作文档/卫健委/_entities/facts/01-progress.yaml"
+    scope_entity_ids:
+      - proj-syld
+      - proj-jingbao
+      - proj-emr-quality
+    writes: []
+    evidence_relative_path: control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json
+    evidence_schema: runtime.documents-sanyi-status-consistency.evidence.v1
+    fail_closed: true
+""",
+        encoding="utf-8",
+    )
+
+    registry = _default_registry(environ)
+
+    assert (
+        registry.resolve("documents-weijian-controller-shadow")[0].owner
+        == "runtime-control"
+    )
+    assert (
+        registry.resolve("documents-weijian-model-freshness")[0].owner
+        == "runtime-control"
+    )
+    assert (
+        registry.resolve("documents-weijian-sanyi-status-audit")[0].owner
+        == "runtime-control"
+    )
 
 
 def _documents_digest(root: Path) -> tuple[tuple[str, bytes], ...]:
@@ -1385,8 +1471,13 @@ def test_sanyi_binding_rejects_unknown_or_reordered_contract_values(
     environ = _sanyi_environ(tmp_path)
     binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
     binding = json.loads(binding_path.read_text(encoding="utf-8"))
-    binding["runtime_jobs"][0]["scope_entity_ids"].reverse()
-    binding["runtime_jobs"][0]["unexpected"] = True
+    sanyi_job = next(
+        job
+        for job in binding["runtime_jobs"]
+        if job["id"] == "documents-weijian-sanyi-status-audit"
+    )
+    sanyi_job["scope_entity_ids"].reverse()
+    sanyi_job["unexpected"] = True
     binding_path.write_text(json.dumps(binding), encoding="utf-8")
     with pytest.raises(DocumentsPlanePathError, match="invalid contract"):
         _sanyi_status_job_spec(environ)

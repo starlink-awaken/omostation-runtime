@@ -427,18 +427,17 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     if environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY") or environ.get(
         "WORKSPACE_ROOT"
     ):
-        if _binding_declares_job(environ, "documents-weijian-controller-shadow"):
-            registry.register(
-                _controller_shadow_job_spec(environ),
-                [
-                    sys.executable,
-                    "-m",
-                    "runtime.documents_plane.controller_shadow",
-                    "inspect",
-                    "--domain-relative",
-                    "@工作文档/卫健委",
-                ],
-            )
+        registry.register(
+            _controller_shadow_job_spec(environ),
+            [
+                sys.executable,
+                "-m",
+                "runtime.documents_plane.controller_shadow",
+                "inspect",
+                "--domain-relative",
+                "@工作文档/卫健委",
+            ],
+        )
         if _binding_declares_model_freshness(environ):
             registry.register(
                 _model_freshness_job_spec(environ),
