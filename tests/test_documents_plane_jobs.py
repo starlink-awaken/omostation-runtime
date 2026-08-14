@@ -1334,6 +1334,9 @@ def test_sanyi_status_job_persists_bounded_attention_evidence(
     assert receipt_path.is_file()
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert receipt["owner_evidence"]["status"] == "attention"
+    assert receipt["owner_evidence"]["schema"] == (
+        "runtime.documents-sanyi-status-consistency.evidence.v1"
+    )
     assert "statement" not in json.dumps(receipt, ensure_ascii=False)
 
 

@@ -68,6 +68,7 @@ _MODEL_FRESHNESS_ERRORS = frozenset(
     }
 )
 _SANYI_STATUS_SCHEMA = "runtime.documents-sanyi-status-consistency.v1"
+_SANYI_STATUS_EVIDENCE_SCHEMA = "runtime.documents-sanyi-status-consistency.evidence.v1"
 _SANYI_STATUS_ERRORS = frozenset(
     {
         "arguments_invalid",
@@ -706,7 +707,7 @@ def _sanyi_status_evidence(stdout: str) -> dict[str, object]:
     ):
         raise ValueError("sanyi-status evidence has an invalid schema")
     return {
-        "schema": _SANYI_STATUS_SCHEMA,
+        "schema": _SANYI_STATUS_EVIDENCE_SCHEMA,
         "status": status,
         "checked_on": payload["checked_on"],
         "dashboard_last_reviewed": dashboard_last_reviewed,
