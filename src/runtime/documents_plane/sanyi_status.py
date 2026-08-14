@@ -78,22 +78,86 @@ def _strict_iso_date(value: object) -> date | None:
     return parsed if parsed.isoformat() == value else None
 
 
-def _read_regular_file(path: Path, *, unavailable: str) -> str:
+def _open_directory(path: Path, *, unavailable: str) -> int:
     try:
         before = path.lstat()
     except OSError as exc:
         raise _InspectionError(unavailable) from exc
-    if not stat.S_ISREG(before.st_mode):
+    if not stat.S_ISDIR(before.st_mode):
         raise _InspectionError(unavailable)
     nofollow = getattr(os, "O_NOFOLLOW", None)
-    if nofollow is None:
+    directory = getattr(os, "O_DIRECTORY", None)
+    if nofollow is None or directory is None:
         raise _InspectionError(unavailable)
     try:
-        descriptor = os.open(path, os.O_RDONLY | nofollow)
+        descriptor = os.open(path, os.O_RDONLY | directory | nofollow)
     except (OSError, UnicodeError) as exc:
         raise _InspectionError(unavailable) from exc
+
     try:
         opened = os.fstat(descriptor)
+    except OSError as exc:
+        os.close(descriptor)
+        raise _InspectionError(unavailable) from exc
+    if not stat.S_ISDIR(opened.st_mode) or (before.st_dev, before.st_ino) != (
+        opened.st_dev,
+        opened.st_ino,
+    ):
+        os.close(descriptor)
+        raise _InspectionError(unavailable)
+    return descriptor
+
+
+def _read_domain_regular_file(
+    domain_root: Path, relative_parts: tuple[str, ...], *, unavailable: str
+) -> str:
+    """Read one fixed domain input through no-follow directory descriptors."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if nofollow is None or directory is None:
+        raise _InspectionError(unavailable)
+    directory_descriptor = _open_directory(domain_root, unavailable=unavailable)
+    file_descriptor: int | None = None
+    try:
+        for component in relative_parts[:-1]:
+            try:
+                before = os.stat(
+                    component, dir_fd=directory_descriptor, follow_symlinks=False
+                )
+                if not stat.S_ISDIR(before.st_mode):
+                    raise _InspectionError(unavailable)
+                next_descriptor = os.open(
+                    component,
+                    os.O_RDONLY | directory | nofollow,
+                    dir_fd=directory_descriptor,
+                )
+            except (OSError, UnicodeError) as exc:
+                raise _InspectionError(unavailable) from exc
+            opened = os.fstat(next_descriptor)
+            if not stat.S_ISDIR(opened.st_mode) or (before.st_dev, before.st_ino) != (
+                opened.st_dev,
+                opened.st_ino,
+            ):
+                os.close(next_descriptor)
+                raise _InspectionError(unavailable)
+            os.close(directory_descriptor)
+            directory_descriptor = next_descriptor
+
+        filename = relative_parts[-1]
+        try:
+            before = os.stat(
+                filename, dir_fd=directory_descriptor, follow_symlinks=False
+            )
+            if not stat.S_ISREG(before.st_mode):
+                raise _InspectionError(unavailable)
+            file_descriptor = os.open(
+                filename,
+                os.O_RDONLY | nofollow,
+                dir_fd=directory_descriptor,
+            )
+        except (OSError, UnicodeError) as exc:
+            raise _InspectionError(unavailable) from exc
+        opened = os.fstat(file_descriptor)
         if (
             not stat.S_ISREG(opened.st_mode)
             or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)
@@ -103,14 +167,14 @@ def _read_regular_file(path: Path, *, unavailable: str) -> str:
         chunks: list[bytes] = []
         remaining = _MAX_INPUT_BYTES + 1
         while remaining:
-            chunk = os.read(descriptor, min(65536, remaining))
+            chunk = os.read(file_descriptor, min(65536, remaining))
             if not chunk:
                 break
             chunks.append(chunk)
             remaining -= len(chunk)
         if remaining == 0:
             raise _InspectionError(unavailable)
-        after = path.lstat()
+        after = os.stat(filename, dir_fd=directory_descriptor, follow_symlinks=False)
         if not stat.S_ISREG(after.st_mode) or (opened.st_dev, opened.st_ino) != (
             after.st_dev,
             after.st_ino,
@@ -120,11 +184,17 @@ def _read_regular_file(path: Path, *, unavailable: str) -> str:
     except (OSError, UnicodeError) as exc:
         raise _InspectionError(unavailable) from exc
     finally:
-        os.close(descriptor)
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        os.close(directory_descriptor)
 
 
-def _dashboard_last_reviewed(path: Path) -> date:
-    content = _read_regular_file(path, unavailable="dashboard_unavailable")
+def _dashboard_last_reviewed(domain_root: Path) -> date:
+    content = _read_domain_regular_file(
+        domain_root,
+        ("_control", "三医态势仪表盘.md"),
+        unavailable="dashboard_unavailable",
+    )
     lines = content.splitlines()
     if not lines or lines[0] != "---":
         raise _InspectionError("dashboard_invalid")
@@ -149,8 +219,12 @@ def _dashboard_last_reviewed(path: Path) -> date:
     return parsed
 
 
-def _relevant_verified_dates(path: Path) -> tuple[date, ...]:
-    content = _read_regular_file(path, unavailable="facts_unavailable")
+def _relevant_verified_dates(domain_root: Path) -> tuple[date, ...]:
+    content = _read_domain_regular_file(
+        domain_root,
+        ("_entities", "facts", "01-progress.yaml"),
+        unavailable="facts_unavailable",
+    )
     try:
         document: Any = yaml.safe_load(content)
     except yaml.YAMLError as exc:
@@ -195,12 +269,8 @@ def inspect_sanyi_status(
     """Compare declared CR08 facts with dashboard frontmatter only."""
     checked_on = today or datetime.now(UTC).date()
     try:
-        dashboard_date = _dashboard_last_reviewed(
-            domain_root / "_control" / "三医态势仪表盘.md"
-        )
-        verified_dates = _relevant_verified_dates(
-            domain_root / "_entities" / "facts" / "01-progress.yaml"
-        )
+        dashboard_date = _dashboard_last_reviewed(domain_root)
+        verified_dates = _relevant_verified_dates(domain_root)
     except _InspectionError as exc:
         return _unavailable(checked_on, str(exc))
     latest = max(verified_dates)

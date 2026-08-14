@@ -120,7 +120,7 @@ def test_inspect_sanyi_status_fails_closed_without_identity(
 
 
 @pytest.mark.parametrize("input_name", ["dashboard", "facts"])
-def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_after_lstat(
+def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_before_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, input_name: str
 ) -> None:
     domain = _write_domain(tmp_path)
@@ -141,19 +141,80 @@ def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_after_lstat(
         ),
         encoding="utf-8",
     )
-    original_lstat = Path.lstat
+    original_open = os.open
     swapped = False
 
-    def swap_after_lstat(path: Path) -> os.stat_result:
+    def swap_before_leaf_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
         nonlocal swapped
-        result = original_lstat(path)
-        if path == target and not swapped:
+        if path == target.name and dir_fd is not None and not swapped:
             target.unlink()
             target.symlink_to(outside)
             swapped = True
-        return result
+        return original_open(path, flags, mode, dir_fd=dir_fd)
 
-    monkeypatch.setattr(Path, "lstat", swap_after_lstat)
+    monkeypatch.setattr(os, "open", swap_before_leaf_open)
+    result = inspect_sanyi_status(domain, today=date(2026, 8, 14))
+
+    assert swapped is True
+    assert result.status == "unavailable"
+    assert result.dashboard_last_reviewed is None
+    assert result.latest_verified_at is None
+    assert "outside-private" not in json.dumps(result.as_dict(), ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    ("directory_parts", "leaf_name"),
+    [
+        (("_control",), "三医态势仪表盘.md"),
+        (("_entities",), "facts/01-progress.yaml"),
+        (("_entities", "facts"), "01-progress.yaml"),
+    ],
+)
+def test_inspect_sanyi_status_refuses_intermediate_directory_symlink_races(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    directory_parts: tuple[str, ...],
+    leaf_name: str,
+) -> None:
+    domain = _write_domain(tmp_path)
+    target = domain.joinpath(*directory_parts)
+    outside = tmp_path / f"outside-{'-'.join(directory_parts)}"
+    outside.mkdir()
+    outside.joinpath(leaf_name).parent.mkdir(parents=True, exist_ok=True)
+    outside.joinpath(leaf_name).write_text("outside-private", encoding="utf-8")
+    original_open = os.open
+    swapped = False
+
+    def swap_before_component_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if path == target.name and dir_fd is not None and not swapped:
+            for child in sorted(
+                target.rglob("*"),
+                key=lambda candidate: len(candidate.parts),
+                reverse=True,
+            ):
+                if child.is_file() or child.is_symlink():
+                    child.unlink()
+                else:
+                    child.rmdir()
+            target.rmdir()
+            target.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", swap_before_component_open)
     result = inspect_sanyi_status(domain, today=date(2026, 8, 14))
 
     assert swapped is True
