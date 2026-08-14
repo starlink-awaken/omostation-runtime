@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from .jobs import JobRegistry, JobSpec, run_job
+from .jobs import JobRegistry, JobResult, JobSpec, run_job
 from .paths import (
     DocumentsPlanePathError,
     documents_content_root,
@@ -48,6 +48,7 @@ _MODEL_FRESHNESS_EVIDENCE = (
 )
 _MODEL_FRESHNESS_EVIDENCE_PREFIX = "control/evidence/documents-weijian-model-freshness/"
 _SANYI_ACTION = "audit_sanyi_status_consistency"
+_SANYI_JOB_ID = "documents-weijian-sanyi-status-audit"
 _SANYI_SCHEMA = "runtime.documents-sanyi-status-consistency.evidence.v1"
 _SANYI_READS = (
     "@工作文档/卫健委/_control/三医态势仪表盘.md",
@@ -238,15 +239,14 @@ def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
     matches = [
         item
         for item in raw["runtime_jobs"]
-        if isinstance(item, dict)
-        and item.get("id") == "documents-weijian-sanyi-status-audit"
+        if isinstance(item, dict) and item.get("id") == _SANYI_JOB_ID
     ]
     if len(matches) != 1:
         raise DocumentsPlanePathError(
             "Workspace sanyi status job must be declared exactly once"
         )
     expected = {
-        "id": "documents-weijian-sanyi-status-audit",
+        "id": _SANYI_JOB_ID,
         "domain_id": "work-weijian",
         "owner": "runtime-control",
         "action": _SANYI_ACTION,
@@ -426,6 +426,19 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     return registry
 
 
+def _sanyi_status_cli_payload(result: JobResult) -> dict[str, object]:
+    """Expose only bounded CR08 outcome data; receipts remain Runtime-internal."""
+    return {
+        "job_id": result.job_id,
+        "owner": result.owner,
+        "dry_run": result.dry_run,
+        "exit_code": result.exit_code,
+        "timed_out": result.timed_out,
+        "status": result.status,
+        "evidence_summary": result.evidence_summary,
+    }
+
+
 def _documents_main(
     argv: Sequence[str], *, registry: JobRegistry, environ: Mapping[str, str]
 ) -> int:
@@ -461,7 +474,12 @@ def _documents_main(
         return 2
 
     if args.json_output:
-        print(json.dumps(result.as_dict(), ensure_ascii=False, sort_keys=True))
+        payload = (
+            _sanyi_status_cli_payload(result)
+            if result.job_id == _SANYI_JOB_ID
+            else result.as_dict()
+        )
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
     else:
         if result.stdout:
             print(result.stdout, end="")

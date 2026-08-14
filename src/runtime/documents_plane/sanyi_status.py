@@ -179,15 +179,14 @@ def main(argv: list[str] | None = None) -> int:
     inspect_parser.add_argument("--domain-relative", required=True)
     args = parser.parse_args(argv)
     checked_on = datetime.now(UTC).date()
-    if args.command != "inspect" or args.domain_relative != _DOMAIN_RELATIVE:
-        result = _unavailable(checked_on, "domain_invalid")
-    else:
+    result = _unavailable(checked_on, "domain_invalid")
+    if args.command == "inspect" and args.domain_relative == _DOMAIN_RELATIVE:
         try:
             domain = resolve_documents_read_path(
                 documents_content_root(), _DOMAIN_RELATIVE
             )
         except DocumentsPlanePathError:
-            result = _unavailable(checked_on, "domain_invalid")
+            pass
         else:
             result = inspect_sanyi_status(domain, today=checked_on)
     print(json.dumps(result.as_dict(), ensure_ascii=False, sort_keys=True))
