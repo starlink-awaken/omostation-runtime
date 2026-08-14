@@ -232,6 +232,25 @@ def _binding_declares_model_freshness(environ: Mapping[str, str]) -> bool:
     )
 
 
+def _binding_declares_job(environ: Mapping[str, str], job_id: str) -> bool:
+    """Check whether an optional Workspace-owned job exists in its binding."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    return any(
+        isinstance(item, dict) and item.get("id") == job_id
+        for item in raw["runtime_jobs"]
+    )
+
+
 def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
     """Load the one CR08 declaration from the Workspace binding SSOT."""
     path = _workspace_binding_registry_path(environ)
@@ -408,17 +427,18 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     if environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY") or environ.get(
         "WORKSPACE_ROOT"
     ):
-        registry.register(
-            _controller_shadow_job_spec(environ),
-            [
-                sys.executable,
-                "-m",
-                "runtime.documents_plane.controller_shadow",
-                "inspect",
-                "--domain-relative",
-                "@工作文档/卫健委",
-            ],
-        )
+        if _binding_declares_job(environ, "documents-weijian-controller-shadow"):
+            registry.register(
+                _controller_shadow_job_spec(environ),
+                [
+                    sys.executable,
+                    "-m",
+                    "runtime.documents_plane.controller_shadow",
+                    "inspect",
+                    "--domain-relative",
+                    "@工作文档/卫健委",
+                ],
+            )
         if _binding_declares_model_freshness(environ):
             registry.register(
                 _model_freshness_job_spec(environ),
@@ -431,7 +451,8 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
                     "@工作文档/卫健委",
                 ],
             )
-        registry.register(_sanyi_status_job_spec(environ), _SANYI_COMMAND)
+        if _binding_declares_job(environ, _SANYI_JOB_ID):
+            registry.register(_sanyi_status_job_spec(environ), _SANYI_COMMAND)
     return registry
 
 

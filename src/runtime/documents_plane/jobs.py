@@ -665,8 +665,13 @@ def _sanyi_status_evidence(stdout: str) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise TypeError("sanyi-status evidence must be a JSON object")
     expected_fields = {
-        "schema", "status", "checked_on", "dashboard_last_reviewed",
-        "latest_verified_at", "relevant_fact_count", "error",
+        "schema",
+        "status",
+        "checked_on",
+        "dashboard_last_reviewed",
+        "latest_verified_at",
+        "relevant_fact_count",
+        "error",
     }
     if set(payload) != expected_fields:
         raise ValueError("sanyi-status evidence has an invalid schema")
