@@ -47,6 +47,27 @@ _MODEL_FRESHNESS_EVIDENCE = (
     "documents-weijian-model-freshness.json"
 )
 _MODEL_FRESHNESS_EVIDENCE_PREFIX = "control/evidence/documents-weijian-model-freshness/"
+_SANYI_ACTION = "audit_sanyi_status_consistency"
+_SANYI_SCHEMA = "runtime.documents-sanyi-status-consistency.evidence.v1"
+_SANYI_READS = (
+    "@工作文档/卫健委/_control/三医态势仪表盘.md",
+    "@工作文档/卫健委/_entities/facts/01-progress.yaml",
+)
+_SANYI_SCOPE = ("proj-syld", "proj-jingbao", "proj-emr-quality")
+_SANYI_EVIDENCE = (
+    "control/evidence/documents-weijian-sanyi-status-audit/"
+    "documents-weijian-sanyi-status-audit.json"
+)
+_SANYI_EVIDENCE_PREFIX = "control/evidence/documents-weijian-sanyi-status-audit/"
+_SANYI_COMMAND = (
+    sys.executable,
+    "-m",
+    "runtime.documents_plane.sanyi_status",
+    "inspect",
+    "--domain-relative",
+    "@工作文档/卫健委",
+)
+_SANYI_PROJECTION = "sanyi-status-consistency-v1"
 
 
 def _workspace_binding_registry_path(environ: Mapping[str, str]) -> Path:
@@ -201,6 +222,60 @@ def _binding_declares_model_freshness(environ: Mapping[str, str]) -> bool:
     )
 
 
+def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
+    """Load the one CR08 declaration from the Workspace binding SSOT."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry is unavailable"
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError(
+            "Workspace Documents binding registry has invalid runtime_jobs"
+        )
+    matches = [
+        item
+        for item in raw["runtime_jobs"]
+        if isinstance(item, dict)
+        and item.get("id") == "documents-weijian-sanyi-status-audit"
+    ]
+    if len(matches) != 1:
+        raise DocumentsPlanePathError(
+            "Workspace sanyi status job must be declared exactly once"
+        )
+    expected = {
+        "id": "documents-weijian-sanyi-status-audit",
+        "domain_id": "work-weijian",
+        "owner": "runtime-control",
+        "action": _SANYI_ACTION,
+        "schedule": "manual",
+        "timeout_seconds": 30,
+        "reads": list(_SANYI_READS),
+        "scope_entity_ids": list(_SANYI_SCOPE),
+        "writes": [],
+        "evidence_relative_path": _SANYI_EVIDENCE,
+        "evidence_schema": _SANYI_SCHEMA,
+        "fail_closed": True,
+    }
+    if matches[0] != expected:
+        raise DocumentsPlanePathError(
+            "Workspace sanyi status job has an invalid contract"
+        )
+    return JobSpec(
+        job_id=expected["id"],
+        reads=_SANYI_READS,
+        writes=(),
+        owner=expected["owner"],
+        schedule=expected["schedule"],
+        timeout=expected["timeout_seconds"],
+        evidence_path=_SANYI_EVIDENCE.removeprefix(_SANYI_EVIDENCE_PREFIX),
+        fail_closed=True,
+        evidence_projection=_SANYI_PROJECTION,
+    )
+
+
 def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
     """Build the small, explicit owner set shipped with Runtime.
 
@@ -347,6 +422,7 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
                     "@工作文档/卫健委",
                 ],
             )
+        registry.register(_sanyi_status_job_spec(environ), _SANYI_COMMAND)
     return registry
 
 

@@ -1143,3 +1143,96 @@ def test_model_freshness_projection_rejects_unavailable_error_state_conflicts(
     assert receipt["exit_code"] == 74
     assert receipt["evidence_error"] == result.evidence_error
     assert "owner_evidence" not in receipt
+
+
+def _write_sanyi_documents(
+    root: Path, *, dashboard: str = "2026-08-05", latest: str = "2026-08-13"
+) -> Path:
+    documents_root = root / "Documents"
+    domain = documents_root / "@工作文档" / "卫健委"
+    dashboard_path = domain / "_control" / "三医态势仪表盘.md"
+    facts_path = domain / "_entities" / "facts" / "01-progress.yaml"
+    dashboard_path.parent.mkdir(parents=True)
+    facts_path.parent.mkdir(parents=True)
+    dashboard_path.write_text(
+        f"---\nlast-reviewed: '{dashboard}'\n---\n# 三医态势\n",
+        encoding="utf-8",
+    )
+    facts_path.write_text(
+        "facts:\n"
+        "  - fid: fact-private\n"
+        "    statement: 不得进入收据\n"
+        "    entity_ids: [proj-syld]\n"
+        f"    verified_at: '{latest}'\n",
+        encoding="utf-8",
+    )
+    return documents_root
+
+
+def _sanyi_environ(root: Path) -> dict[str, str]:
+    documents = _write_sanyi_documents(root)
+    binding_path = root / "documents-domain-projects.yaml"
+    binding_path.write_text(
+        json.dumps(
+            {
+                "runtime_jobs": [
+                    {
+                        "id": "documents-weijian-sanyi-status-audit",
+                        "domain_id": "work-weijian",
+                        "owner": "runtime-control",
+                        "action": "audit_sanyi_status_consistency",
+                        "schedule": "manual",
+                        "timeout_seconds": 30,
+                        "reads": [
+                            "@工作文档/卫健委/_control/三医态势仪表盘.md",
+                            "@工作文档/卫健委/_entities/facts/01-progress.yaml",
+                        ],
+                        "scope_entity_ids": [
+                            "proj-syld",
+                            "proj-jingbao",
+                            "proj-emr-quality",
+                        ],
+                        "writes": [],
+                        "evidence_relative_path": "control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json",
+                        "evidence_schema": "runtime.documents-sanyi-status-consistency.evidence.v1",
+                        "fail_closed": True,
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "DOCUMENTS_CONTENT_ROOT": str(documents),
+        "OMOSTATION_RUNTIME_STATE_ROOT": str(root / "state"),
+        "DOCUMENTS_DOMAIN_PROJECTS_REGISTRY": str(binding_path),
+    }
+
+
+def test_sanyi_status_job_persists_bounded_attention_evidence(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from runtime.documents_plane.cli import main
+
+    monkeypatch.setattr(
+        "runtime.documents_plane.commands._sandbox_argv", lambda command, _roots: command
+    )
+    monkeypatch.setenv("PYTHONPATH", str(Path(__file__).parents[1] / "src"))
+    environ = _sanyi_environ(tmp_path)
+
+    assert main(
+        ["documents", "run", "documents-weijian-sanyi-status-audit", "--json"],
+        environ=environ,
+    ) == 1
+    receipt_path = (
+        Path(environ["OMOSTATION_RUNTIME_STATE_ROOT"])
+        / "control/evidence/documents-weijian-sanyi-status-audit"
+        / "documents-weijian-sanyi-status-audit.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["owner_evidence"]["status"] == "attention"
+    serialized = json.dumps(receipt, ensure_ascii=False)
+    assert "statement" not in serialized
+    assert "fact-private" not in serialized
+    assert "01-progress.yaml" not in serialized
