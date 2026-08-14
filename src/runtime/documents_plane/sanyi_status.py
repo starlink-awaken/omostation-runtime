@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import stat
 import sys
@@ -28,6 +29,7 @@ _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _LAST_REVIEWED = re.compile(
     r"^last-reviewed:\s*(?:'(?P<single>\d{4}-\d{2}-\d{2})'|\"(?P<double>\d{4}-\d{2}-\d{2})\"|(?P<bare>\d{4}-\d{2}-\d{2}))\s*$"
 )
+_MAX_INPUT_BYTES = 1024 * 1024
 
 
 class _InspectionError(ValueError):
@@ -69,15 +71,47 @@ def _strict_iso_date(value: object) -> date | None:
 
 def _read_regular_file(path: Path, *, unavailable: str) -> str:
     try:
-        file_stat = path.lstat()
+        before = path.lstat()
     except OSError as exc:
         raise _InspectionError(unavailable) from exc
-    if not stat.S_ISREG(file_stat.st_mode):
+    if not stat.S_ISREG(before.st_mode):
+        raise _InspectionError(unavailable)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
         raise _InspectionError(unavailable)
     try:
-        return path.read_text(encoding="utf-8")
+        descriptor = os.open(path, os.O_RDONLY | nofollow)
     except (OSError, UnicodeError) as exc:
         raise _InspectionError(unavailable) from exc
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)
+            or opened.st_size > _MAX_INPUT_BYTES
+        ):
+            raise _InspectionError(unavailable)
+        chunks: list[bytes] = []
+        remaining = _MAX_INPUT_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if remaining == 0:
+            raise _InspectionError(unavailable)
+        after = path.lstat()
+        if not stat.S_ISREG(after.st_mode) or (opened.st_dev, opened.st_ino) != (
+            after.st_dev,
+            after.st_ino,
+        ):
+            raise _InspectionError(unavailable)
+        return b"".join(chunks).decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise _InspectionError(unavailable) from exc
+    finally:
+        os.close(descriptor)
 
 
 def _dashboard_last_reviewed(path: Path) -> date:

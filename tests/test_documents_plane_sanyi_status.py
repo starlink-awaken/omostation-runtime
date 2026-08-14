@@ -117,3 +117,47 @@ def test_inspect_sanyi_status_fails_closed_without_identity(
     serialized = json.dumps(result.as_dict(), ensure_ascii=False)
     assert "fact-private" not in serialized
     assert str(tmp_path) not in serialized
+
+
+@pytest.mark.parametrize("input_name", ["dashboard", "facts"])
+def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_after_lstat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, input_name: str
+) -> None:
+    domain = _write_domain(tmp_path)
+    target = (
+        domain / "_control" / "三医态势仪表盘.md"
+        if input_name == "dashboard"
+        else domain / "_entities" / "facts" / "01-progress.yaml"
+    )
+    outside = tmp_path / f"outside-{input_name}"
+    outside.write_text(
+        "---\nlast-reviewed: '2099-01-01'\n---\n# outside-private\n"
+        if input_name == "dashboard"
+        else (
+            "facts:\n"
+            "  - fid: outside-private\n"
+            "    entity_ids: [proj-syld]\n"
+            "    verified_at: '2026-08-13'\n"
+        ),
+        encoding="utf-8",
+    )
+    original_lstat = Path.lstat
+    swapped = False
+
+    def swap_after_lstat(path: Path) -> os.stat_result:
+        nonlocal swapped
+        result = original_lstat(path)
+        if path == target and not swapped:
+            target.unlink()
+            target.symlink_to(outside)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(Path, "lstat", swap_after_lstat)
+    result = inspect_sanyi_status(domain, today=date(2026, 8, 14))
+
+    assert swapped is True
+    assert result.status == "unavailable"
+    assert result.dashboard_last_reviewed is None
+    assert result.latest_verified_at is None
+    assert "outside-private" not in json.dumps(result.as_dict(), ensure_ascii=False)

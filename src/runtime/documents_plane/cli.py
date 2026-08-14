@@ -439,6 +439,16 @@ def _sanyi_status_cli_payload(result: JobResult) -> dict[str, object]:
     }
 
 
+def _print_sanyi_status_text_result(result: JobResult) -> None:
+    """Keep CR08 text output aggregate-only when a Runtime failure occurs."""
+    if result.dry_run:
+        print(f"{result.job_id}: dry_run")
+    elif result.evidence_summary is not None:
+        print(json.dumps(result.evidence_summary, ensure_ascii=False, sort_keys=True))
+    else:
+        print(f"{result.job_id}: runtime_error")
+
+
 def _documents_main(
     argv: Sequence[str], *, registry: JobRegistry, environ: Mapping[str, str]
 ) -> int:
@@ -480,6 +490,8 @@ def _documents_main(
             else result.as_dict()
         )
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+    elif result.job_id == _SANYI_JOB_ID:
+        _print_sanyi_status_text_result(result)
     else:
         if result.stdout:
             print(result.stdout, end="")
