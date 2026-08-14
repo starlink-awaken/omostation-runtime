@@ -15,12 +15,6 @@ from typing import Any
 
 import yaml
 
-from .paths import (
-    DocumentsPlanePathError,
-    documents_content_root,
-    resolve_documents_read_path,
-)
-
 _SCHEMA = "runtime.documents-sanyi-status-consistency.v1"
 _DOMAIN_RELATIVE = "@工作文档/卫健委"
 _SCOPE_ENTITY_IDS = frozenset({"proj-syld", "proj-jingbao", "proj-emr-quality"})
@@ -108,15 +102,15 @@ def _open_directory(path: Path, *, unavailable: str) -> int:
     return descriptor
 
 
-def _read_domain_regular_file(
-    domain_root: Path, relative_parts: tuple[str, ...], *, unavailable: str
+def _read_documents_regular_file(
+    documents_root: Path, relative_parts: tuple[str, ...], *, unavailable: str
 ) -> str:
-    """Read one fixed domain input through no-follow directory descriptors."""
+    """Read one fixed Documents input through no-follow directory descriptors."""
     nofollow = getattr(os, "O_NOFOLLOW", None)
     directory = getattr(os, "O_DIRECTORY", None)
     if nofollow is None or directory is None:
         raise _InspectionError(unavailable)
-    directory_descriptor = _open_directory(domain_root, unavailable=unavailable)
+    directory_descriptor = _open_directory(documents_root, unavailable=unavailable)
     file_descriptor: int | None = None
     try:
         for component in relative_parts[:-1]:
@@ -189,10 +183,10 @@ def _read_domain_regular_file(
         os.close(directory_descriptor)
 
 
-def _dashboard_last_reviewed(domain_root: Path) -> date:
-    content = _read_domain_regular_file(
-        domain_root,
-        ("_control", "三医态势仪表盘.md"),
+def _dashboard_last_reviewed(documents_root: Path) -> date:
+    content = _read_documents_regular_file(
+        documents_root,
+        ("@工作文档", "卫健委", "_control", "三医态势仪表盘.md"),
         unavailable="dashboard_unavailable",
     )
     lines = content.splitlines()
@@ -219,10 +213,10 @@ def _dashboard_last_reviewed(domain_root: Path) -> date:
     return parsed
 
 
-def _relevant_verified_dates(domain_root: Path) -> tuple[date, ...]:
-    content = _read_domain_regular_file(
-        domain_root,
-        ("_entities", "facts", "01-progress.yaml"),
+def _relevant_verified_dates(documents_root: Path) -> tuple[date, ...]:
+    content = _read_documents_regular_file(
+        documents_root,
+        ("@工作文档", "卫健委", "_entities", "facts", "01-progress.yaml"),
         unavailable="facts_unavailable",
     )
     try:
@@ -264,13 +258,13 @@ def _unavailable(checked_on: date, error: str) -> SanyiStatusConsistency:
 
 
 def inspect_sanyi_status(
-    domain_root: Path, *, today: date | None = None
+    documents_root: Path, *, today: date | None = None
 ) -> SanyiStatusConsistency:
     """Compare declared CR08 facts with dashboard frontmatter only."""
     checked_on = today or datetime.now(UTC).date()
     try:
-        dashboard_date = _dashboard_last_reviewed(domain_root)
-        verified_dates = _relevant_verified_dates(domain_root)
+        dashboard_date = _dashboard_last_reviewed(documents_root)
+        verified_dates = _relevant_verified_dates(documents_root)
     except _InspectionError as exc:
         return _unavailable(checked_on, str(exc))
     latest = max(verified_dates)
@@ -300,13 +294,12 @@ def main(argv: list[str] | None = None) -> int:
     result = _unavailable(checked_on, "domain_invalid")
     if args.command == "inspect" and args.domain_relative == _DOMAIN_RELATIVE:
         try:
-            domain = resolve_documents_read_path(
-                documents_content_root(), _DOMAIN_RELATIVE
-            )
-        except DocumentsPlanePathError:
+            configured_root = Path(
+                os.environ.get("DOCUMENTS_CONTENT_ROOT", str(Path.home() / "Documents"))
+            ).expanduser()
+            result = inspect_sanyi_status(configured_root, today=checked_on)
+        except (OSError, UnicodeError):
             pass
-        else:
-            result = inspect_sanyi_status(domain, today=checked_on)
     print(json.dumps(result.as_dict(), ensure_ascii=False, sort_keys=True))
     return _EXIT_CODES[result.status]
 

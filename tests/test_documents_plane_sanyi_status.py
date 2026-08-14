@@ -39,6 +39,10 @@ def _write_domain(
     return domain
 
 
+def _documents_root(domain: Path) -> Path:
+    return domain.parents[1]
+
+
 def _mutate_domain(root: Path, mutation: str) -> Path:
     domain = _write_domain(root)
     dashboard = domain / "_control" / "三医态势仪表盘.md"
@@ -79,7 +83,7 @@ def test_inspect_sanyi_status_reports_aggregate_attention_only(tmp_path: Path) -
         facts=[("proj-jingbao", "2026-08-12"), ("proj-syld", "2026-08-13")],
     )
 
-    result = inspect_sanyi_status(domain, today=date(2026, 8, 14))
+    result = inspect_sanyi_status(_documents_root(domain), today=date(2026, 8, 14))
 
     assert result.as_dict() == {
         "schema": "runtime.documents-sanyi-status-consistency.v1",
@@ -107,7 +111,7 @@ def test_inspect_sanyi_status_fails_closed_without_identity(
     tmp_path: Path, mutation: str
 ) -> None:
     result = inspect_sanyi_status(
-        _mutate_domain(tmp_path, mutation), today=date(2026, 8, 14)
+        _documents_root(_mutate_domain(tmp_path, mutation)), today=date(2026, 8, 14)
     )
 
     assert result.status == "unavailable"
@@ -159,7 +163,7 @@ def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_before_open(
         return original_open(path, flags, mode, dir_fd=dir_fd)
 
     monkeypatch.setattr(os, "open", swap_before_leaf_open)
-    result = inspect_sanyi_status(domain, today=date(2026, 8, 14))
+    result = inspect_sanyi_status(_documents_root(domain), today=date(2026, 8, 14))
 
     assert swapped is True
     assert result.status == "unavailable"
@@ -215,13 +219,75 @@ def test_inspect_sanyi_status_refuses_intermediate_directory_symlink_races(
         return original_open(path, flags, mode, dir_fd=dir_fd)
 
     monkeypatch.setattr(os, "open", swap_before_component_open)
-    result = inspect_sanyi_status(domain, today=date(2026, 8, 14))
+    result = inspect_sanyi_status(_documents_root(domain), today=date(2026, 8, 14))
 
     assert swapped is True
     assert result.status == "unavailable"
     assert result.dashboard_last_reviewed is None
     assert result.latest_verified_at is None
     assert "outside-private" not in json.dumps(result.as_dict(), ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    ("ancestor_parts", "leaf_name"),
+    [
+        (("@工作文档",), "卫健委/_control/三医态势仪表盘.md"),
+        (("@工作文档", "卫健委"), "_control/三医态势仪表盘.md"),
+    ],
+)
+def test_inspect_sanyi_status_refuses_ancestor_directory_symlink_races(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    ancestor_parts: tuple[str, ...],
+    leaf_name: str,
+) -> None:
+    from runtime.documents_plane.sanyi_status import main
+
+    domain = _write_domain(tmp_path)
+    documents_root = _documents_root(domain)
+    target = documents_root.joinpath(*ancestor_parts)
+    outside = tmp_path / f"outside-{'-'.join(ancestor_parts)}"
+    outside.mkdir()
+    outside.joinpath(leaf_name).parent.mkdir(parents=True, exist_ok=True)
+    outside.joinpath(leaf_name).write_text("outside-private", encoding="utf-8")
+    original_open = os.open
+    swapped = False
+
+    def swap_before_ancestor_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if path == target.name and dir_fd is not None and not swapped:
+            for child in sorted(
+                target.rglob("*"),
+                key=lambda candidate: len(candidate.parts),
+                reverse=True,
+            ):
+                if child.is_file() or child.is_symlink():
+                    child.unlink()
+                else:
+                    child.rmdir()
+            target.rmdir()
+            target.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", swap_before_ancestor_open)
+    monkeypatch.setenv("DOCUMENTS_CONTENT_ROOT", str(documents_root))
+    exit_code = main(["inspect", "--domain-relative", "@工作文档/卫健委"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert swapped is True
+    assert exit_code == 2
+    assert payload["status"] == "unavailable"
+    assert payload["dashboard_last_reviewed"] is None
+    assert payload["latest_verified_at"] is None
+    assert "outside-private" not in json.dumps(payload, ensure_ascii=False)
 
 
 @pytest.mark.parametrize(
