@@ -22,14 +22,10 @@ def store() -> RegistryStore:
 
 @pytest.fixture
 def hb(store: RegistryStore) -> HeartbeatManager:
-    return HeartbeatManager(
-        store, heartbeat_ttl=5, zombie_threshold=10, check_interval=1
-    )
+    return HeartbeatManager(store, heartbeat_ttl=5, zombie_threshold=10, check_interval=1)
 
 
-def _reg(
-    store: RegistryStore, agent_id: str, *, status: AgentStatus = AgentStatus.IDLE
-) -> None:
+def _reg(store: RegistryStore, agent_id: str, *, status: AgentStatus = AgentStatus.IDLE) -> None:
     store.register_agent(AgentInfo(agent_id=agent_id, name=agent_id, status=status))
 
 
@@ -54,29 +50,21 @@ class TestHeartbeatManagerLifecycle:
 
 
 class TestSweep:
-    def test_sweep_marks_stale_offline(
-        self, hb: HeartbeatManager, store: RegistryStore
-    ) -> None:
+    def test_sweep_marks_stale_offline(self, hb: HeartbeatManager, store: RegistryStore) -> None:
         _reg(store, "a1", status=AgentStatus.BUSY)
         agent = store.get_agent("a1")
-        agent.last_heartbeat = datetime.now(UTC) - timedelta(  # type: ignore[reportOptionalMemberAccess]
-            seconds=100
-        )  # 100s ago  # type: ignore[reportOptionalMemberAccess]
+        agent.last_heartbeat = datetime.now(UTC) - timedelta(seconds=100)  # 100s ago
         hb.sweep()
         agent = store.get_agent("a1")
-        assert agent.status == AgentStatus.OFFLINE  # type: ignore[reportOptionalMemberAccess]
+        assert agent.status == AgentStatus.OFFLINE
 
-    def test_sweep_keeps_fresh(
-        self, hb: HeartbeatManager, store: RegistryStore
-    ) -> None:
+    def test_sweep_keeps_fresh(self, hb: HeartbeatManager, store: RegistryStore) -> None:
         _reg(store, "a1", status=AgentStatus.BUSY)
         agent = store.get_agent("a1")
-        agent.last_heartbeat = datetime.now(  # type: ignore[reportOptionalMemberAccess]
-            UTC
-        )  # now  # type: ignore[reportOptionalMemberAccess]
+        agent.last_heartbeat = datetime.now(UTC)  # now
         hb.sweep()
         agent = store.get_agent("a1")
-        assert agent.status == AgentStatus.BUSY  # type: ignore[reportOptionalMemberAccess]
+        assert agent.status == AgentStatus.BUSY
 
 
 # ── Constants ───────────────────────────────────────────────────────────────

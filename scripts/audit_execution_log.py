@@ -17,7 +17,6 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 REQUIRED_FIELDS = ["ts", "task_id", "status", "summary"]
 
 

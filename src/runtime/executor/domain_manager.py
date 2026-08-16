@@ -10,7 +10,6 @@ and a registry for shared boilerplate defaults.
 
 from __future__ import annotations
 
-import math
 import re
 import time
 import uuid
@@ -291,7 +290,7 @@ def _check_type(value: Any, type_name: str) -> bool:
     mapping = {
         "string": lambda v: isinstance(v, str),
         "number": lambda v: (
-            isinstance(v, (int, float)) and not (isinstance(v, float) and math.isnan(v))
+            isinstance(v, (int, float)) and not (isinstance(v, float) and v != v)
         ),
         "boolean": lambda v: isinstance(v, bool),
         "object": lambda v: isinstance(v, dict),

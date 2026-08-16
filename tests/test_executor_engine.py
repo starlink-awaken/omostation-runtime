@@ -19,23 +19,21 @@ def test_log_execution_writes_jsonl():
         log_path = Path(tf.name)
 
     try:
-        with (
-            mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path),
-            mock.patch("runtime.executor.engine.report_execution"),
-        ):
-            from runtime.executor.engine import _log_execution
+        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):
+            with mock.patch("runtime.executor.engine.report_execution"):
+                from runtime.executor.engine import _log_execution
 
-            _log_execution(
-                task_id="task-001",
-                status="ok",
-                summary="task completed",
-                result={
-                    "result": "done",
-                    "turns": 3,
-                    "usage": {"total_tokens": 150},
-                },
-                duration_sec=2.5,
-            )
+                _log_execution(
+                    task_id="task-001",
+                    status="ok",
+                    summary="task completed",
+                    result={
+                        "result": "done",
+                        "turns": 3,
+                        "usage": {"total_tokens": 150},
+                    },
+                    duration_sec=2.5,
+                )
 
         lines = log_path.read_text().strip().splitlines()
         assert len(lines) == 1
@@ -55,19 +53,17 @@ def test_log_execution_with_error():
         log_path = Path(tf.name)
 
     try:
-        with (
-            mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path),
-            mock.patch("runtime.executor.engine.report_execution"),
-        ):
-            from runtime.executor.engine import _log_execution
+        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):
+            with mock.patch("runtime.executor.engine.report_execution"):
+                from runtime.executor.engine import _log_execution
 
-            _log_execution(
-                task_id="task-err",
-                status="error",
-                summary="failed",
-                result={"error": "timeout", "turns": 1},
-                duration_sec=30.0,
-            )
+                _log_execution(
+                    task_id="task-err",
+                    status="error",
+                    summary="failed",
+                    result={"error": "timeout", "turns": 1},
+                    duration_sec=30.0,
+                )
 
         entry = json.loads(log_path.read_text().strip())
         assert entry["task_id"] == "task-err"
@@ -84,7 +80,7 @@ def test_log_execution_matrix_bridge_failure_is_silent():
         log_path = Path(tf.name)
 
     try:
-        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):  # noqa: SIM117  (multi-line context managers read better nested)
+        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):
             with mock.patch(
                 "runtime.executor.engine.report_execution",
                 side_effect=RuntimeError("matrix down"),
@@ -149,89 +145,81 @@ def test_build_alert_message_no_summary():
 
 def test_execute_tool_known_function():
     """_execute_tool dispatches to known function in tool registry."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
-        # Tool registry entries use {"fn": callable} format
-        rt._tool_registry = {
-            "echo": {"fn": lambda message: {"result": f"echoed: {message}"}}
-        }
+            rt = AgentRuntime()
+            # Tool registry entries use {"fn": callable} format
+            rt._tool_registry = {
+                "echo": {"fn": lambda message: {"result": f"echoed: {message}"}}
+            }
 
-        tc = {
-            "id": "call-1",
-            "function": {"name": "echo", "arguments": '{"message": "hello"}'},
-        }
-        result = rt._execute_tool(tc)
-        assert result["role"] == "tool"
-        assert result["tool_call_id"] == "call-1"
-        assert "echoed" in result["content"]
+            tc = {
+                "id": "call-1",
+                "function": {"name": "echo", "arguments": '{"message": "hello"}'},
+            }
+            result = rt._execute_tool(tc)
+            assert result["role"] == "tool"
+            assert result["tool_call_id"] == "call-1"
+            assert "echoed" in result["content"]
 
 
 def test_execute_tool_unknown_function():
     """_execute_tool returns error for unknown tool."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
-        rt._tool_registry = {}
+            rt = AgentRuntime()
+            rt._tool_registry = {}
 
-        tc = {
-            "id": "call-99",
-            "function": {"name": "nonexistent", "arguments": "{}"},
-        }
-        result = rt._execute_tool(tc)
-        assert "Unknown tool" in result["content"]
+            tc = {
+                "id": "call-99",
+                "function": {"name": "nonexistent", "arguments": "{}"},
+            }
+            result = rt._execute_tool(tc)
+            assert "Unknown tool" in result["content"]
 
 
 def test_execute_tool_invalid_json_args():
     """_execute_tool handles invalid JSON arguments."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
-        rt._tool_registry = {"parse": {"fn": lambda x=42: str(x)}}
+            rt = AgentRuntime()
+            rt._tool_registry = {"parse": {"fn": lambda x=42: str(x)}}
 
-        tc = {
-            "id": "call-1",
-            "function": {"name": "parse", "arguments": "not valid json"},
-        }
-        result = rt._execute_tool(tc)
-        # Falls back to {}, calls fn(**{})
-        assert result["role"] == "tool"
-        assert "42" in result["content"]
+            tc = {
+                "id": "call-1",
+                "function": {"name": "parse", "arguments": "not valid json"},
+            }
+            result = rt._execute_tool(tc)
+            # Falls back to {}, calls fn(**{})
+            assert result["role"] == "tool"
+            assert "42" in result["content"]
 
 
 def test_execute_tool_exception_propagation():
     """_execute_tool propagates tool function exceptions and returns error."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
+            rt = AgentRuntime()
 
-        def crashy(**kwargs):
-            raise ValueError("boom")
+            def crashy(**kwargs):
+                raise ValueError("boom")
 
-        rt._tool_registry = {"crashy": {"fn": crashy}}
+            rt._tool_registry = {"crashy": {"fn": crashy}}
 
-        tc = {
-            "id": "call-1",
-            "function": {"name": "crashy", "arguments": "{}"},
-        }
-        with pytest.raises(ValueError, match="boom"):
-            rt._execute_tool(tc)
+            tc = {
+                "id": "call-1",
+                "function": {"name": "crashy", "arguments": "{}"},
+            }
+            with pytest.raises(ValueError, match="boom"):
+                rt._execute_tool(tc)
 
 
 # ── AgentRuntime.run_task ──────────────────────────────────────────────
@@ -239,51 +227,47 @@ def test_execute_tool_exception_propagation():
 
 def test_run_task_no_llm_returns_error():
     """run_task without LLM backend returns error gracefully."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
-        rt._call_llm = mock.MagicMock(
-            return_value={
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [],
-                "finish_reason": "error",
-                "error": "No LLM backend",
-            }
-        )
+            rt = AgentRuntime()
+            rt._call_llm = mock.MagicMock(
+                return_value={
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [],
+                    "finish_reason": "error",
+                    "error": "No LLM backend",
+                }
+            )
 
-        result = rt.run_task("test prompt")
-        assert "error" in result
-        assert "No LLM backend" in result["error"]
+            result = rt.run_task("test prompt")
+            assert "error" in result
+            assert "No LLM backend" in result["error"]
 
 
 def test_run_task_direct_answer():
     """run_task with direct LLM answer (no tool calls)."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
-        rt._call_llm = mock.MagicMock(
-            return_value={
-                "role": "assistant",
-                "content": "The answer is 42",
-                "tool_calls": [],
-                "finish_reason": "stop",
-                "usage": {"total_tokens": 50},
-            }
-        )
+            rt = AgentRuntime()
+            rt._call_llm = mock.MagicMock(
+                return_value={
+                    "role": "assistant",
+                    "content": "The answer is 42",
+                    "tool_calls": [],
+                    "finish_reason": "stop",
+                    "usage": {"total_tokens": 50},
+                }
+            )
 
-        result = rt.run_task("what is 6*7?")
-        assert result["result"] == "The answer is 42"
-        assert result["turns"] == 1
-        assert result["usage"]["total_tokens"] == 50
+            result = rt.run_task("what is 6*7?")
+            assert result["result"] == "The answer is 42"
+            assert result["turns"] == 1
+            assert result["usage"]["total_tokens"] == 50
 
 
 def test_call_llm_uses_registry_route_for_matching_provider():
@@ -326,14 +310,14 @@ def test_call_llm_uses_registry_route_for_matching_provider():
             self.__dict__.update(kwargs)
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FallbackProvider(), _FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FallbackProvider(), _FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = _LLMRequest
+    fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -342,12 +326,12 @@ def test_call_llm_uses_registry_route_for_matching_provider():
             reasoning="Matched route anthropic/claude-sonnet-4",
         )
     )
-    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = (
         lambda model_id, input_tokens, output_tokens: 0.0
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")
 
     with mock.patch.dict(
         sys.modules,
@@ -400,14 +384,14 @@ def test_call_llm_falls_back_when_routed_provider_unavailable():
             self.__dict__.update(kwargs)
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = _LLMRequest
+    fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -416,12 +400,12 @@ def test_call_llm_falls_back_when_routed_provider_unavailable():
             reasoning="Matched route anthropic/claude-sonnet-4",
         )
     )
-    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = (
         lambda model_id, input_tokens, output_tokens: 0.0
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")
 
     with mock.patch.dict(
         sys.modules,
@@ -466,26 +450,26 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
             self.__dict__.update(kwargs)
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = _LLMRequest
+    fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="openai",
             model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
             reasoning="Matched route openai/gpt-4.1",
         )
     )
-    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = (
         lambda model_id, input_tokens, output_tokens: 0.42
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
 
     with mock.patch.dict(
         sys.modules,
@@ -642,14 +626,14 @@ def test_call_llm_records_audit_log(tmp_path):
         return audit_log
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = _LLMRequest  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = _ToolSchema  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = _LLMRequest
+    fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -658,12 +642,12 @@ def test_call_llm_records_audit_log(tmp_path):
             reasoning="Matched route anthropic/claude-sonnet-4",
         )
     )
-    fake_registry_loader.estimate_model_cost = (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = (
         lambda model_id, input_tokens, output_tokens: 0.123
     )
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = _record_llm_audit  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = _record_llm_audit
 
     with mock.patch.dict(
         sys.modules,
@@ -696,33 +680,31 @@ def test_call_llm_records_audit_log(tmp_path):
 
 def test_run_task_truncated_on_max_turns():
     """run_task returns truncated after 30 turns of tool calls."""
-    with (
-        mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")),
-        mock.patch("runtime.executor.engine.report_execution"),
-    ):
-        from runtime.executor.engine import AgentRuntime
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+        with mock.patch("runtime.executor.engine.report_execution"):
+            from runtime.executor.engine import AgentRuntime
 
-        rt = AgentRuntime()
-        # Always return tool_calls to keep the loop going
-        rt._call_llm = mock.MagicMock(
-            return_value={
-                "role": "assistant",
-                "content": "calling",
-                "tool_calls": [
-                    {
-                        "id": "1",
-                        "function": {"name": "echo", "arguments": '{"msg":"hi"}'},
-                    }
-                ],
-                "finish_reason": "tool_calls",
-                "usage": {"total_tokens": 10},
-            }
-        )
-        rt._tool_registry = {"echo": {"fn": lambda msg="": {"result": msg}}}
+            rt = AgentRuntime()
+            # Always return tool_calls to keep the loop going
+            rt._call_llm = mock.MagicMock(
+                return_value={
+                    "role": "assistant",
+                    "content": "calling",
+                    "tool_calls": [
+                        {
+                            "id": "1",
+                            "function": {"name": "echo", "arguments": '{"msg":"hi"}'},
+                        }
+                    ],
+                    "finish_reason": "tool_calls",
+                    "usage": {"total_tokens": 10},
+                }
+            )
+            rt._tool_registry = {"echo": {"fn": lambda msg="": {"result": msg}}}
 
-        result = rt.run_task("loop")
-        assert result["truncated"] is True
-        assert result["turns"] == 30
+            result = rt.run_task("loop")
+            assert result["truncated"] is True
+            assert result["turns"] == 30
 
 
 # ── P4-E3 budget governance closeout ─────────────────────────────────────
@@ -739,14 +721,14 @@ def test_budget_policy_includes_task_id_and_model_in_route_info(tmp_path):
             raise AssertionError("budget must reject before provider call")
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)
+    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="anthropic",
             model=types.SimpleNamespace(
@@ -755,10 +737,10 @@ def test_budget_policy_includes_task_id_and_model_in_route_info(tmp_path):
             reasoning="Matched",
         )
     )
-    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.02  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.02
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
 
     with mock.patch.dict(
         sys.modules,
@@ -811,24 +793,24 @@ def test_budget_debt_reuse_does_not_create_duplicate_files(tmp_path):
             raise AssertionError("generate should not be called when budget rejects")
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)
+    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="openai",
             model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
             reasoning="Matched",
         )
     )
-    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.5  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.5
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
 
     with mock.patch.dict(
         sys.modules,
@@ -884,24 +866,24 @@ def test_budget_reject_returns_error_dict_not_traceback(tmp_path):
             raise AssertionError("must not be reached")
 
     fake_detection = types.ModuleType("llm_gateway.detection")
-    fake_detection.detect_backends = lambda: [_FakeProvider()]  # type: ignore[reportAttributeAccessIssue]
+    fake_detection.detect_backends = lambda: [_FakeProvider()]
 
     fake_provider = types.ModuleType("llm_gateway.provider")
-    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
-    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)  # type: ignore[reportAttributeAccessIssue]
+    fake_provider.LLMRequest = lambda **kwargs: types.SimpleNamespace(**kwargs)
+    fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
         types.SimpleNamespace(
             provider_name="openai",
             model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
             reasoning="Matched",
         )
     )
-    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 1.0  # type: ignore[reportAttributeAccessIssue]
+    fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 1.0
 
     fake_audit = types.ModuleType("llm_gateway.audit")
-    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"  # type: ignore[reportAttributeAccessIssue]
+    fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
 
     with mock.patch.dict(
         sys.modules,

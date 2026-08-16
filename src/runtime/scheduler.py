@@ -54,11 +54,7 @@ class MatrixScheduler:
             return {"status": "unknown"}
         try:
             r = subprocess.run(
-                ["launchctl", "list", label],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+                ["launchctl", "list", label], capture_output=True, text=True, check=False)
             if r.returncode != 0:
                 return {"status": "failed", "exit_code": r.returncode}
 
@@ -95,17 +91,9 @@ class MatrixScheduler:
         try:
             print(f"🔧 [launchd repair] {label}: unloading/loading {cfg}")
             subprocess.run(
-                ["launchctl", "unload", str(cfg)],
-                capture_output=True,
-                timeout=10,
-                check=False,
-            )
+                ["launchctl", "unload", str(cfg)], capture_output=True, timeout=10, check=False)
             subprocess.run(
-                ["launchctl", "load", str(cfg)],
-                capture_output=True,
-                timeout=10,
-                check=False,
-            )
+                ["launchctl", "load", str(cfg)], capture_output=True, timeout=10, check=False)
             time.sleep(0.5)
             status = self._check_launchd(label)
             return status.get("status") == "running"
@@ -127,9 +115,7 @@ class MatrixScheduler:
                     "{{.Status}}",
                 ],
                 capture_output=True,
-                text=True,
-                check=False,
-            )
+                text=True, check=False)
             status = r.stdout.strip()
             if status:
                 return {"status": "running", "details": status}
@@ -143,10 +129,7 @@ class MatrixScheduler:
             return False
         try:
             r = subprocess.run(
-                ["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-P"],
-                capture_output=True,
-                check=False,
-            )
+                ["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-P"], capture_output=True, check=False)
             return r.returncode == 0
         except Exception:  # noqa: BLE001  # defensive fallback
             return False
@@ -283,16 +266,12 @@ class MatrixScheduler:
                     and svc.launchd_config
                 ):
                     exit_code = rt_status.get("exit_code")
-                    if exit_code in (
-                        "78",
-                        "19968",
-                        78,
-                        19968,
-                    ) and self._repair_launchd_service(
-                        svc.launchd_label, svc.launchd_config
-                    ):
-                        rt_status = self._check_launchd(svc.launchd_label)
-                        result["runtime"] = rt_status
+                    if exit_code in ("78", "19968", 78, 19968):
+                        if self._repair_launchd_service(
+                            svc.launchd_label, svc.launchd_config
+                        ):
+                            rt_status = self._check_launchd(svc.launchd_label)
+                            result["runtime"] = rt_status
                 if rt_status.get("status") in ("failed", "error"):
                     # B 治本 (self-heal 死循环防护): 确定性故障 (ImportError/配置错) 重启不可能
                     # 修复, launchctl stop/start 会无限重试. 服务持续未 healthy 超 30 分钟 →
@@ -313,14 +292,10 @@ class MatrixScheduler:
                             )
                             subprocess.run(
                                 ["launchctl", "stop", svc.launchd_label],
-                                capture_output=True,
-                                check=False,
-                            )
+                                capture_output=True, check=False)
                             subprocess.run(
                                 ["launchctl", "start", svc.launchd_label],
-                                capture_output=True,
-                                check=False,
-                            )
+                                capture_output=True, check=False)
                             svc_history.append(current_time)
                             result["runtime"]["self_heal_attempted"] = True
                         else:
@@ -341,9 +316,7 @@ class MatrixScheduler:
                         )
                         subprocess.run(
                             ["docker", "restart", svc.docker_container],
-                            capture_output=True,
-                            check=False,
-                        )
+                            capture_output=True, check=False)
                         svc_history.append(current_time)
                         result["runtime"]["self_heal_attempted"] = True
                     else:
@@ -382,13 +355,11 @@ class MatrixScheduler:
                     )
                 # stdio-only daemon (无 port 无 health_url): 日志新鲜度交叉校验真活,
                 # 揭穿 launcher 僵尸 (uv 保活但子服务死, 无 heartbeat). 仅当配了 log_path 才生效.
-                if (
-                    not svc.port
-                    and not svc.health_url
-                    and svc.log_path
-                    and not self._check_log_freshness(svc.log_path)
-                ):
-                    _degrade_reasons.append(f"log {svc.log_path} stale (no heartbeat)")
+                if not svc.port and not svc.health_url and svc.log_path:
+                    if not self._check_log_freshness(svc.log_path):
+                        _degrade_reasons.append(
+                            f"log {svc.log_path} stale (no heartbeat)"
+                        )
                 if _degrade_reasons:
                     result["runtime"]["status"] = "degraded"
                     result["runtime"]["degraded_reason"] = "; ".join(_degrade_reasons)
@@ -432,7 +403,7 @@ class MatrixScheduler:
                     running_since[svc.name] = current_time
                     if current_pid:
                         running_pid[svc.name] = current_pid
-                result["runtime"]["uptime_seconds"] = int(  # type: ignore[reportArgumentType]
+                result["runtime"]["uptime_seconds"] = int(
                     current_time - running_since[svc.name]
                 )
                 # freshness_seconds: time since last confirmed healthy
@@ -443,16 +414,16 @@ class MatrixScheduler:
                     freshness = int(
                         current_time - running_since.get(svc.name, current_time)
                     )
-                result["runtime"]["freshness_seconds"] = freshness  # type: ignore[reportArgumentType]
+                result["runtime"]["freshness_seconds"] = freshness
             # Track last healthy time — runs for both running and idle services
             if rt in ("running", "idle") or hc == "healthy":
                 last_healthy[svc.name] = current_time
-                result["runtime"]["last_healthy_seconds"] = 0  # type: ignore[reportArgumentType]
+                result["runtime"]["last_healthy_seconds"] = 0
             else:
                 running_since.pop(svc.name, None)
                 running_pid.pop(svc.name, None)  # Bug A: 连带清 pid tracking
                 # Report staleness: time since last seen healthy
-                result["runtime"]["last_healthy_seconds"] = int(  # type: ignore[reportArgumentType]
+                result["runtime"]["last_healthy_seconds"] = int(
                     current_time - last_healthy.get(svc.name, current_time)
                 )
 
@@ -530,9 +501,7 @@ class MatrixScheduler:
                         ],
                         capture_output=True,
                         text=True,
-                        timeout=10,
-                        check=False,
-                    )
+                        timeout=10, check=False)
                 except Exception as e:  # noqa: BLE001  # defensive fallback
                     print(f"Failed to run notify script for {svc_name}: {e}")
             self._prev_health[svc_name] = current_hc
@@ -590,9 +559,7 @@ class MatrixScheduler:
                 ["bash", str(autoheal_script), svc_name],
                 capture_output=True,
                 text=True,
-                timeout=30,
-                check=False,
-            )
+                timeout=30, check=False)
             if r.returncode == 0:
                 print(f"✅ [P1-AUTO_HEAL] {svc_name}: autoheal succeeded")
             else:

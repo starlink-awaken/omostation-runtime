@@ -100,7 +100,7 @@ def build_receipt(
         "status": status,
         "transport": mode,
         # timezone.utc is required here because this script supports system Python 3.9.
-        "recorded_at": recorded_at or datetime.now(timezone.utc).isoformat(),  # noqa: UP017
+        "recorded_at": recorded_at or datetime.now(timezone.utc).isoformat(),
     }
 
 

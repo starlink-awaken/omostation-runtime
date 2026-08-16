@@ -33,7 +33,7 @@ _GOVERNANCE_ONLY_KEYS = {
 
 def validate_runtime_health_snapshot(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
-        raise TypeError("runtime health snapshot must be a mapping")
+        raise ValueError("runtime health snapshot must be a mapping")
     mixed = sorted(_GOVERNANCE_ONLY_KEYS.intersection(payload))
     if mixed:
         raise ValueError(
@@ -41,5 +41,5 @@ def validate_runtime_health_snapshot(payload: Any) -> dict[str, Any]:
         )
     services = payload.get("services")
     if not isinstance(services, dict):
-        raise TypeError("runtime health snapshot services must be a mapping")
+        raise ValueError("runtime health snapshot services must be a mapping")
     return payload

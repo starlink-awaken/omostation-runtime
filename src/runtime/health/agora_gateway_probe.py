@@ -96,9 +96,7 @@ def _find_pid() -> int | None:
             ["launchctl", "list", "com.agora.gateway"],
             capture_output=True,
             text=True,
-            timeout=5,
-            check=False,
-        )
+            timeout=5, check=False)
         m = re.search(r'"PID"\s*=\s*(\d+)', result.stdout)
         if m:
             return int(m.group(1))
@@ -110,9 +108,7 @@ def _find_pid() -> int | None:
             ["pgrep", "-f", "agora"],
             capture_output=True,
             text=True,
-            timeout=5,
-            check=False,
-        )
+            timeout=5, check=False)
         if result.returncode == 0 and result.stdout.strip():
             return int(result.stdout.strip().split("\n")[0])
     except (subprocess.TimeoutExpired, OSError, ValueError):

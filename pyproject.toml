@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.scripts]
-runtime = "runtime.documents_plane.cli:main"
+runtime = "runtime.cli:main"
 ecos-matrix-scheduler = "runtime.scheduler:main"
 ecos-bus-consumer = "runtime.bus_consumer:main"
 

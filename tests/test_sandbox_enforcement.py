@@ -24,7 +24,7 @@ except PermissionError as e:
 finally:
     os.unlink(config_path)
 """
-    result = subprocess.run(  # noqa: PLW1510  (test asserts on stdout)
+    result = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
@@ -55,7 +55,7 @@ except PermissionError as e:
 finally:
     os.unlink(config_path)
 """
-    result = subprocess.run(  # noqa: PLW1510  (test asserts on stdout)
+    result = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
@@ -88,7 +88,7 @@ except PermissionError as e:
 finally:
     os.unlink(config_path)
 """
-    result = subprocess.run(  # noqa: PLW1510  (test asserts on stdout)
+    result = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
@@ -120,7 +120,7 @@ finally:
     except Exception:
         pass
 """
-    result = subprocess.run(  # noqa: PLW1510  (test asserts on stdout)
+    result = subprocess.run(
         [sys.executable, "-c", wrapper],
         capture_output=True,
         text=True,

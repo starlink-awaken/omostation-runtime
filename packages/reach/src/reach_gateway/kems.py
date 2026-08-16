@@ -64,7 +64,7 @@ def prepare_manifest(manifest: dict[str, object]) -> dict[str, object]:
     digest = hashlib.sha256(_canonical_manifest(manifest)).hexdigest()
     prepared["manifest_sha256"] = digest
     prepared["dispatch_id"] = f"reach-{manifest['run_id']}-{digest[:16]}"
-    prepared.setdefault("created_at", datetime.now(timezone.utc).isoformat())  # noqa: UP017
+    prepared.setdefault("created_at", datetime.now(timezone.utc).isoformat())
     return prepared
 
 
@@ -95,7 +95,7 @@ def dispatch_manifest(
     if os.environ.get("BOS_REACHBRIDGE_MODE") != "local_hermes":
         raise RuntimeError("ReachBridge transport is not configured")
 
-    body = f"{len(prepared['documents'])} 个私有源清单已生成，manifest={digest[:16]}"  # type: ignore[reportArgumentType]
+    body = f"{len(prepared['documents'])} 个私有源清单已生成，manifest={digest[:16]}"
     payload = ReachPayload(
         app_id="app_bos_kems",
         user_id=os.environ.get("BOS_REACHBRIDGE_USER", "usr_primary_owner"),

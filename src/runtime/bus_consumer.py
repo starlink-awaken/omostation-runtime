@@ -108,13 +108,8 @@ def process_event(conn, event_id, payload):
         cmd = ["bun", "run", "gbrain", "put", slug, "--content", content]
         # We assume gbrain needs to be set up, so we catch errors
         result = subprocess.run(
-            cmd,
-            cwd=str(GBRAIN_DIR),
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
+            cmd, cwd=str(GBRAIN_DIR), capture_output=True, text=True, timeout=30
+, check=False)
 
         if result.returncode == 0:
             logger.info(f"Successfully ingested log into gbrain: {slug}")
@@ -174,7 +169,7 @@ def main():
 
     session = requests.Session()
     # explicitly bypass proxy for local loopback
-    session.proxies = {"http": None, "https": None}  # type: ignore[reportAttributeAccessIssue]
+    session.proxies = {"http": None, "https": None}
 
     while True:
         try:
@@ -221,8 +216,8 @@ def main():
         except requests.exceptions.RequestException as e:
             logger.error(f"Connection error to Agora stream: {e}")
             time.sleep(5)
-        except Exception:  # defensive fallback
-            logger.exception("Unexpected error in loop")
+        except Exception as e:  # defensive fallback
+            logger.exception(f"Unexpected error in loop: {e}")
             time.sleep(5)
 
 

@@ -126,18 +126,8 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
 
     @app.post("/agents", response_model=AgentResponse, status_code=201)
     def register_agent(req: RegisterAgentRequest) -> AgentResponse:
-        caps = [
-            Capability(name=c.name, tags=c.tags, cost_eu=c.cost_eu)
-            for c in req.capabilities
-        ]
-        agent = AgentInfo(
-            name=req.name,
-            node_id=req.node_id,
-            endpoint=req.endpoint,
-            capabilities=caps,
-            max_concurrency=req.max_concurrency,
-            metadata=req.metadata,
-        )
+        caps = [Capability(name=c.name, tags=c.tags, cost_eu=c.cost_eu) for c in req.capabilities]
+        agent = AgentInfo(name=req.name, node_id=req.node_id, endpoint=req.endpoint, capabilities=caps, max_concurrency=req.max_concurrency, metadata=req.metadata)
         _get_store().register_agent(agent)
         _get_sync().notify_local_mutation()
         return _agent_to_response(agent)
@@ -147,16 +137,10 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
         return [_agent_to_response(a) for a in _get_store().list_agents()]
 
     @app.get("/agents/find", response_model=list[AgentResponse])
-    def find_agents(
-        capability: str | None = Query(None),
-        status: str | None = Query(None),
-        node_id: str | None = Query(None),
-    ) -> list[AgentResponse]:
+    def find_agents(capability: str | None = Query(None), status: str | None = Query(None), node_id: str | None = Query(None)) -> list[AgentResponse]:
         caps = [capability] if capability else None
         st = AgentStatus(status) if status else None
-        return [
-            _agent_to_response(a) for a in _get_store().find_agents(caps, st, node_id)
-        ]
+        return [_agent_to_response(a) for a in _get_store().find_agents(caps, st, node_id)]
 
     @app.get("/agents/{agent_id}", response_model=AgentResponse)
     def get_agent(agent_id: str) -> AgentResponse:
@@ -181,17 +165,8 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
 
     @app.post("/nodes", response_model=NodeResponse, status_code=201)
     def register_node(req: RegisterNodeRequest) -> NodeResponse:
-        caps = [
-            Capability(name=c.name, tags=c.tags, cost_eu=c.cost_eu)
-            for c in req.capabilities
-        ]
-        node = NodeInfo(
-            host=req.host,
-            port=req.port,
-            mcp_port=req.mcp_port,
-            role=NodeRole(req.role),
-            capabilities=caps,
-        )
+        caps = [Capability(name=c.name, tags=c.tags, cost_eu=c.cost_eu) for c in req.capabilities]
+        node = NodeInfo(host=req.host, port=req.port, mcp_port=req.mcp_port, role=NodeRole(req.role), capabilities=caps)
         _get_store().register_node(node)
         return _node_to_response(node)
 
@@ -214,92 +189,49 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     @app.post("/tasks", status_code=201)
     async def submit_task(req: SubmitTaskRequest) -> dict:
         assert _fallback is not None
-        request = TaskRequest(
-            name=req.name,
-            required_capabilities=req.required_capabilities,
-            priority=req.priority,
-            payload=req.payload,
-        )
+        request = TaskRequest(name=req.name, required_capabilities=req.required_capabilities, priority=req.priority, payload=req.payload)
         event = await _fallback.submit_with_fallback(request)
         if event.result == FallbackResult.DISPATCHED:
-            return {
-                "task_id": event.task_id,
-                "status": "dispatched",
-                "attempts": event.attempts,
-            }
+            return {"task_id": event.task_id, "status": "dispatched", "attempts": event.attempts}
         if event.result == FallbackResult.ESCALATED:
-            return {
-                "task_id": event.task_id,
-                "status": "escalated",
-                "attempts": event.attempts,
-                "error": event.error,
-            }
-        return {
-            "task_id": event.task_id,
-            "status": "pending",
-            "attempts": event.attempts,
-        }
+            return {"task_id": event.task_id, "status": "escalated", "attempts": event.attempts, "error": event.error}
+        return {"task_id": event.task_id, "status": "pending", "attempts": event.attempts}
 
     @app.get("/tasks")
     def list_tasks(status: str | None = Query(None)) -> list[dict]:
         st = TaskStatus(status) if status else None
-        assignments = _dispatcher.get_assignments(st)  # type: ignore[reportOptionalMemberAccess]
-        return [
-            {
-                "task_id": a.task_id,
-                "agent_id": a.agent_id,
-                "agent_name": a.agent_name,
-                "status": a.status.value,
-                "assigned_at": a.assigned_at.isoformat(),
-            }
-            for a in assignments
-        ]
+        assignments = _dispatcher.get_assignments(st)
+        return [{"task_id": a.task_id, "agent_id": a.agent_id, "agent_name": a.agent_name, "status": a.status.value, "assigned_at": a.assigned_at.isoformat()} for a in assignments]
 
     @app.get("/tasks/pending")
     def list_pending_tasks() -> list[dict]:
-        return [
-            {
-                "task_id": t.task_id,
-                "name": t.name,
-                "required_capabilities": t.required_capabilities,
-            }
-            for t in _dispatcher.get_pending()  # type: ignore[reportOptionalMemberAccess]
-        ]  # type: ignore[reportOptionalMemberAccess]
+        return [{"task_id": t.task_id, "name": t.name, "required_capabilities": t.required_capabilities} for t in _dispatcher.get_pending()]
 
     @app.post("/tasks/{task_id}/complete")
     def complete_task(task_id: str) -> dict:
-        if not _dispatcher.complete(task_id):  # type: ignore[reportOptionalMemberAccess]
+        if not _dispatcher.complete(task_id):
             raise HTTPException(404, f"Task {task_id} not found")
         return {"ok": True, "task_id": task_id, "status": "completed"}
 
     @app.post("/tasks/{task_id}/fail")
     def fail_task(task_id: str) -> dict:
-        if not _dispatcher.fail(task_id):  # type: ignore[reportOptionalMemberAccess]
+        if not _dispatcher.fail(task_id):
             raise HTTPException(404, f"Task {task_id} not found")
         return {"ok": True, "task_id": task_id, "status": "failed"}
 
     @app.get("/tasks/stats")
     def task_stats() -> dict:
-        return _dispatcher.stats()  # type: ignore[reportOptionalMemberAccess]
+        return _dispatcher.stats()
 
     @app.post("/tasks/dispatch-pending")
     def dispatch_pending() -> dict:
-        assigned = _dispatcher.dispatch_pending()  # type: ignore[reportOptionalMemberAccess]
-        return {
-            "dispatched": len(assigned),
-            "assignments": [
-                {"task_id": a.task_id, "agent_id": a.agent_id} for a in assigned
-            ],
-        }
+        assigned = _dispatcher.dispatch_pending()
+        return {"dispatched": len(assigned), "assignments": [{"task_id": a.task_id, "agent_id": a.agent_id} for a in assigned]}
 
     @app.post("/sync/delta")
     def apply_sync_delta(req: SyncDeltaRequest) -> dict:
         merged = _get_sync().apply_delta(req.agents, req.source_node_id, req.vclock)
-        return {
-            "ok": True,
-            "merged": merged,
-            "vclock": _get_sync().get_status()["vclock"],
-        }
+        return {"ok": True, "merged": merged, "vclock": _get_sync().get_status()["vclock"]}
 
     @app.post("/sync/force")
     async def force_sync() -> dict:
@@ -313,17 +245,10 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     def add_peer(peer: RegisterNodeRequest) -> dict:
         """Configure a gossip peer for sync."""
         # Use provided node_id or derive from host-port
-        nid = (
-            getattr(peer, "node_id", None)
-            or peer.host.replace(".", "-") + f"-{peer.port}"
-        )
+        nid = getattr(peer, "node_id", None) or peer.host.replace(".", "-") + f"-{peer.port}"
         p = Peer(node_id=nid, host=peer.host, port=peer.port)
         _get_sync().add_peer(p)
-        return {
-            "ok": True,
-            "peer_id": p.node_id,
-            "peers": len(_get_sync().list_peers()),
-        }
+        return {"ok": True, "peer_id": p.node_id, "peers": len(_get_sync().list_peers())}
 
     @app.delete("/peers/{peer_id}")
     def remove_peer(peer_id: str) -> dict:
@@ -332,27 +257,20 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
 
     @app.post("/failover/{node_id}")
     def failover_node(node_id: str) -> dict:
-        assignments = _dispatcher.failover_node(node_id)  # type: ignore[reportOptionalMemberAccess]
+        assignments = _dispatcher.failover_node(node_id)
         return {
             "ok": True,
             "node_id": node_id,
             "redispatched": len(assignments),
-            "assignments": [
-                {"task_id": a.task_id, "agent_id": a.agent_id} for a in assignments
-            ],
+            "assignments": [{"task_id": a.task_id, "agent_id": a.agent_id} for a in assignments],
         }
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
         store = _store
-        agents = store.list_agents()  # type: ignore[reportOptionalMemberAccess]
+        agents = store.list_agents()
         healthy = [a for a in agents if a.status != AgentStatus.OFFLINE]
-        return HealthResponse(
-            status="ok",
-            agents=len(agents),
-            nodes=len(store.list_nodes()),  # type: ignore[reportOptionalMemberAccess]
-            healthy_agents=len(healthy),
-        )  # type: ignore[reportOptionalMemberAccess]
+        return HealthResponse(status="ok", agents=len(agents), nodes=len(store.list_nodes()), healthy_agents=len(healthy))
 
     @app.get("/tasks/fallback/status")
     def fallback_status() -> dict:
@@ -363,12 +281,7 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     def fallback_retry() -> dict:
         assert _fallback is not None
         events = _fallback.retry_pending()
-        return {
-            "retried": len(events),
-            "dispatched": sum(
-                1 for e in events if e.result == FallbackResult.DISPATCHED
-            ),
-        }
+        return {"retried": len(events), "dispatched": sum(1 for e in events if e.result == FallbackResult.DISPATCHED)}
 
     @app.get("/push/status")
     def push_status() -> dict:
@@ -387,31 +300,17 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
 
 def _agent_to_response(a: AgentInfo) -> AgentResponse:
     return AgentResponse(
-        agent_id=a.agent_id,
-        name=a.name,
-        node_id=a.node_id,
-        endpoint=a.endpoint,
-        capabilities=[
-            CapabilitySchema(name=c.name, tags=c.tags, cost_eu=c.cost_eu)
-            for c in a.capabilities
-        ],
-        status=a.status.value,
-        max_concurrency=a.max_concurrency,
-        active_tasks=a.active_tasks,
-        load_ratio=round(a.load_ratio, 3),
-        last_heartbeat=a.last_heartbeat.isoformat(),
+        agent_id=a.agent_id, name=a.name, node_id=a.node_id, endpoint=a.endpoint,
+        capabilities=[CapabilitySchema(name=c.name, tags=c.tags, cost_eu=c.cost_eu) for c in a.capabilities],
+        status=a.status.value, max_concurrency=a.max_concurrency, active_tasks=a.active_tasks,
+        load_ratio=round(a.load_ratio, 3), last_heartbeat=a.last_heartbeat.isoformat(),
     )
 
 
 def _node_to_response(n: NodeInfo) -> NodeResponse:
     return NodeResponse(
-        node_id=n.node_id,
-        host=n.host,
-        port=n.port,
-        role=n.role.value,
-        health=n.health,
-        load_score=n.load_score,
-        last_heartbeat=n.last_heartbeat.isoformat(),
+        node_id=n.node_id, host=n.host, port=n.port, role=n.role.value,
+        health=n.health, load_score=n.load_score, last_heartbeat=n.last_heartbeat.isoformat(),
     )
 
 

@@ -71,7 +71,7 @@ def load_protocols(path: Path | None = None) -> list[ProtocolEntry]:
 
     protocols = payload.get("protocols")
     if not isinstance(protocols, list):
-        raise TypeError(
+        raise ValueError(
             f"Invalid L0 protocol registry: missing protocol list in {path}"
         )
 
@@ -102,10 +102,10 @@ def active_protocols() -> list[ProtocolEntry]:
 # ── Protocol dispatch registry ──────────────────────────────────────────────
 # Per-protocol handlers are registered here. Each handler receives a
 # validated message dict and returns a (success: bool, result: dict) tuple.
-_PROTOCOL_HANDLERS: dict[str, callable] = {}  # type: ignore[reportGeneralTypeIssues]
+_PROTOCOL_HANDLERS: dict[str, callable] = {}
 
 
-def register_protocol_handler(protocol_name: str, handler: callable) -> None:  # type: ignore[reportGeneralTypeIssues]
+def register_protocol_handler(protocol_name: str, handler: callable) -> None:
     """Register a runtime handler for a protocol.
 
     Example:

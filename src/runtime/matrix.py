@@ -199,9 +199,7 @@ def health_check_url(url: str | None) -> str:
         r = subprocess.run(
             ["curl", "-sf", "-o", "/dev/null", "--max-time", "2", url],
             capture_output=True,
-            timeout=5,
-            check=False,
-        )
+            timeout=5, check=False)
         return "healthy" if r.returncode == 0 else "unreachable"
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return "error"

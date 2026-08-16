@@ -47,14 +47,17 @@ protocols:
     transport: ["mcp-stdio"]
 
   - name: "A2A"
-    version: "0.1"
+    version: "1.0"
     category: "agent-communication"
-    status: "planned"
-    usage: "planned"
-    description: "Agent-to-Agent messaging (Google A2A inspired)"
+    status: "active"
+    usage: "active"
+    description: "Agent-to-Agent asynchronous message exchange and task collaboration protocol"
     port_range: "7430-7435"
-    transport: ["http", "websocket"]
-    notes: "Not yet implemented. Planned for cross-machine agent orchestration."
+    transport: ["jsonl", "stdio", "http", "websocket"]
+    implementations:
+      - "projects/aetherforge (swarm_engine.a2a_adapter)"
+      - "projects/omo (.omo/state/a2a-messages.jsonl)"
+    notes: "Provides decoupled event and task dispatching across heterogeneous autonomous agents."
 
   # ── Service Discovery ──────────────────────────────────────────────
   - name: "Runtime Matrix"
@@ -260,6 +263,19 @@ protocols:
       - "qwen3.6:35b-a3b"
     notes: "Used for local inference and embedding-related workflows."
 
+  - name: "omlxc Compute Fabric"
+    version: "3.4.0"
+    category: "model-access"
+    status: "active"
+    usage: "active"
+    description: "Local heterogeneous compute mesh & scheduler for LLMs — prefix cache pre-warming, dynamic VRAM budgeting, sliding compaction advisory, AST triage"
+    port_range: "9290, 7422"
+    transport: ["unix-socket", "stdio", "http", "fastmcp"]
+    implementations:
+      - "projects/omlxc (omlxc v3.4.0, omlxcd daemon)"
+      - "projects/aetherforge (forge_fabric_*, forge_swarm_run)"
+    notes: "Provides 0ms TTFT prefix pre-warming, dynamic KV Cache budgeting with self-healing compaction advisory, and hardware thermal awareness."
+
   # ── Identity & Auth ────────────────────────────────────────────────
   - name: "OMO Governance"
     version: "4.0"
@@ -310,18 +326,23 @@ protocols:
       - "projects/metaos"
     notes: "L2 Engine Layer. Provides decision gate, immune monitor, and cognitive framework loading. Migrated from kairon/packages/metaos to projects/metaos on 2026-06-06."
 
-  # ── Legacy / Deprecated ───────────────────────────────────────────
+  # ── Capability Weave ──────────────────────────────────────────────
   - name: "BOS URI"
-    version: "0"
+    version: "1.0"
     category: "agent-communication"
-    status: "deprecated"
-    usage: "legacy"
-    description: "BOS internal URI scheme (bos://) — listed in PAT-45 protocol mapping matrix but zero code implements it"
-    spec_url: null
-    transport: [\"bos\"]
-    implementations: []
-    notes: "DEPRECATED. BOS URI was defined in PAT-45 eCOS v6 protocol mapping matrix (tools/call, task, discovery, health) but never implemented in any codebase. Kept here for traceability. See DEBT-OMO-021."
+    status: "active"
+    usage: "active"
+    description: "BOS Unified Capability URI scheme (bos://) — Unified routing for 223+ ecosystem services across compute, memory, governance, and ontology"
+    spec_url: "docs/generated/capability-registry.yaml"
+    transport: ["bos", "stdio", "http"]
+    implementations:
+      - "projects/agora (bos_call, bos_route)"
+      - "projects/cockpit (Router and Capability Map)"
+      - "projects/aetherforge (bos://compute/aetherforge/*)"
+      - "projects/omo (bos://governance/*)"
+    notes: "SSOT capability addressing scheme. All 223 ecosystem capabilities are addressable via bos:// URIs."
 
+  # ── Legacy / Deprecated ───────────────────────────────────────────
   - name: "Agent Runtime API"
     version: "1"
     category: "orchestration"

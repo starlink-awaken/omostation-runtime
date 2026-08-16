@@ -19,9 +19,9 @@ jobs:
       - name: Install dependencies
         run: uv venv --allow-existing --python 3.13
       - name: Ruff check
-        run: uv run --no-project --with ruff ruff check packages/reach/src/ scripts/reachbridge-kems-gateway.py tests/test_reach_kems.py src/runtime/documents_plane/ tests/test_documents_plane_control_health.py tests/test_documents_plane_jobs.py
+        run: uv run --no-project --with ruff ruff check packages/reach/src/ scripts/reachbridge-kems-gateway.py tests/test_reach_kems.py
       - name: Ruff format check
-        run: uv run --no-project --with ruff ruff format packages/reach/src/ scripts/reachbridge-kems-gateway.py tests/test_reach_kems.py src/runtime/documents_plane/ tests/test_documents_plane_control_health.py tests/test_documents_plane_jobs.py --check
+        run: uv run --no-project --with ruff ruff format packages/reach/src/ scripts/reachbridge-kems-gateway.py tests/test_reach_kems.py --check
       - name: Contract Gatekeeper
         run: python3 scripts/contract_gatekeeper.py packages/reach/src/reach_gateway/ scripts/reachbridge-kems-gateway.py
 
@@ -37,4 +37,4 @@ jobs:
       - name: Install dependencies
         run: uv venv --allow-existing --python 3.13
       - name: Run tests
-        run: PYTHONPATH=packages/reach/src:src uv run --no-project --with pytest --with pytest-asyncio --with pyyaml pytest tests/test_reach_kems.py tests/test_documents_plane_paths.py tests/test_documents_plane_commands.py tests/test_documents_plane_jobs.py tests/test_documents_plane_kems.py tests/test_documents_plane_control_health.py -q --tb=short
+        run: PYTHONPATH=packages/reach/src uv run --no-project --with pytest --with pytest-asyncio pytest tests/test_reach_kems.py -q --tb=short

@@ -1,5 +1,4 @@
 """G-CONV.3: summarize_system_health_snapshot de-false-positive + single-source."""
-
 from __future__ import annotations
 
 from runtime.adapters.omo import _daemon_is_online, summarize_system_health_snapshot

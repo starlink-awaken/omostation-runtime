@@ -50,12 +50,15 @@ def _check_path_sandbox(path: Path) -> Path:
 
 def _is_agora_direct_mode() -> bool:
     """Check if we are currently in direct MCP mode (bypassing Agora)."""
-    return time.monotonic() <= _agora_direct_mode_until
+    global _agora_direct_mode_until
+    if time.monotonic() > _agora_direct_mode_until:
+        return False
+    return True
 
 
 def _enter_agora_direct_mode():
     """Switch to direct MCP mode for the configured duration."""
-    global _agora_direct_mode_until
+    global _agora_failure_count, _agora_direct_mode_until
     _agora_direct_mode_until = time.monotonic() + _AGORA_DIRECT_MODE_DURATION
     log.warning(
         f"⚠️  Agora direct mode activated for {_AGORA_DIRECT_MODE_DURATION}s (until t={_agora_direct_mode_until:.0f})"
@@ -187,9 +190,7 @@ class Tools:
                 capture_output=True,
                 text=True,
                 cwd=cwd or str(ECOS_DIR),
-                timeout=timeout,
-                check=False,
-            )
+                timeout=timeout, check=False)
             return {
                 "exit_code": r.returncode,
                 "stdout": r.stdout[:5000],
