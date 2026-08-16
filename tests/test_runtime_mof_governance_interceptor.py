@@ -174,3 +174,46 @@ def test_interceptor_sub_millisecond_latency():
 
     avg_ms = (elapsed / 100) * 1000
     assert avg_ms < 5.0, f"Average pre-flight latency too high: {avg_ms:.2f}ms"
+
+
+def test_interceptor_anti_escape_on_shell_script():
+    interceptor = GovernanceInterceptor()
+    bad_script = "#!/bin/bash\npip install --user malicious_pkg\n"
+    allowed, diag = interceptor.intercept_tool_call(
+        tool_name="write_to_file",
+        arguments={"TargetFile": "/tmp/setup.sh", "CodeContent": bad_script},
+        caller_layer="L3",
+    )
+    assert allowed is False
+    assert diag["status"] == "REJECTED"
+    assert diag["violation"]["violation_code"] == "E-CMD-001"
+
+
+def test_interceptor_returns_suggested_patch_code_recipe():
+    interceptor = GovernanceInterceptor()
+    code = "import runtime.private.credentials as creds"
+    allowed, diag = interceptor.intercept_tool_call(
+        tool_name="write_to_file",
+        arguments={"TargetFile": "src/app.py", "CodeContent": code},
+        caller_layer="L3",
+    )
+    assert allowed is False
+    assert "suggested_patch" in diag["violation"]
+    assert "agora.client" in diag["violation"]["suggested_patch"]
+
+
+def test_mcp_server_guardrails_and_explain_handlers():
+    from runtime.mcp_server import (
+        handle_governance_explain,
+        handle_governance_guardrails,
+    )
+
+    guardrail_res = handle_governance_guardrails(
+        domain="runtime", layer="L3", max_rules=3
+    )
+    assert "guardrail_prompt" in guardrail_res
+    assert "<mof_architecture_guardrails" in guardrail_res["guardrail_prompt"]
+
+    explain_res = handle_governance_explain("E-L0-002")
+    assert explain_res["violation_code"] == "E-L0-002"
+    assert "remediation" in explain_res
