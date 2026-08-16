@@ -290,7 +290,7 @@ def _check_type(value: Any, type_name: str) -> bool:
     mapping = {
         "string": lambda v: isinstance(v, str),
         "number": lambda v: (
-            isinstance(v, (int, float)) and not (isinstance(v, float) and v != v)
+            isinstance(v, (int, float)) and not (isinstance(v, float) and v != v)  # noqa: PLR0124
         ),
         "boolean": lambda v: isinstance(v, bool),
         "object": lambda v: isinstance(v, dict),

@@ -43,7 +43,7 @@ class _Server:
             try:
                 if httpx.get(url, timeout=0.1).status_code == 200:
                     return
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
             time.sleep(0.05)
 
@@ -184,7 +184,7 @@ class TestGossipSyncTwoNodeE2E:
             })
             assert task_resp.status_code == 201
             assert task_resp.json()["status"] == "dispatched"
-            task_id = task_resp.json()["task_id"]
+            assert "task_id" in task_resp.json()
 
             # Failover node-a (the node that got the task)
             fail_resp = c.post(f"{base_a}/failover/node-a")

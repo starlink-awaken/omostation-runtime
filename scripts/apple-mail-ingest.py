@@ -26,7 +26,7 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
     if not MAIL_BASE.exists():
         return emails
 
-    emlx_files = sorted(list(MAIL_BASE.glob("**/*.emlx")), key=lambda x: x.stat().st_mtime, reverse=True)
+    emlx_files = sorted(MAIL_BASE.glob("**/*.emlx"), key=lambda x: x.stat().st_mtime, reverse=True)
     
     for f in emlx_files[:20]:
         try:
@@ -70,7 +70,7 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
                 "date": str(date),
                 "body": clean_body
             })
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     return emails

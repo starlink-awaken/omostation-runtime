@@ -94,8 +94,7 @@ def main() -> int:
     meta_model = load_yaml(META_MODEL_PATH)
     constraints = []
     for layer in meta_model.get("layers", []):
-        for c in layer.get("constraints", []):
-            constraints.append(c)
+        constraints.extend(layer.get("constraints", []))
     print(f"   Found {len(constraints)} meta-model constraints")
     print()
 

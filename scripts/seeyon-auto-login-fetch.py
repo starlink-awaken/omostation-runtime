@@ -44,7 +44,7 @@ def perform_seeyon_login() -> tuple[urllib.request.OpenerDirector | None, str]:
         req_get = urllib.request.Request(SEEYON_MAIN_URL, headers=headers)
         res_get = opener.open(req_get, timeout=5)
         _ = res_get.read()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return None, f"网络访问异常: {e}"
 
     login_data = urllib.parse.urlencode({
@@ -62,7 +62,7 @@ def perform_seeyon_login() -> tuple[urllib.request.OpenerDirector | None, str]:
             return None, "登录鉴权失败"
 
         return opener, "LOGIN_SUCCESS"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return None, f"登录报文异常: {e}"
 
 
@@ -101,7 +101,7 @@ def fetch_seeyon_real_pending_documents(opener: urllib.request.OpenerDirector) -
                         "affair_id": str(affair_id),
                         "summary_id": str(summary_id)
                     })
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ 解析致远 OA 真实公文节点异常: {e}")
 
     return items

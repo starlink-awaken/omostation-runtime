@@ -192,7 +192,13 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
         request = TaskRequest(name=req.name, required_capabilities=req.required_capabilities, priority=req.priority, payload=req.payload)
         event = await _fallback.submit_with_fallback(request)
         if event.result == FallbackResult.DISPATCHED:
-            return {"task_id": event.task_id, "status": "dispatched", "attempts": event.attempts}
+            assignment = _dispatcher.get_assignment(event.task_id)
+            return {
+                "task_id": event.task_id,
+                "status": "dispatched",
+                "attempts": event.attempts,
+                "agent_id": assignment.agent_id if assignment else None,
+            }
         if event.result == FallbackResult.ESCALATED:
             return {"task_id": event.task_id, "status": "escalated", "attempts": event.attempts, "error": event.error}
         return {"task_id": event.task_id, "status": "pending", "attempts": event.attempts}

@@ -29,6 +29,7 @@ finally:
         capture_output=True,
         text=True,
         env={**os.environ, "PYTHONPATH": "src"},
+        check=False,
     )
     assert "SUCCESS: KEI Sandbox: subprocess execution is blocked." in result.stdout
 
@@ -60,6 +61,7 @@ finally:
         capture_output=True,
         text=True,
         env={**os.environ, "PYTHONPATH": "src"},
+        check=False,
     )
     assert (
         "SUCCESS: KEI Sandbox: Network connection to 8.8.8.8 is blocked."
@@ -93,6 +95,7 @@ finally:
         capture_output=True,
         text=True,
         env={**os.environ, "PYTHONPATH": "src"},
+        check=False,
     )
     assert (
         "SUCCESS: KEI Sandbox: Write access to /tmp/blocked_file.txt is blocked."
@@ -125,6 +128,7 @@ finally:
         capture_output=True,
         text=True,
         env={**os.environ, "PYTHONPATH": "src"},
+        check=False,
     )
     return result.stdout
 

@@ -77,7 +77,7 @@ class ConfigLoader:
         if not archetype or not isinstance(archetype, str):
             raise ValueError("Project config missing required field: archetype")
         if not isinstance(goals, list):
-            raise ValueError("Project config missing required field: goals")
+            raise TypeError("Project config missing required field: goals")
         return ProjectConfig(
             name=name,
             description=desc,

@@ -535,7 +535,7 @@ class TestDeliverOrigin:
     """deliver(target='origin'): WeChat iLink delivery"""
 
     def test_no_home_channel_returns_error(self, tmp_path):
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117
             with patch.dict(os.environ, {}, clear=True):
                 err = delivery.deliver(
                     "test-job", "content", target="origin", job_id="j1"
@@ -544,7 +544,7 @@ class TestDeliverOrigin:
                 assert "home channel" in err.lower()
 
     def test_no_credentials_returns_error(self, tmp_path):
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117
             with patch.dict(os.environ, {"WEIXIN_HOME_CHANNEL": "chan1"}, clear=True):
                 err = delivery.deliver(
                     "test-job", "content", target="origin", job_id="j1"
@@ -555,7 +555,7 @@ class TestDeliverOrigin:
     def test_successful_weixin_send(self, tmp_path):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"errcode": 0}
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117
             with patch.dict(
                 os.environ,
                 {
@@ -577,7 +577,7 @@ class TestDeliverOrigin:
     def test_weixin_errcode_nonzero(self, tmp_path):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"errcode": 1001, "errmsg": "rate limited"}
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117
             with patch.dict(
                 os.environ,
                 {
@@ -595,7 +595,7 @@ class TestDeliverOrigin:
                     assert "errcode=1001" in err
 
     def test_weixin_timeout(self, tmp_path):
-        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):
+        with patch("runtime.cron_service.delivery.OUTPUT_ROOT", tmp_path):  # noqa: SIM117
             with patch.dict(
                 os.environ,
                 {
@@ -862,7 +862,7 @@ class TestServerEndpoints:
     def test_health_endpoint(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.list_jobs", return_value=[]):
                 with TestClient(app) as client:
                     resp = client.get("/health")
@@ -875,7 +875,7 @@ class TestServerEndpoints:
     def test_list_jobs_empty(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.list_jobs", return_value=[]):
                 with TestClient(app) as client:
                     resp = client.get("/jobs")
@@ -888,7 +888,7 @@ class TestServerEndpoints:
         from runtime.cron_service.server import app
 
         job = _make_job()
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.list_jobs", return_value=[job]):
                 with TestClient(app) as client:
                     resp = client.get("/jobs")
@@ -901,7 +901,7 @@ class TestServerEndpoints:
         from runtime.cron_service.server import app
 
         job = _make_job()
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.get_job", return_value=job):
                 with TestClient(app) as client:
                     resp = client.get(f"/jobs/{job.id}")
@@ -912,7 +912,7 @@ class TestServerEndpoints:
     def test_get_job_not_found(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.get_job", return_value=None):
                 with TestClient(app) as client:
                     resp = client.get("/jobs/nonexistent")
@@ -922,7 +922,7 @@ class TestServerEndpoints:
         from runtime.cron_service.server import app
 
         job = _make_job()
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.create_job", return_value=job):
                 with TestClient(app) as client:
                     resp = client.post(
@@ -936,7 +936,7 @@ class TestServerEndpoints:
     def test_delete_job(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.delete_job", return_value=True):
                 with TestClient(app) as client:
                     resp = client.delete("/jobs/test-id")
@@ -946,7 +946,7 @@ class TestServerEndpoints:
     def test_delete_job_not_found(self):
         from runtime.cron_service.server import app
 
-        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):
+        with patch("runtime.cron_service.server.sched", _MockCronScheduler()):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.delete_job", return_value=False):
                 with TestClient(app) as client:
                     resp = client.delete("/jobs/nonexistent")
@@ -960,7 +960,7 @@ class TestServerMain:
     def test_init_db(self):
         from runtime.cron_service.server import main
 
-        with patch("sys.argv", ["cron-service", "--init-db"]):
+        with patch("sys.argv", ["cron-service", "--init-db"]):  # noqa: SIM117
             with patch("runtime.cron_service.server.db.init_db") as mock_init:
                 main()
                 mock_init.assert_called_once()
@@ -968,7 +968,7 @@ class TestServerMain:
     def test_mcp_mode(self):
         from runtime.cron_service.server import main
 
-        with patch("sys.argv", ["cron-service"]):
+        with patch("sys.argv", ["cron-service"]):  # noqa: SIM117
             with patch("runtime.cron_service.server.run_mcp") as mock_run:
                 main()
                 mock_run.assert_called_once()
@@ -976,7 +976,7 @@ class TestServerMain:
     def test_http_mode(self):
         from runtime.cron_service.server import main
 
-        with patch("sys.argv", ["cron-service", "--http"]):
+        with patch("sys.argv", ["cron-service", "--http"]):  # noqa: SIM117
             with patch("runtime.cron_service.server.run_http") as mock_run:
                 main()
                 mock_run.assert_called_once()
