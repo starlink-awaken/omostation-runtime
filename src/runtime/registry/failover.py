@@ -95,40 +95,37 @@ class FailoverManager:
         for agent in self._store.list_agents():
             if agent.status.value == "offline":
                 # Check if agent has active tasks
-                if agent.active_tasks > 0:
-                    # Find alternative agent
-                    alternative = self._find_alternative(agent)
-                    if alternative:
-                        # Reassign
-                        event = FailoverEvent(
-                            agent_id=agent.agent_id,
-                            event_type="reassigned",
-                            old_status=agent.status.value,
-                            new_status="idle",
-                            reassigned_task_id=f"reassign-{agent.agent_id}",
-                            target_agent_id=alternative.agent_id,
-                        )
-                        events.append(event)
-                        self._events.append(event)
-                        logger.info(
-                            "Failover: agent %s down, tasks → %s",
-                            agent.agent_id,
-                            alternative.agent_id,
-                        )
-                    else:
-                        # Queue for fallback
-                        event = FailoverEvent(
-                            agent_id=agent.agent_id,
-                            event_type="fallback_queued",
-                            old_status=agent.status.value,
-                            new_status="queued",
-                        )
-                        events.append(event)
-                        self._events.append(event)
-                        logger.info(
-                            "Failover: agent %s down, no alternative — queued",
-                            agent.agent_id,
-                        )
+                if agent.active_tasks > 0 and (alternative := self._find_alternative(agent)):
+                    # Reassign
+                    event = FailoverEvent(
+                        agent_id=agent.agent_id,
+                        event_type="reassigned",
+                        old_status=agent.status.value,
+                        new_status="idle",
+                        reassigned_task_id=f"reassign-{agent.agent_id}",
+                        target_agent_id=alternative.agent_id,
+                    )
+                    events.append(event)
+                    self._events.append(event)
+                    logger.info(
+                        "Failover: agent %s down, tasks → %s",
+                        agent.agent_id,
+                        alternative.agent_id,
+                    )
+                elif agent.active_tasks > 0:
+                    # Queue for fallback
+                    event = FailoverEvent(
+                        agent_id=agent.agent_id,
+                        event_type="fallback_queued",
+                        old_status=agent.status.value,
+                        new_status="queued",
+                    )
+                    events.append(event)
+                    self._events.append(event)
+                    logger.info(
+                        "Failover: agent %s down, no alternative — queued",
+                        agent.agent_id,
+                    )
 
         return events
 

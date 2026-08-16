@@ -49,8 +49,8 @@ class CronScheduler:
         while self._running:
             try:
                 self._tick()
-            except Exception as e:
-                logger.error("Scheduler tick error: %s", e, exc_info=True)
+            except Exception:
+                logger.exception("Scheduler tick error")
             time.sleep(config.TICK_INTERVAL)
 
     def _tick(self) -> None:
@@ -67,8 +67,8 @@ class CronScheduler:
         if run_scan_if_due is not None:
             try:
                 run_scan_if_due()
-            except Exception as e:
-                logger.error("Health scan error: %s", e, exc_info=True)
+            except Exception:
+                logger.exception("Health scan error")
 
     @property
     def is_running(self) -> bool:

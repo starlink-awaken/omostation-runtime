@@ -141,5 +141,6 @@ finally:
             capture_output=True,
             text=True,
             env={**os.environ, "PYTHONPATH": "src"},
+            check=False,
         )
         assert "SUCCESS" in result.stdout

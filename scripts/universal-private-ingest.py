@@ -45,7 +45,7 @@ def fetch_chrome_real_history(limit: int = 15) -> list[dict[str, str]]:
             url, title, _ = r
             if title and url:
                 items.append({"title": title.strip(), "url": url.strip()})
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ 读取 Chrome 历史数据库异常: {e}")
     finally:
         if temp_db.exists():
@@ -71,7 +71,7 @@ def fetch_iphone_real_sms(limit: int = 15) -> list[dict[str, str]]:
             text, date_val = r
             if text:
                 items.append({"text": str(text).replace("\n", " ").strip(), "date": str(date_val)})
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ 读取 SMS chat.db 异常: {e}")
 
     return items
@@ -106,7 +106,7 @@ def fetch_real_wechat_messages(limit: int = 15) -> list[dict[str, str]]:
                     "timestamp": str(ts),
                     "session_id": str(sid)[:12]
                 })
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ 读取微信 state.db 异常: {e}")
 
     return items
@@ -132,7 +132,7 @@ def fetch_native_wechat_files(limit: int = 10) -> list[dict[str, str]]:
                 })
                 if len(items) >= limit:
                     break
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ 扫描 Mac 微信原生接收文件异常: {e}")
 
     return items
@@ -156,11 +156,11 @@ def fetch_wechat_ui_accessibility_messages() -> list[str]:
     return {}
     '''
     try:
-        res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5)
+        res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5, check=False)
         if res.stdout:
             texts = [t.strip() for t in res.stdout.split(",") if len(t.strip()) > 2]
             return texts[:20]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ℹ️ AppleScript UI 提取说明: {e}")
 
     return []

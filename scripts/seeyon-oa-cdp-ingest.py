@@ -29,7 +29,7 @@ def check_chrome_cdp_status() -> dict | None:
         req = urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json/version", timeout=2)
         data = json.loads(req.read().decode("utf-8"))
         return data
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -69,7 +69,7 @@ def fetch_seeyon_oa_pending_tasks() -> list[dict[str, str]]:
             })
         else:
             print("ℹ️ CDP 窗口列表中暂未找到 10.216.16.151 致远 OA 页面，请确保在 Chrome 中打开该页面。")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ 物理查询 CDP 窗口异常: {e}")
 
     return items

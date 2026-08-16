@@ -18,7 +18,7 @@ Phase 8.2 / DEBT-L3-001 (🔴)
 
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -105,8 +105,8 @@ def handle_protocol_get(protocol_id: str) -> dict:
     data = yaml.safe_load(constraint_file.read_text())
     for p in data.get("protocol_registry", []):
         if p["id"].lower() == protocol_id.lower():
-            now = datetime.now()
-            intro = datetime.strptime(p["introduced"], "%Y-%m-%d")
+            now = datetime.now(tz=timezone.utc)
+            intro = datetime.strptime(p["introduced"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
             age_days = (now - intro).days
             decay = (
                 min(1.0, age_days / p["half_life_days"])

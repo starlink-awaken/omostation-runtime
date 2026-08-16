@@ -111,10 +111,9 @@ class _GatekeeperVisitor(ast.NodeVisitor):
             self._check_call_arg(node, 0)
 
         # .read_text(), .write_text(), .read_bytes(), .write_bytes()
-        if isinstance(func, ast.Attribute) and func.attr in IO_FUNCTION_NAMES:
+        if isinstance(func, ast.Attribute) and func.attr in IO_FUNCTION_NAMES and isinstance(func.value, ast.Call):
             # If called on a forbidden Path literal: Path(".omo/...").read_text()
-            if isinstance(func.value, ast.Call):
-                self.visit_Call(func.value)
+            self.visit_Call(func.value)
 
         self.generic_visit(node)
 
@@ -129,15 +128,17 @@ class _GatekeeperVisitor(ast.NodeVisitor):
     # ── Assign to a path-like name using forbidden literal ──────
     def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
-            if isinstance(target, ast.Name) and "path" in target.id.lower():
-                if isinstance(node.value, ast.Constant) and isinstance(
-                    node.value.value, str
-                ):
-                    if _has_forbidden_prefix(node.value.value):
-                        self._add(
-                            node.value,
-                            f"forbidden path assigned to {target.id}: {node.value.value!r}",
-                        )
+            if (
+                isinstance(target, ast.Name)
+                and "path" in target.id.lower()
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and _has_forbidden_prefix(node.value.value)
+            ):
+                self._add(
+                    node.value,
+                    f"forbidden path assigned to {target.id}: {node.value.value!r}",
+                )
         self.generic_visit(node)
 
 
@@ -164,6 +165,7 @@ def _git_diff_files() -> list[Path]:
         ["git", "diff", "--name-only", "--diff-filter=ACM", "HEAD"],
         capture_output=True,
         text=True,
+        check=False,
     )
     paths = []
     for line in result.stdout.strip().splitlines():

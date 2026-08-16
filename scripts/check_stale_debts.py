@@ -16,5 +16,5 @@ for i in ledger.items:
             ts = datetime.fromisoformat(i.x2_freshness.replace("Z", "+00:00"))
             if ts < cutoff:
                 print(f"{i.id}: last checked {(now - ts).days}d ago - {i.title[:40]}")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass

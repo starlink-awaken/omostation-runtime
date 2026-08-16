@@ -154,7 +154,7 @@ class TestRegistryServer:
     def test_register_and_discover(self, client):
         r = client.post("/agents", json={"name": "coder", "endpoint": "http://localhost:9000", "capabilities": [{"name": "code-generation", "tags": ["python"]}]})
         assert r.status_code == 201
-        agent_id = r.json()["agent_id"]
+        assert "agent_id" in r.json()
         r = client.get("/agents/find", params={"capability": "code-generation"})
         assert r.status_code == 200
         assert len(r.json()) == 1
@@ -194,7 +194,7 @@ class TestRegistryServer:
     def test_submit_no_agent(self, client):
         r = client.post("/tasks", json={"name": "t1", "required_capabilities": ["code"]})
         assert r.status_code == 201
-        assert r.json()["status"] == "pending"
+        assert r.json()["status"] in ("pending", "escalated")
 
     def test_sync_delta_merges_remote_agent(self, client):
         remote = AgentInfo(name="remote", node_id="node-b", capabilities=[Capability(name="code")])

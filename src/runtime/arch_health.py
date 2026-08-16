@@ -159,9 +159,11 @@ def load_arch_health() -> dict:
                 str(workspace / "projects" / "agora"),
                 "python",
                 "-c",
-                "from agora.auth.mcp_gateway import KNOWN_BACKENDS; "
-                "import json; "
-                "print(json.dumps([b['name'] for b in KNOWN_BACKENDS]))",
+                (
+                    "from agora.auth.mcp_gateway import KNOWN_BACKENDS; "
+                    "import json; "
+                    "print(json.dumps([b['name'] for b in KNOWN_BACKENDS]))"
+                ),
             ],
             capture_output=True,
             text=True,

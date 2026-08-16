@@ -19,7 +19,7 @@ def test_log_execution_writes_jsonl():
         log_path = Path(tf.name)
 
     try:
-        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):
+        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):  # noqa: SIM117
             with mock.patch("runtime.executor.engine.report_execution"):
                 from runtime.executor.engine import _log_execution
 
@@ -53,7 +53,7 @@ def test_log_execution_with_error():
         log_path = Path(tf.name)
 
     try:
-        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):
+        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):  # noqa: SIM117
             with mock.patch("runtime.executor.engine.report_execution"):
                 from runtime.executor.engine import _log_execution
 
@@ -80,7 +80,7 @@ def test_log_execution_matrix_bridge_failure_is_silent():
         log_path = Path(tf.name)
 
     try:
-        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):
+        with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", log_path):  # noqa: SIM117
             with mock.patch(
                 "runtime.executor.engine.report_execution",
                 side_effect=RuntimeError("matrix down"),
@@ -145,7 +145,7 @@ def test_build_alert_message_no_summary():
 
 def test_execute_tool_known_function():
     """_execute_tool dispatches to known function in tool registry."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 
@@ -167,7 +167,7 @@ def test_execute_tool_known_function():
 
 def test_execute_tool_unknown_function():
     """_execute_tool returns error for unknown tool."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 
@@ -184,7 +184,7 @@ def test_execute_tool_unknown_function():
 
 def test_execute_tool_invalid_json_args():
     """_execute_tool handles invalid JSON arguments."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 
@@ -203,7 +203,7 @@ def test_execute_tool_invalid_json_args():
 
 def test_execute_tool_exception_propagation():
     """_execute_tool propagates tool function exceptions and returns error."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 
@@ -227,7 +227,7 @@ def test_execute_tool_exception_propagation():
 
 def test_run_task_no_llm_returns_error():
     """run_task without LLM backend returns error gracefully."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 
@@ -249,7 +249,7 @@ def test_run_task_no_llm_returns_error():
 
 def test_run_task_direct_answer():
     """run_task with direct LLM answer (no tool calls)."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 
@@ -680,7 +680,7 @@ def test_call_llm_records_audit_log(tmp_path):
 
 def test_run_task_truncated_on_max_turns():
     """run_task returns truncated after 30 turns of tool calls."""
-    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):
+    with mock.patch("runtime.executor.engine.EXEC_LOG_FILE", Path("/dev/null")):  # noqa: SIM117
         with mock.patch("runtime.executor.engine.report_execution"):
             from runtime.executor.engine import AgentRuntime
 

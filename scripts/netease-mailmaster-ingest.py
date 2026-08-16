@@ -57,7 +57,7 @@ def fetch_netease_mailmaster_real_bodies(limit: int = 15) -> list[dict[str, str]
 
             account_name = db_path.parent.name
             for r in rows:
-                lid, mid, raw_blob = r
+                _lid, mid, raw_blob = r
                 if raw_blob:
                     try:
                         decompressed = zlib.decompress(raw_blob)
@@ -70,10 +70,10 @@ def fetch_netease_mailmaster_real_bodies(limit: int = 15) -> list[dict[str, str]
                                 "mail_id": str(mid.decode() if isinstance(mid, bytes) else mid),
                                 "content": plain_text[:350]
                             })
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110
                         pass
             conn.close()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"⚠️ 物理解压网易邮箱大师 {db_path.name} 异常: {e}")
         finally:
             if temp_db.exists():
