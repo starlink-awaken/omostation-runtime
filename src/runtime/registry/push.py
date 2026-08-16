@@ -107,27 +107,21 @@ class PushTrigger:
         self._last_push = time.time()
         return results
 
-    async def push_register_agent(
-        self, agent_dict: dict, local_node_id: str
-    ) -> list[PushResult]:
+    async def push_register_agent(self, agent_dict: dict, local_node_id: str) -> list[PushResult]:
         """Push an agent registration event."""
         return await self.push_delta(
             {"type": "agent_registered", "agent": agent_dict},
             local_node_id,
         )
 
-    async def push_deregister_agent(
-        self, agent_id: str, local_node_id: str
-    ) -> list[PushResult]:
+    async def push_deregister_agent(self, agent_id: str, local_node_id: str) -> list[PushResult]:
         """Push an agent deregistration event."""
         return await self.push_delta(
             {"type": "agent_deregistered", "agent_id": agent_id},
             local_node_id,
         )
 
-    async def push_heartbeat(
-        self, agent_id: str, local_node_id: str
-    ) -> list[PushResult]:
+    async def push_heartbeat(self, agent_id: str, local_node_id: str) -> list[PushResult]:
         """Push a heartbeat event."""
         return await self.push_delta(
             {"type": "heartbeat", "agent_id": agent_id},
@@ -154,7 +148,9 @@ class PushTrigger:
         for attempt in range(self._retry_limit):
             try:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
-                    resp = await client.post(f"{base_url}/sync/delta", json=body)
+                    resp = await client.post(
+                        f"{base_url}/sync/delta", json=body
+                    )
                     if resp.status_code < 400:
                         result.success = True
                         result.status_code = resp.status_code

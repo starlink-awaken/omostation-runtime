@@ -12,7 +12,6 @@ v2.0 (Real Seeyon OA Document Extractor) | 2026-07-31
 from __future__ import annotations
 
 import json
-import os
 import re
 import urllib.parse
 import urllib.request
@@ -119,7 +118,7 @@ def run_seeyon_auto_login_pipeline() -> bool:
         target_file = INBOX_DIR / f"{now_str}-auto-seeyon-oa-pending.md"
         lines = [
             f"# 致远 OA (10.216.16.151) 账号 [夏明星] 真实待办公文与批示通知 — {now_str}\n\n",
-            f"> 数据源: 致远 OA 协同办公系统 (物理全自动登录 $.ctx.fillmaps 节点解密)\n",
+            "> 数据源: 致远 OA 协同办公系统 (物理全自动登录 $.ctx.fillmaps 节点解密)\n",
             f"> 提取时间: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
         ]
         

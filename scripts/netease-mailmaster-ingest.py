@@ -11,10 +11,8 @@ v2.0 (Real zlib Email Body Extractor) | 2026-07-31
 
 from __future__ import annotations
 
-import os
 import re
 import sqlite3
-import sys
 import zlib
 from datetime import datetime, timezone
 from pathlib import Path

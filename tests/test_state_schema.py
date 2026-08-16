@@ -20,7 +20,7 @@ class TestValidateRuntimeHealthSnapshot:
         assert result["services"]["agora"]["status"] == "ok"
 
     def test_not_a_dict(self):
-        with pytest.raises(TypeError, match="must be a mapping"):
+        with pytest.raises(ValueError, match="must be a mapping"):
             validate_runtime_health_snapshot("not a dict")
 
     def test_governance_keys_rejected(self):
@@ -33,11 +33,11 @@ class TestValidateRuntimeHealthSnapshot:
             )
 
     def test_missing_services(self):
-        with pytest.raises(TypeError, match="services must be a mapping"):
+        with pytest.raises(ValueError, match="services must be a mapping"):
             validate_runtime_health_snapshot({"status": "ok"})
 
     def test_services_not_dict(self):
-        with pytest.raises(TypeError, match="services must be a mapping"):
+        with pytest.raises(ValueError, match="services must be a mapping"):
             validate_runtime_health_snapshot({"services": "not a dict"})
 
 

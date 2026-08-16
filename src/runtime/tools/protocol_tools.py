@@ -47,7 +47,7 @@ def _plane_list() -> str:
     data = yaml.safe_load(registry_file.read_text())
     planes = data.get("planes", {})
     lines = [f"{'PLANE':15s} {'STATUS':10s} {'CAPABILITIES':30s}", "-" * 60]
-    for p in planes.values():
+    for name, p in planes.items():
         caps = len(p.get("capabilities", []))
         lines.append(f"{p['name']:15s} {p.get('status', '?'):10s} {caps} capabilities")
     lines.append(f"\nTotal: {len(planes)} planes registered")

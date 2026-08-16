@@ -29,7 +29,7 @@ def _action_agent_list(args: dict[str, Any]) -> dict[str, Any]:
     from runtime.executor.agent_hub import AgentHub  # type: ignore[import-not-found]
 
     hub = AgentHub()
-    agents = [a.to_dict() for a in hub.list_all()]  # type: ignore[reportAttributeAccessIssue]
+    agents = [a.to_dict() for a in hub.list_all()]
     return {"status": "ok", "result": {"agents": agents, "args_echo": args}}
 
 
@@ -41,7 +41,7 @@ def _action_chat(args: dict[str, Any]) -> dict[str, Any]:
 
     runner = AgentRunner()
     query = args.get("query", args.get("message", ""))
-    response = runner.run(query) if hasattr(runner, "run") else f"[runner-stub] {query}"  # type: ignore[reportAttributeAccessIssue]
+    response = runner.run(query) if hasattr(runner, "run") else f"[runner-stub] {query}"
     return {
         "status": "ok",
         "result": {"query": query, "response": response},
@@ -54,12 +54,12 @@ def _action_run_task(args: dict[str, Any]) -> dict[str, Any]:
         AgentExecutor,  # type: ignore[import-not-found]
     )
 
-    executor = AgentExecutor()  # type: ignore[reportCallIssue]
+    executor = AgentExecutor()
     task = args.get("task", args.get("name", ""))
     task_id = f"task-{uuid.uuid4().hex[:8]}"
     try:
         result = (
-            executor.execute(task) if hasattr(executor, "execute") else {"echo": task}  # type: ignore[reportCallIssue]
+            executor.execute(task) if hasattr(executor, "execute") else {"echo": task}
         )
     except Exception as exc:  # noqa: BLE001  # defensive fallback
         result = {"_execute_error": f"{type(exc).__name__}: {exc}"}
@@ -89,7 +89,7 @@ def _action_task_status(args: dict[str, Any]) -> dict[str, Any]:
         "result": {
             "task": None,
             "all_tasks": list(_TASK_STATE.values()),
-            "agents": [a.to_dict() for a in hub.list_all()],  # type: ignore[reportAttributeAccessIssue]
+            "agents": [a.to_dict() for a in hub.list_all()],
         },
     }
 

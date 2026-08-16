@@ -6,14 +6,12 @@
 3. 所有工具通过 HTTP/MCP 调用 (不依赖 Hermes)
 """
 
-import hashlib
 import json
 import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from runtime.executor.config import (
     DEFAULT_MODEL,
@@ -25,10 +23,6 @@ from runtime.executor.io import AppendOnlyLog
 from runtime.executor.io_schemas import ExecutorLogRecord
 from runtime.executor.matrix_bridge import report_execution
 from runtime.executor.tools import Tools
-from runtime.workflow_admission import WorkflowAdmissionError, validate_admission_grant
-from runtime.workflow_checkpoint import WorkflowCheckpointStore
-from runtime.workflow_effects import WorkflowEffectStore
-from runtime.workflow_mesh import EventSink, new_workflow_event
 
 OMO_DEBT_DIR = WORKSPACE / ".omo" / "debt" / "items"
 
@@ -50,12 +44,8 @@ def _runtime_required_capabilities(tools: list[dict] | None = None) -> list[str]
 def _resolve_llm_provider_and_model(
     requested_model: str | None, tools: list[dict] | None = None
 ) -> tuple[Any | None, str | None, dict[str, Any]]:
-    from llm_gateway._legacy.detection import (  # type: ignore[reportMissingImports]
-        detect_backends,  # type: ignore[reportMissingImports]
-    )
-    from llm_gateway._legacy.registry_data_loader import (  # type: ignore[reportMissingImports]
-        route_role_request,  # type: ignore[reportMissingImports]
-    )
+    from llm_gateway._legacy.detection import detect_backends
+    from llm_gateway._legacy.registry_data_loader import route_role_request
 
     providers = [
         provider
@@ -117,7 +107,7 @@ def _resolve_llm_provider_and_model(
 
 def _estimate_tokens(text: str) -> int:
     try:
-        import tiktoken  # type: ignore[reportMissingImports]
+        import tiktoken
 
         enc = tiktoken.get_encoding("cl100k_base")
         return len(enc.encode(text))
@@ -262,13 +252,8 @@ class AgentRuntime:
         """调用 LLM API。使用 llm_gateway 统一网关。"""
         import asyncio
 
-        from llm_gateway._legacy.audit import (  # type: ignore[reportMissingImports]
-            record_llm_audit,  # type: ignore[reportMissingImports]
-        )
-        from llm_gateway._legacy.provider import (  # type: ignore[reportMissingImports]
-            LLMRequest,
-            ToolSchema,
-        )
+        from llm_gateway._legacy.audit import record_llm_audit
+        from llm_gateway._legacy.provider import LLMRequest, ToolSchema
 
         provider, requested_model, route_info = _resolve_llm_provider_and_model(
             self.model, tools=tools
@@ -348,9 +333,7 @@ class AgentRuntime:
             task_id = str((request_context or {}).get("task_id") or "runtime-task")
             total_cost_usd = 0.0
             try:
-                from llm_gateway.registry_data_loader import (  # type: ignore[reportMissingImports]
-                    estimate_model_cost,  # type: ignore[reportMissingImports]
-                )
+                from llm_gateway.registry_data_loader import estimate_model_cost
 
                 total_cost_usd = estimate_model_cost(
                     model_id,
@@ -442,236 +425,14 @@ class AgentRuntime:
             "content": json.dumps(result, ensure_ascii=False)[:5000],
         }
 
-    def compensate_effect(
-        self,
-        effect_store: WorkflowEffectStore,
-        effect_key: str,
-        compensation: Any,
-        *,
-        workflow_run_id: str,
-        step_run_id: str,
-        admission: dict[str, Any],
-        event_sink: EventSink | None = None,
-        trace_id: str | None = None,
-        reason: str = "explicit-compensation",
-    ) -> dict[str, Any]:
-        """Run an explicit compensation and project its Mesh lifecycle.
-
-        A timeout is deliberately not compensated automatically: the remote
-        system may have committed the forward effect.  Callers must decide
-        whether compensation is safe, then invoke this method with the same
-        admitted step and effect key.
-        """
-        run_id = str(workflow_run_id)
-        trace = trace_id or run_id
-        admission_id = str(admission.get("admission_id") or "")
-
-        def emit(event_type: str, payload: dict[str, Any], key: str) -> None:
-            if callable(event_sink):
-                event_sink(
-                    new_workflow_event(
-                        event_type,
-                        run_id,
-                        trace_id=trace,
-                        payload=payload,
-                        idempotency_key=key,
-                    )
-                )
-
-        emit(
-            "CompensationStarted",
-            {
-                "step_run_id": step_run_id,
-                "admission_id": admission_id,
-                "effect_key": effect_key,
-                "reason": reason,
-            },
-            f"{step_run_id}:compensation:{effect_key}:started",
-        )
-        outcome = effect_store.compensate(effect_key, compensation)
-        if outcome.status == "compensated":
-            emit(
-                "WorkflowRecovered",
-                {
-                    "step_run_id": step_run_id,
-                    "admission_id": admission_id,
-                    "effect_key": effect_key,
-                    "compensation": outcome.safe_payload(),
-                },
-                f"{step_run_id}:compensation:{effect_key}:recovered",
-            )
-        else:
-            emit(
-                "StepFailed",
-                {
-                    "step_run_id": step_run_id,
-                    "admission_id": admission_id,
-                    "effect_key": effect_key,
-                    "error_code": outcome.error_code or "COMPENSATION_FAILED",
-                },
-                f"{step_run_id}:compensation:{effect_key}:failed",
-            )
-            emit(
-                "WorkflowFailed",
-                {
-                    "error_code": outcome.error_code or "COMPENSATION_FAILED",
-                    "state": "failed",
-                },
-                f"{run_id}:compensation-failed:{effect_key}",
-            )
-        return outcome.safe_payload()
-
     def run_task(
         self,
         prompt: str,
         tools_enabled: list[str] | None = None,
         context: dict | None = None,
-        *,
-        workflow_run_id: str | None = None,
-        trace_id: str | None = None,
-        event_sink: EventSink | None = None,
-        checkpoint_store: WorkflowCheckpointStore | None = None,
-        resume: bool = True,
-        admission: dict[str, Any] | None = None,
-        effect_store: WorkflowEffectStore | None = None,
-        retry_policy: dict[str, Any] | None = None,
     ) -> dict:
         """执行一个任务。返回最终结果。"""
         log.info(f"🎯 Task starting (model={self.model})")
-
-        mesh_errors: list[str] = []
-        run_id = (
-            workflow_run_id
-            or (context or {}).get("workflow_run_id")
-            or os.environ.get("WORKFLOW_RUN_ID")
-        )
-        grant = admission or (context or {}).get("admission")
-        if grant is None:
-            raw_grant = os.environ.get("WORKFLOW_ADMISSION")
-            if raw_grant:
-                try:
-                    grant = json.loads(raw_grant)
-                except json.JSONDecodeError:
-                    return {
-                        "error": "WORKFLOW_ADMISSION is not valid JSON",
-                        "error_code": "WORKFLOW_ADMISSION_INVALID",
-                        "result": "",
-                    }
-        if run_id is None and isinstance(grant, dict):
-            run_id = grant.get("workflow_run_id")
-        if event_sink is not None and not run_id:
-            run_id = f"runtime-{uuid4().hex[:12]}"
-        run_trace_id = (
-            trace_id
-            or (context or {}).get("trace_id")
-            or os.environ.get("TRACE_ID")
-            or run_id
-        )
-        base_step_run_id = f"{run_id}:runtime" if run_id else None
-        if run_id is not None:
-            try:
-                validate_admission_grant(
-                    grant,
-                    workflow_run_id=run_id,
-                    step_run_id=base_step_run_id,
-                )
-            except WorkflowAdmissionError as exc:
-                return {
-                    "error": str(exc),
-                    "error_code": "WORKFLOW_ADMISSION_REQUIRED",
-                    "workflow_run_id": run_id,
-                    "result": "",
-                }
-        checkpoint = (
-            checkpoint_store.latest(run_id, base_step_run_id)  # type: ignore[reportArgumentType]
-            if checkpoint_store is not None and run_id and resume
-            else None
-        )
-        if checkpoint and checkpoint.get("status") == "succeeded":
-            cached = dict(checkpoint.get("state", {}).get("result", {}))
-            cached["resumed"] = True
-            return cached
-        attempt = int(checkpoint.get("attempt", 0)) + 1 if checkpoint else 1
-        step_run_id = f"{base_step_run_id}:{attempt}" if base_step_run_id else None
-        admission_id = grant.get("admission_id") if isinstance(grant, dict) else None
-        durable_effects = effect_store
-        if durable_effects is None and isinstance(context, dict):
-            effect_path = context.get("effect_store_path")
-            if effect_path:
-                durable_effects = WorkflowEffectStore(str(effect_path))
-
-        def emit(
-            event_type: str,
-            payload: dict[str, Any] | None = None,
-            *,
-            idempotency_key: str | None = None,
-        ) -> None:
-            if not callable(event_sink) or not run_id:
-                return
-            try:
-                event_sink(
-                    new_workflow_event(
-                        event_type,
-                        run_id,
-                        trace_id=run_trace_id,
-                        payload=payload,
-                        idempotency_key=idempotency_key,
-                    )
-                )
-            except Exception as exc:  # noqa: BLE001  # event persistence must not hide execution
-                mesh_errors.append(str(exc))
-
-        def with_mesh_errors(result: dict[str, Any]) -> dict[str, Any]:
-            if mesh_errors:
-                result["event_sink_errors"] = list(mesh_errors)
-            return result
-
-        if run_id:
-            if checkpoint and checkpoint.get("status") == "failed":
-                emit(
-                    "WorkflowRecovered",
-                    {"reason": "checkpoint-resume", "attempt": attempt},
-                    idempotency_key=f"{run_id}:recovered:{attempt}",
-                )
-            elif not checkpoint:
-                emit(
-                    "WorkflowRequested",
-                    {
-                        "workflow": "runtime.agent_task",
-                        "task_id": (context or {}).get("task_id"),
-                    },
-                    idempotency_key=f"{run_id}:requested",
-                )
-                emit(
-                    "WorkflowAdmitted",
-                    {
-                        "workflow": "runtime.agent_task",
-                        "backend": "runtime",
-                        "admission": grant,
-                        **grant,  # type: ignore[reportGeneralTypeIssues]
-                    },
-                    idempotency_key=f"{run_id}:admitted",
-                )
-            emit(
-                "StepDispatched",
-                {
-                    "step_run_id": step_run_id,
-                    "step_name": "runtime.agent_task",
-                    "attempt": attempt,
-                    "admission_id": grant["admission_id"],  # type: ignore[reportOptionalSubscript]
-                },
-                idempotency_key=f"{step_run_id}:dispatched",
-            )
-            emit(
-                "StepStarted",
-                {
-                    "step_run_id": step_run_id,
-                    "step_name": "runtime.agent_task",
-                    "attempt": attempt,
-                    "admission_id": grant["admission_id"],  # type: ignore[reportOptionalSubscript]
-                },
-                idempotency_key=f"{step_run_id}:started",
-            )
 
         system_prompt = (
             "You are an AI task executor. Execute the user's request step by step.\n"
@@ -700,127 +461,21 @@ class AgentRuntime:
             )
         messages.append({"role": "user", "content": prompt})
 
-        if checkpoint and resume:
-            saved_state = checkpoint.get("state", {})
-            saved_messages = saved_state.get("messages")
-            if isinstance(saved_messages, list) and saved_messages:
-                messages = saved_messages
-
         schemas = self.tools.build_tool_schemas()
         if tools_enabled:
             schemas = [s for s in schemas if s["function"]["name"] in tools_enabled]
         tools = schemas if schemas else None
 
         max_turns = 30
-        retry_max_attempts = max(1, int((retry_policy or {}).get("max_attempts", 1)))
-        retry_backoff_seconds = max(
-            0.0, float((retry_policy or {}).get("backoff_seconds", 0.0))
-        )
-        retry_count = 0
-        all_tool_calls: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("tool_calls", [])
-        )
-        effect_outcomes: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("effect_outcomes", [])
-        )
-        effect_receipts: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("effect_receipts", [])
-        )
-        usage = dict((checkpoint or {}).get("state", {}).get("usage", {}))
-        start_turn = int((checkpoint or {}).get("next_turn", 0))
+        all_tool_calls: list[dict[str, Any]] = []
+        usage = {}
 
-        def remember_effect(payload: dict[str, Any]) -> None:
-            """Keep one latest safe summary per effect key in resumable state."""
-            key = payload.get("effect_key")
-            effect_outcomes[:] = [
-                existing
-                for existing in effect_outcomes
-                if existing.get("effect_key") != key
-            ]
-            effect_outcomes.append(payload)
-
-        def remember_receipt(receipt: dict[str, Any]) -> None:
-            receipt_id = receipt.get("receipt_id")
-            effect_receipts[:] = [
-                existing
-                for existing in effect_receipts
-                if existing.get("receipt_id") != receipt_id
-            ]
-            effect_receipts.append(receipt)
-
-        for turn in range(start_turn, max_turns):
-            emit(
-                "StepHeartbeat",
-                {
-                    "step_run_id": step_run_id,
-                    "step_name": "runtime.agent_task",
-                    "turn": turn + 1,
-                    "attempt": attempt,
-                    "admission_id": admission_id,
-                },
-                idempotency_key=f"{step_run_id}:heartbeat:{turn + 1}",
-            )
+        for turn in range(max_turns):
             response = self._call_llm(messages, tools=tools, request_context=context)
             finish = response.get("finish_reason", "stop")
 
             if response.get("error"):
-                error = str(response["error"])
-                if retry_count + 1 < retry_max_attempts:
-                    retry_count += 1
-                    emit(
-                        "StepRetryScheduled",
-                        {
-                            "step_run_id": step_run_id,
-                            "step_name": "runtime.agent_task",
-                            "retry_count": retry_count,
-                            "max_attempts": retry_max_attempts,
-                            "backoff_seconds": retry_backoff_seconds,
-                            "admission_id": admission_id,
-                        },
-                        idempotency_key=f"{step_run_id}:retry:{retry_count}",
-                    )
-                    if retry_backoff_seconds:
-                        time.sleep(retry_backoff_seconds)
-                    continue
-                emit(
-                    "StepFailed",
-                    {
-                        "step_run_id": step_run_id,
-                        "step_name": "runtime.agent_task",
-                        "error": error,
-                        "attempt": attempt,
-                        "admission_id": admission_id,
-                    },
-                    idempotency_key=f"{step_run_id}:failed",
-                )
-                emit(
-                    "WorkflowFailed",
-                    {"error_code": "RUNTIME_EXECUTION_FAILED", "state": "failed"},
-                    idempotency_key=f"{run_id}:terminal" if run_id else None,
-                )
-                if checkpoint_store is not None and run_id and step_run_id:
-                    checkpoint_store.save(
-                        run_id,
-                        base_step_run_id or step_run_id,
-                        status="failed",
-                        next_turn=turn,
-                        attempt=attempt,
-                        state={
-                            "messages": messages,
-                            "tool_calls": all_tool_calls,
-                            "effect_outcomes": effect_outcomes,
-                            "effect_receipts": effect_receipts,
-                            "usage": usage,
-                        },
-                    )
-                return with_mesh_errors(
-                    {
-                        "error": error,
-                        "result": "",
-                        "effect_outcomes": effect_outcomes,
-                        "effect_receipts": effect_receipts,
-                    }
-                )
+                return {"error": response["error"], "result": ""}
 
             if response.get("usage"):
                 usage = response["usage"]
@@ -837,118 +492,15 @@ class AgentRuntime:
                 log.info(
                     f"✅ Task done (turn={turn + 1}, tokens={usage.get('total_tokens', '?')})"
                 )
-                emit(
-                    "CheckpointSaved",
-                    {
-                        "step_run_id": step_run_id,
-                        "step_name": "runtime.agent_task",
-                        "turn": turn + 1,
-                        "checkpoint": "llm-response",
-                        "checkpoint_id": f"{base_step_run_id}:checkpoint:{turn + 1}",
-                        "next_turn": turn + 1,
-                        "attempt": attempt,
-                        "admission_id": admission_id,
-                    },
-                    idempotency_key=f"{step_run_id}:checkpoint:{turn + 1}",
-                )
-                emit(
-                    "WorkflowSucceeded",
-                    {"state": "succeeded", "turns": turn + 1},
-                    idempotency_key=f"{run_id}:terminal" if run_id else None,
-                )
-                result_payload = {
+                return {
                     "result": result,
                     "tool_calls": all_tool_calls,
-                    "effect_outcomes": effect_outcomes,
-                    "effect_receipts": effect_receipts,
                     "turns": turn + 1,
                     "usage": usage,
                 }
-                if checkpoint_store is not None and run_id and step_run_id:
-                    checkpoint_store.save(
-                        run_id,
-                        base_step_run_id or step_run_id,
-                        status="succeeded",
-                        next_turn=turn + 1,
-                        attempt=attempt,
-                        state={
-                            "messages": messages,
-                            "tool_calls": all_tool_calls,
-                            "effect_outcomes": effect_outcomes,
-                            "effect_receipts": effect_receipts,
-                            "usage": usage,
-                            "result": result_payload,
-                        },
-                    )
-                return with_mesh_errors(result_payload)
 
             for tc in tcs:
-                if durable_effects is None:
-                    tool_result = self._execute_tool(tc)
-                else:
-                    effect_descriptor = {
-                        "name": tc.get("function", {}).get("name", ""),
-                        "arguments": tc.get("function", {}).get("arguments", "{}"),
-                    }
-                    effect_hash = hashlib.sha256(
-                        json.dumps(
-                            effect_descriptor,
-                            ensure_ascii=False,
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        ).encode("utf-8")
-                    ).hexdigest()
-                    effect_key = f"{base_step_run_id or 'runtime'}:effect:{effect_hash}"
-                    effect_outcome = durable_effects.execute_once_with_outcome(
-                        effect_key, lambda tool_call=tc: self._execute_tool(tool_call)
-                    )
-                    remember_effect(effect_outcome.safe_payload())
-                    if effect_outcome.status in {"succeeded", "degraded"}:
-                        tool_name = tc.get("function", {}).get("name", "tool")
-                        receipt = effect_outcome.external_receipt(
-                            trace_id=run_trace_id or effect_key,
-                            resource_id=str(
-                                (context or {}).get(
-                                    "resource_id", f"runtime-tool:{tool_name}"
-                                )
-                            ),
-                            operation=str((context or {}).get("operation", tool_name)),
-                            provenance_ref=str(
-                                (context or {}).get(
-                                    "provenance_ref", f"runtime://effect/{effect_key}"
-                                )
-                            ),
-                            policy_digest=str(
-                                (context or {}).get(
-                                    "policy_digest",
-                                    (grant or {}).get(
-                                        "policy_digest", "runtime-effect/v1"
-                                    )
-                                    if isinstance(grant, dict)
-                                    else "runtime-effect/v1",
-                                )
-                            ),
-                            decision_factors={"tool_name": tool_name},
-                        )
-                        remember_receipt(receipt)
-                    if effect_outcome.status not in {"succeeded", "degraded"}:
-                        tool_result = {
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": json.dumps(
-                                {
-                                    "error_code": effect_outcome.error_code
-                                    or "EFFECT_EXECUTION_FAILED"
-                                },
-                                ensure_ascii=False,
-                            ),
-                        }
-                    else:
-                        tool_result = effect_outcome.result or {
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": "",
-                        }
+                tool_result = self._execute_tool(tc)
                 messages.append(tool_result)
                 all_tool_calls.append(
                     {
@@ -957,82 +509,16 @@ class AgentRuntime:
                     }
                 )
 
-            emit(
-                "CheckpointSaved",
-                {
-                    "step_run_id": step_run_id,
-                    "step_name": "runtime.agent_task",
-                    "turn": turn + 1,
-                    "checkpoint": "tool-results",
-                    "tool_count": len(all_tool_calls),
-                    "checkpoint_id": f"{base_step_run_id}:checkpoint:{turn + 1}",
-                    "next_turn": turn + 1,
-                    "attempt": attempt,
-                    "admission_id": admission_id,
-                },
-                idempotency_key=f"{step_run_id}:checkpoint:{turn + 1}",
-            )
-            if checkpoint_store is not None and run_id and step_run_id:
-                checkpoint_store.save(
-                    run_id,
-                    base_step_run_id or step_run_id,
-                    status="running",
-                    next_turn=turn + 1,
-                    attempt=attempt,
-                    state={
-                        "messages": messages,
-                        "tool_calls": all_tool_calls,
-                        "effect_outcomes": effect_outcomes,
-                        "effect_receipts": effect_receipts,
-                        "usage": usage,
-                    },
-                )
-
             if finish == "error":
                 break
 
-        emit(
-            "StepFailed",
-            {
-                "step_run_id": step_run_id,
-                "step_name": "runtime.agent_task",
-                "error": "maximum turns exceeded",
-                "attempt": attempt,
-                "admission_id": admission_id,
-            },
-            idempotency_key=f"{step_run_id}:failed",
-        )
-        emit(
-            "WorkflowFailed",
-            {"error_code": "MAX_TURNS_EXCEEDED", "state": "failed"},
-            idempotency_key=f"{run_id}:terminal" if run_id else None,
-        )
-        if checkpoint_store is not None and run_id and step_run_id:
-            checkpoint_store.save(
-                run_id,
-                base_step_run_id or step_run_id,
-                status="failed",
-                next_turn=max_turns,
-                attempt=attempt,
-                state={
-                    "messages": messages,
-                    "tool_calls": all_tool_calls,
-                    "effect_outcomes": effect_outcomes,
-                    "effect_receipts": effect_receipts,
-                    "usage": usage,
-                },
-            )
-        return with_mesh_errors(
-            {
-                "result": messages[-1].get("content", "") if messages else "",
-                "tool_calls": all_tool_calls,
-                "effect_outcomes": effect_outcomes,
-                "effect_receipts": effect_receipts,
-                "turns": max_turns,
-                "usage": usage,
-                "truncated": True,
-            }
-        )
+        return {
+            "result": messages[-1].get("content", "") if messages else "",
+            "tool_calls": all_tool_calls,
+            "turns": max_turns,
+            "usage": usage,
+            "truncated": True,
+        }
 
 
 # ── API key 解析（从多个来源） ──────────────────────────────────────────────
@@ -1044,7 +530,7 @@ def _get_env(key: str, default: str = "") -> str:
 
 def _resolve_api_key() -> str:
     """Resolve API key using the historical precedence order."""
-    for key in ("AETHERFORGE_URL", "AGENT_RUNTIME_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
+    for key in ("AGENT_RUNTIME_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
         value = _get_env(key).strip()
         if value:
             return value

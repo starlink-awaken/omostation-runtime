@@ -18,7 +18,7 @@ Phase 8.2 / DEBT-L3-001 (🔴)
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
 
@@ -38,12 +38,7 @@ def handle_health() -> dict:
     if not script.exists():
         return {"status": "error", "detail": "health-check 脚本不存在"}
     r = subprocess.run(
-        ["python3", str(script), "--json"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
+        ["python3", str(script), "--json"], capture_output=True, text=True, timeout=30, check=False)
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
@@ -63,9 +58,7 @@ def handle_matrix_list() -> dict:
             ["python3", str(script), "--status"],
             capture_output=True,
             text=True,
-            timeout=10,
-            check=False,
-        )
+            timeout=10, check=False)
         try:
             return json.loads(r.stdout)
         except json.JSONDecodeError:
@@ -112,8 +105,8 @@ def handle_protocol_get(protocol_id: str) -> dict:
     data = yaml.safe_load(constraint_file.read_text())
     for p in data.get("protocol_registry", []):
         if p["id"].lower() == protocol_id.lower():
-            now = datetime.now(UTC)
-            intro = datetime.strptime(p["introduced"], "%Y-%m-%d").replace(tzinfo=UTC)
+            now = datetime.now()
+            intro = datetime.strptime(p["introduced"], "%Y-%m-%d")
             age_days = (now - intro).days
             decay = (
                 min(1.0, age_days / p["half_life_days"])
@@ -150,12 +143,7 @@ def handle_brief() -> dict:
     if not script.exists():
         return {"error": "ecos-brief.py 不存在"}
     r = subprocess.run(
-        ["python3", str(script), "--json"],
-        capture_output=True,
-        text=True,
-        timeout=45,
-        check=False,
-    )
+        ["python3", str(script), "--json"], capture_output=True, text=True, timeout=45, check=False)
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
@@ -198,7 +186,7 @@ def handle_kv_get(key: str) -> dict:
         result = {"key": key, "note": f"未知键: {key}"}
 
     conn.close()
-    result["_key"] = key  # type: ignore[reportArgumentType]
+    result["_key"] = key
     return result
 
 

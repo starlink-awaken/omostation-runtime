@@ -79,7 +79,7 @@ def record_audit(action: str, extension_id: str, status: str, details: str) -> N
         status:     One of 'pass', 'fail', 'blocked'.
         details:    Human-readable description of the operation.
     """
-    global _IN_AUDIT
+    global _AUDIT_FILE, _IN_AUDIT
     if _AUDIT_FILE is None or _IN_AUDIT:
         return  # Audit not configured or re-entrant — skip logging
 

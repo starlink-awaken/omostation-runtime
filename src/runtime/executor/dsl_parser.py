@@ -54,7 +54,7 @@ class DSLParser:
             )
         except Exception as e:  # noqa: BLE001  # defensive fallback
             self._errors.append(
-                {"kind": "syntax", "message": str(e), "loc": self._current().loc}  # type: ignore[reportAttributeAccessIssue]
+                {"kind": "syntax", "message": str(e), "loc": self._current().loc}
             )  # type: ignore[attr-defined]
             return ParseResult(success=False, errors=self._errors)
 

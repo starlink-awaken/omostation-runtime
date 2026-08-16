@@ -89,9 +89,7 @@ class Dispatcher:
         assignment.status = TaskStatus.FAILED
         agent = self._store.get_agent(assignment.agent_id)
         if agent and agent.active_tasks > 0:
-            self._store.update_agent(
-                agent.agent_id, active_tasks=agent.active_tasks - 1
-            )
+            self._store.update_agent(agent.agent_id, active_tasks=agent.active_tasks - 1)
         return True
 
     def failover_node(self, node_id: str) -> list[TaskAssignment]:
@@ -140,12 +138,8 @@ class Dispatcher:
         return min(candidates, key=lambda a: (a.load_ratio, a.active_tasks))
 
     def _assign(self, request: TaskRequest, agent: AgentInfo) -> TaskAssignment:
-        self._store.update_agent(
-            agent.agent_id, active_tasks=agent.active_tasks + 1, status=AgentStatus.BUSY
-        )
-        assignment = TaskAssignment(
-            task_id=request.task_id, agent_id=agent.agent_id, agent_name=agent.name
-        )
+        self._store.update_agent(agent.agent_id, active_tasks=agent.active_tasks + 1, status=AgentStatus.BUSY)
+        assignment = TaskAssignment(task_id=request.task_id, agent_id=agent.agent_id, agent_name=agent.name)
         self._assignments[request.task_id] = assignment
         return assignment
 

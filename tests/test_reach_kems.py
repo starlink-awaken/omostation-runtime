@@ -5,11 +5,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
-from reach_gateway.kems import (  # type: ignore[reportMissingImports]
-    ManifestError,
-    dispatch_manifest,
-    prepare_manifest,
-)
+from reach_gateway.kems import ManifestError, dispatch_manifest, prepare_manifest
 
 
 def manifest() -> dict[str, object]:
@@ -36,7 +32,7 @@ def test_prepare_manifest_is_stable_and_redacted() -> None:
 
 def test_manifest_rejects_raw_content() -> None:
     payload = manifest()
-    payload["documents"][0]["content"] = "secret"  # type: ignore[reportIndexIssue]
+    payload["documents"][0]["content"] = "secret"
     with pytest.raises(ManifestError, match="raw document content"):
         prepare_manifest(payload)
 
@@ -53,7 +49,7 @@ def test_dispatch_fails_without_explicit_transport(
 def test_local_hermes_dispatch_is_idempotent(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:
-    import reach_gateway  # type: ignore[reportMissingImports]
+    import reach_gateway
 
     relay = tmp_path / "relay.json"
     monkeypatch.setenv("BOS_REACHBRIDGE_MODE", "local_hermes")
@@ -108,4 +104,4 @@ def test_http_dispatch_requires_and_confirms_dispatch_id(
 
     assert result.status == "accepted"
     assert received["idempotency_key"] == result.dispatch_id
-    assert "content" not in received["body"]["documents"][0]  # type: ignore[reportIndexIssue]
+    assert "content" not in received["body"]["documents"][0]

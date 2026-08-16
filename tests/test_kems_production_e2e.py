@@ -7,7 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from reach_gateway.kems import dispatch_manifest  # type: ignore[reportMissingImports]
+from reach_gateway.kems import dispatch_manifest
 from scripts.kems_dispatch_receipt import build_receipt
 from scripts.kems_production_preflight import run_preflight
 
@@ -120,36 +120,6 @@ def _model_acceptance(tmp_path: Path, manifest: Path) -> Path:
     return path
 
 
-def _persistence_recovery_evidence(tmp_path: Path) -> Path:
-    path = tmp_path / "persistence-recovery.json"
-    snapshot_sha256 = "c" * 64
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": "kems.persistence-recovery-evidence.v1",
-                "status": "passed",
-                "backend": "postgresql",
-                "backup_id": "backup-e2e-001",
-                "restore_drill_id": "restore-e2e-001",
-                "backup_ref": "vault://evidence/kems/backup-e2e-001",
-                "restore_ref": "vault://evidence/kems/restore-e2e-001",
-                "backup_sha256": "d" * 64,
-                "graph_snapshot_sha256": snapshot_sha256,
-                "restored_graph_snapshot_sha256": snapshot_sha256,
-                "backup_bytes": 4096,
-                "rpo_minutes": 10,
-                "rto_minutes": 20,
-                "rpo_target_minutes": 30,
-                "rto_target_minutes": 60,
-                "performed_at": "2026-08-02T00:00:00+00:00",
-                "verification_method": "logical_restore_and_hash_compare",
-            }
-        ),
-        encoding="utf-8",
-    )
-    return path
-
-
 def _approved_omo(tmp_path: Path) -> Path:
     omo_root = tmp_path / "omo"
     (omo_root / "tasks" / "active").mkdir(parents=True)
@@ -180,7 +150,6 @@ def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) ->
         evaluation_manifest=manifest_path,
         model_acceptance=_model_acceptance(tmp_path, manifest_path),
         adjudication_database=adjudication_database,
-        persistence_recovery_evidence=_persistence_recovery_evidence(tmp_path),
         omo_root=_approved_omo(tmp_path),
         task_id="KEMS-E2E",
         production=True,
@@ -203,7 +172,7 @@ def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) ->
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, *_args: object) -> None:  # type: ignore[reportIncompatibleMethodOverride]
+        def log_message(self, *_args: object) -> None:
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

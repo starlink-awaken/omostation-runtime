@@ -12,8 +12,6 @@ v2.0 (Real .emlx Mail Body Extractor) | 2026-07-31
 from __future__ import annotations
 
 import email
-import glob
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -55,12 +53,12 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
                     if part.get_content_type() == "text/plain":
                         payload = part.get_payload(decode=True)
                         if payload:
-                            body_text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")  # type: ignore[reportAttributeAccessIssue]
+                            body_text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")
                             break
             else:
                 payload = msg.get_payload(decode=True)
                 if payload:
-                    body_text = payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")  # type: ignore[reportAttributeAccessIssue]
+                    body_text = payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")
 
             clean_body = " ".join(body_text.split()[:80])
             if not clean_body:
@@ -72,7 +70,7 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
                 "date": str(date),
                 "body": clean_body
             })
-        except Exception as e:
+        except Exception:
             pass
 
     return emails
@@ -88,7 +86,7 @@ def run_apple_mail_pipeline() -> bool:
         target_file = INBOX_DIR / f"{today_str}-auto-apple-mail.md"
         lines = [
             f"# Apple Mail 原生 4,091 封邮件正文提取 — {today_str}\n\n",
-            f"> 数据源: macOS Apple Mail V10 .emlx 本地正文数据库\n",
+            "> 数据源: macOS Apple Mail V10 .emlx 本地正文数据库\n",
             f"> 提取时间: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
         ]
         

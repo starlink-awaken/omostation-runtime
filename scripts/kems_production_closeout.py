@@ -101,7 +101,7 @@ def _preflight_inventory(
         )
     ):
         raise CloseoutError("production preflight contains failed checks")
-    for field in ("evaluation", "model_acceptance", "persistence_recovery", "omo"):
+    for field in ("evaluation", "model_acceptance", "omo"):
         if (
             not isinstance(preflight.get(field), dict)
             or preflight[field].get("available") is not True

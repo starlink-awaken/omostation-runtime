@@ -63,9 +63,7 @@ class Peer:
             "node_id": self.node_id,
             "host": self.host,
             "port": self.port,
-            "last_contact": self.last_contact.isoformat()
-            if self.last_contact
-            else None,
+            "last_contact": self.last_contact.isoformat() if self.last_contact else None,
             "consecutive_failures": self.consecutive_failures,
             "reachable": self.reachable,
         }
@@ -123,7 +121,6 @@ class GossipSync:
         self._last_sync_result: SyncResult | None = None
         self._mutation_task: asyncio.Task | None = None
         self._on_push = on_push
-        self._event_loop: asyncio.AbstractEventLoop | None = None
 
     # ── Peer management ──────────────────────────────────────────
 
@@ -142,7 +139,6 @@ class GossipSync:
         if self._running:
             return
         self._running = True
-        self._event_loop = asyncio.get_running_loop()
         self._task = asyncio.create_task(self._loop(), name="gossip-sync")
         logger.info(
             "GossipSync started (interval=%ds, peers=%d)",
@@ -183,7 +179,9 @@ class GossipSync:
             except Exception:
                 logger.exception("Gossip sync tick failed")
             try:
-                await asyncio.wait_for(asyncio.Event().wait(), timeout=self._interval)
+                await asyncio.wait_for(
+                    asyncio.Event().wait(), timeout=self._interval
+                )
             except TimeoutError:
                 continue
 
@@ -231,9 +229,12 @@ class GossipSync:
         """Schedule an immediate push after a local registry mutation."""
         if not self._running or self._mutation_task and not self._mutation_task.done():
             return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
         self._vclock += 1
-        if self._event_loop and self._event_loop.is_running():
-            asyncio.run_coroutine_threadsafe(self._push_reachable(), self._event_loop)
+        self._mutation_task = loop.create_task(self._push_reachable(), name="gossip-push")
 
     async def _push_reachable(self) -> int:
         agents = self._store.list_agents()
@@ -261,9 +262,7 @@ class GossipSync:
                 logger.warning("on_push callback failed", exc_info=True)
         return pushed
 
-    def apply_delta(
-        self, agents: list[dict], source_node_id: str = "", vclock: int = 0
-    ) -> int:
+    def apply_delta(self, agents: list[dict], source_node_id: str = "", vclock: int = 0) -> int:
         """Merge a peer delta and advance the local logical clock."""
         self._vclock = max(self._vclock, vclock) + 1
         merged = 0
@@ -340,9 +339,7 @@ class GossipSync:
             "vclock": self._vclock,
             "running": self._running,
             "peers": [p.to_dict() for p in self._peers.values()],
-            "last_sync": self._last_sync_result.to_dict()
-            if self._last_sync_result
-            else None,
+            "last_sync": self._last_sync_result.to_dict() if self._last_sync_result else None,
         }
 
 

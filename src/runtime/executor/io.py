@@ -41,7 +41,7 @@ class AppendOnlyLog:
     ) -> None:
         """追加一条记录到 JSONL 文件 (线程安全 + 写锁)."""
         if hasattr(record, "model_dump"):
-            record = record.model_dump()  # type: ignore[reportAttributeAccessIssue]
+            record = record.model_dump()
         if schema is not None:
             schema.model_validate(record)  # fail-fast
         line = (

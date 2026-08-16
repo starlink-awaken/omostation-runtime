@@ -89,9 +89,7 @@ def load_arch_health() -> dict:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=str(workspace / "projects" / "ecos"),
-            check=False,
-        )
+            cwd=str(workspace / "projects" / "ecos"), check=False)
         changed = [line for line in result.stdout.splitlines() if line.strip()]
         git["uncommitted"] = len(changed)
         git["status"] = "clean" if not changed else "dirty"
@@ -106,9 +104,7 @@ def load_arch_health() -> dict:
             capture_output=True,
             text=True,
             timeout=15,
-            cwd=str(workspace / "projects" / "ecos"),
-            check=False,
-        )
+            cwd=str(workspace / "projects" / "ecos"), check=False)
         ruff["check"] = "passed" if result.returncode == 0 else "failed"
         ruff["errors"] = (
             len(result.stdout.splitlines()) if result.returncode != 0 else 0
@@ -163,17 +159,13 @@ def load_arch_health() -> dict:
                 str(workspace / "projects" / "agora"),
                 "python",
                 "-c",
-                (
-                    "from agora.auth.mcp_gateway import KNOWN_BACKENDS; "
-                    "import json; "
-                    "print(json.dumps([b['name'] for b in KNOWN_BACKENDS]))"
-                ),
+                "from agora.auth.mcp_gateway import KNOWN_BACKENDS; "
+                "import json; "
+                "print(json.dumps([b['name'] for b in KNOWN_BACKENDS]))",
             ],
             capture_output=True,
             text=True,
-            timeout=10,
-            check=False,
-        )
+            timeout=10, check=False)
         if result.returncode == 0:
             backends = json.loads(result.stdout.strip())
             mcp["total"] = len(backends)
@@ -207,7 +199,7 @@ def load_arch_health() -> dict:
 
         # Governance freshness: fresh=100, aging=60, stale=0
         # Weight: 25%
-        gov_score = {"fresh": 100, "aging": 60, "stale": 0}.get(gov.get("health"), 50)  # type: ignore[reportArgumentType]
+        gov_score = {"fresh": 100, "aging": 60, "stale": 0}.get(gov.get("health"), 50)
         convergence["dimensions"]["governance_freshness"] = {
             "score": gov_score,
             "weight": 25,

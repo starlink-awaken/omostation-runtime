@@ -68,7 +68,7 @@ def _probe_daemons(state: dict) -> None:
     probe_script = Path(__file__).parent.parent / "health" / "agora_gateway_probe.py"
     if not probe_script.exists():
         return
-    for svc in services.values():
+    for name, svc in services.items():
         if svc.get("type") != "daemon" or svc.get("health_check"):
             continue
         try:
@@ -76,9 +76,7 @@ def _probe_daemons(state: dict) -> None:
                 ["python3", str(probe_script)],
                 capture_output=True,
                 text=True,
-                timeout=10,
-                check=False,
-            )
+                timeout=10, check=False)
             if result.returncode == 0:
                 svc["health_check"] = "healthy (probe)"
             elif result.returncode == 2:
@@ -124,6 +122,7 @@ def should_scan(now: float | None = None) -> bool:
     Args:
         now: Current timestamp (time.time()). Defaults to time.time().
     """
+    global _last_scan_ts
     now = now or time.time()
     return (now - _last_scan_ts) >= HEALTH_SCAN_INTERVAL
 

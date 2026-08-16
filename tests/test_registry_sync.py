@@ -88,13 +88,7 @@ class TestSyncResult:
         assert r.errors == []
 
     def test_to_dict(self):
-        r = SyncResult(
-            pulled=5,
-            pushed=3,
-            conflicts_resolved=2,
-            peers_unreachable=1,
-            duration_ms=123.4,
-        )
+        r = SyncResult(pulled=5, pushed=3, conflicts_resolved=2, peers_unreachable=1, duration_ms=123.4)
         d = r.to_dict()
         assert d["pulled"] == 5
         assert d["pushed"] == 3
@@ -242,7 +236,7 @@ class TestGossipSyncOnce:
 class TestGossipSyncLifecycle:
     @pytest.mark.asyncio
     async def test_start_and_stop(self, mock_store):
-        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)  # type: ignore[reportArgumentType]
+        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)
         await sync.start()
         assert sync._running is True
         await sync.stop()
@@ -250,9 +244,84 @@ class TestGossipSyncLifecycle:
 
     @pytest.mark.asyncio
     async def test_double_start_is_noop(self, mock_store):
-        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)  # type: ignore[reportArgumentType]
+        sync = GossipSync(mock_store, local_node_id="node-a", sync_interval=0.1)
         await sync.start()
         task1 = sync._task
         await sync.start()  # Should not create new task
         assert sync._task is task1
         await sync.stop()
+
+
+# ── Push Trigger Callback Tests ────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_on_push_callback_fires_on_mutation():
+    """When on_push is set and a push succeeds, the callback receives the delta."""
+    from runtime.registry.models import AgentInfo
+
+    pushed_deltas = []
+
+    async def capture_push(delta, node_id):
+        pushed_deltas.append((delta, node_id))
+
+    store = MagicMock()
+    agent = AgentInfo(name="test-agent", node_id="node-a")
+    store.list_agents.return_value = [agent]
+    store.get_agent.return_value = None
+
+    sync = GossipSync(store, local_node_id="node-a", on_push=capture_push)
+    sync._running = True
+
+    # Simulate a successful push to one reachable peer
+    peer = Peer(node_id="node-b", host="127.0.0.1", port=18900, reachable=True)
+    sync._peers["node-b"] = peer
+
+    with patch.object(sync, "_push_to_peer", new_callable=AsyncMock, return_value=1):
+        await sync._push_reachable()
+
+    assert len(pushed_deltas) == 1
+    delta, node_id = pushed_deltas[0]
+    assert delta["type"] == "mutation_push"
+    assert node_id == "node-a"
+    assert delta["pushed_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_on_push_not_called_when_no_peers_reachable():
+    """Callback should not fire if no peers received the push."""
+    pushed = []
+
+    async def capture(delta, node_id):
+        pushed.append(delta)
+
+    store = MagicMock()
+    store.list_agents.return_value = []
+
+    sync = GossipSync(store, local_node_id="node-a", on_push=capture)
+    sync._running = True
+
+    await sync._push_reachable()
+    assert len(pushed) == 0
+
+
+@pytest.mark.asyncio
+async def test_on_push_callback_exception_is_caught():
+    """A failing on_push callback must not crash the push flow."""
+    store = MagicMock()
+    from runtime.registry.models import AgentInfo
+    agent = AgentInfo(name="test", node_id="node-a")
+    store.list_agents.return_value = [agent]
+    store.get_agent.return_value = None
+
+    async def bad_callback(delta, node_id):
+        raise RuntimeError("callback failure")
+
+    sync = GossipSync(store, local_node_id="node-a", on_push=bad_callback)
+    sync._running = True
+
+    peer = Peer(node_id="node-b", host="127.0.0.1", port=18901, reachable=True)
+    sync._peers["node-b"] = peer
+
+    with patch.object(sync, "_push_to_peer", new_callable=AsyncMock, return_value=1):
+        await sync._push_reachable()  # Should not raise

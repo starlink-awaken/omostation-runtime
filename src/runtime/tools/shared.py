@@ -106,9 +106,7 @@ def _run_script(script_name: str, *args: str) -> str:
             capture_output=True,
             text=True,
             timeout=30,
-            env=env,
-            check=False,
-        )
+            env=env, check=False)
         return (
             r.stdout.strip()
             if r.returncode == 0

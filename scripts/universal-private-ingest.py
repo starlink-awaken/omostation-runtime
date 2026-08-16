@@ -13,7 +13,6 @@ v4.0 (Zero-Key WeChat UI & File Ingestion) | 2026-07-31
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import subprocess
 import sys

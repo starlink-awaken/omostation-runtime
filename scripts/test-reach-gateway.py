@@ -2,11 +2,10 @@
 """test-reach-gateway.py — ReachBridge 物理 Hermes 中转站 (Relay Station) 实操测试"""
 
 import sys
-from pathlib import Path
 
 sys.path.insert(0, "/Users/xiamingxing/Workspace/projects/runtime/packages/reach/src")
 
-from reach_gateway import ReachGateway, ReachPayload, ScenarioLevel  # type: ignore[reportMissingImports]
+from reach_gateway import ReachGateway, ReachPayload, ScenarioLevel
 
 
 def main() -> int:

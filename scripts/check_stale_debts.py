@@ -1,8 +1,8 @@
 """Check for debt items with stale x2_freshness."""
 
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
 import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 sys.path.insert(0, str(Path.home() / "Workspace/projects/omo/src"))
 from omo.omo_debt_registry import load_debt_ledger

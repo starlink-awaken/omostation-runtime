@@ -258,7 +258,7 @@ def _start_sched_in_thread():
     """Run scheduler in a new event loop on a background thread."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(sched.start())  # type: ignore[reportArgumentType]
+    loop.run_until_complete(sched.start())
     loop.run_forever()
 
 

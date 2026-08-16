@@ -103,9 +103,7 @@ def _get_pid_for_port(port: int) -> int | None:
             ["lsof", "-ti", f":{port}"],
             capture_output=True,
             text=True,
-            timeout=5,
-            check=False,
-        )
+            timeout=5, check=False)
         if r.stdout.strip():
             return int(r.stdout.strip().split("\n")[0])
     except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, OSError):
@@ -193,8 +191,8 @@ def i0_services() -> list[dict]:
             port_listening = True
             pid = None
         elif has_port:
-            port_listening = _probe_port("127.0.0.1", svc.port)  # type: ignore[reportArgumentType]
-            pid = _get_pid_for_port(svc.port) if port_listening else None  # type: ignore[reportArgumentType]
+            port_listening = _probe_port("127.0.0.1", svc.port)
+            pid = _get_pid_for_port(svc.port) if port_listening else None
         else:
             # No port — trust matrix.yaml status (running/active = online)
             port_listening = svc.status in ("running", "active", "idle")

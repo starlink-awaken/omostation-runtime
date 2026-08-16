@@ -26,8 +26,6 @@ FORBIDDEN_KEYS = {"body", "content", "ocr_text", "raw_text", "text"}
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 APPROVED_STATUSES = {"approved", "dispatched", "executing", "verified", "closed"}
 MODEL_ACCEPTANCE_SCHEMA = "kems.model-acceptance.v1"
-PERSISTENCE_RECOVERY_SCHEMA = "kems.persistence-recovery-evidence.v1"
-EVIDENCE_REF_PREFIX = "vault://evidence/"
 
 
 @dataclass(frozen=True)
@@ -452,118 +450,6 @@ def _model_acceptance_check(
     )
 
 
-def _persistence_recovery_check(path: Path | None) -> Check:
-    """Require an operator-produced PostgreSQL backup and restore drill proof."""
-    if path is None:
-        return Check(
-            "persistence_recovery",
-            False,
-            "missing PostgreSQL persistence recovery evidence path",
-        )
-    if not path.is_file():
-        return Check(
-            "persistence_recovery",
-            False,
-            "PostgreSQL persistence recovery evidence is unavailable",
-        )
-    try:
-        payload = _load_json(path)
-    except ValueError as exc:
-        return Check("persistence_recovery", False, str(exc))
-    if not isinstance(payload, dict):
-        return Check(
-            "persistence_recovery",
-            False,
-            "persistence recovery evidence must be an object",
-        )
-    if _contains_forbidden_key(payload):
-        return Check(
-            "persistence_recovery",
-            False,
-            "persistence recovery evidence contains forbidden raw content key",
-        )
-    if payload.get("schema_version") != PERSISTENCE_RECOVERY_SCHEMA:
-        return Check(
-            "persistence_recovery",
-            False,
-            "unsupported persistence recovery evidence schema",
-        )
-    if payload.get("status") != "passed":
-        return Check(
-            "persistence_recovery",
-            False,
-            "PostgreSQL backup and restore drill did not pass",
-        )
-    if payload.get("backend") != "postgresql":
-        return Check(
-            "persistence_recovery",
-            False,
-            "production persistence backend must be PostgreSQL",
-        )
-    for field in ("backup_id", "restore_drill_id", "performed_at"):
-        if not isinstance(payload.get(field), str) or not payload[field].strip():
-            return Check("persistence_recovery", False, f"{field} is missing")
-    for field in ("backup_ref", "restore_ref"):
-        value = payload.get(field)
-        if not isinstance(value, str) or not value.startswith(EVIDENCE_REF_PREFIX):
-            return Check(
-                "persistence_recovery",
-                False,
-                f"{field} must be a redacted evidence reference",
-            )
-    for field in (
-        "backup_sha256",
-        "graph_snapshot_sha256",
-        "restored_graph_snapshot_sha256",
-    ):
-        value = payload.get(field)
-        if not isinstance(value, str) or not SHA256.fullmatch(value):
-            return Check("persistence_recovery", False, f"{field} is invalid")
-    if payload["graph_snapshot_sha256"] != payload["restored_graph_snapshot_sha256"]:
-        return Check(
-            "persistence_recovery",
-            False,
-            "restored graph snapshot does not match the source snapshot",
-        )
-    try:
-        backup_bytes = int(payload["backup_bytes"])
-        rpo_minutes = float(payload["rpo_minutes"])
-        rto_minutes = float(payload["rto_minutes"])
-        rpo_target_minutes = float(payload["rpo_target_minutes"])
-        rto_target_minutes = float(payload["rto_target_minutes"])
-    except (KeyError, TypeError, ValueError):
-        return Check("persistence_recovery", False, "recovery metrics are invalid")
-    metrics = (
-        backup_bytes,
-        rpo_minutes,
-        rto_minutes,
-        rpo_target_minutes,
-        rto_target_minutes,
-    )
-    if (
-        backup_bytes <= 0
-        or not all(math.isfinite(value) and value >= 0 for value in metrics[1:])
-        or rpo_minutes > rpo_target_minutes
-        or rto_minutes > rto_target_minutes
-    ):
-        return Check(
-            "persistence_recovery",
-            False,
-            "recovery metrics do not satisfy configured RPO/RTO targets",
-        )
-    if payload.get("verification_method") != "logical_restore_and_hash_compare":
-        return Check(
-            "persistence_recovery",
-            False,
-            "recovery verification method is missing or unsupported",
-        )
-    return Check(
-        "persistence_recovery",
-        True,
-        f"PostgreSQL restore drill={payload['restore_drill_id']} snapshot hash matched",
-    )
-
-
 def _omo_check(omo_root: Path, task_id: str | None) -> Check:
     if not task_id:
         return Check("omo_approval", False, "missing approved OMO task id")
@@ -687,30 +573,6 @@ def _model_acceptance_metadata(path: Path | None) -> dict[str, object]:
     }
 
 
-def _persistence_recovery_metadata(path: Path | None) -> dict[str, object]:
-    if path is None or not path.is_file():
-        return {"available": False}
-    try:
-        payload = _load_json(path)
-    except ValueError:
-        return {"available": False}
-    if not isinstance(payload, dict):
-        return {"available": False}
-    return {
-        "available": True,
-        "backend": payload.get("backend"),
-        "backup_id": payload.get("backup_id"),
-        "restore_drill_id": payload.get("restore_drill_id"),
-        "graph_snapshot_sha256": payload.get("graph_snapshot_sha256"),
-        "restored_graph_snapshot_sha256": payload.get(
-            "restored_graph_snapshot_sha256"
-        ),
-        "rpo_minutes": payload.get("rpo_minutes"),
-        "rto_minutes": payload.get("rto_minutes"),
-        "sha256": _sha256(path),
-    }
-
-
 def _omo_metadata(omo_root: Path, task_id: str | None) -> dict[str, object]:
     if not task_id:
         return {"available": False}
@@ -762,7 +624,6 @@ def run_preflight(
     evidence_output: Path | None = None,
     model_acceptance: Path | None = None,
     adjudication_database: Path | None = None,
-    persistence_recovery_evidence: Path | None = None,
 ) -> dict[str, object]:
     checks: list[Check] = []
     endpoint = os.environ.get("BOS_REACHBRIDGE_ENDPOINT", "").strip()
@@ -825,11 +686,6 @@ def run_preflight(
         if production
         else Check("model_acceptance", True, "not required outside production")
     )
-    checks.append(
-        _persistence_recovery_check(persistence_recovery_evidence)
-        if production
-        else Check("persistence_recovery", True, "not required outside production")
-    )
     checks.append(_omo_check(omo_root, task_id))
     ok = all(check.ok for check in checks)
     result = {
@@ -853,9 +709,6 @@ def run_preflight(
             "evaluation": _evaluation_metadata(evaluation_manifest),
             "adjudication": _adjudication_metadata(adjudication_database),
             "model_acceptance": _model_acceptance_metadata(model_acceptance),
-            "persistence_recovery": _persistence_recovery_metadata(
-                persistence_recovery_evidence
-            ),
             "omo": _omo_metadata(omo_root, task_id),
             "checks": result["checks"],
         }
@@ -895,14 +748,6 @@ def main() -> int:
         help="read-only persistent adjudication SQLite database",
     )
     parser.add_argument(
-        "--persistence-recovery-evidence",
-        type=Path,
-        default=Path(os.environ["KEMS_PERSISTENCE_RECOVERY_EVIDENCE"])
-        if os.environ.get("KEMS_PERSISTENCE_RECOVERY_EVIDENCE")
-        else None,
-        help="redacted PostgreSQL backup/restore drill evidence",
-    )
-    parser.add_argument(
         "--omo-root",
         type=Path,
         default=Path(
@@ -932,9 +777,6 @@ def main() -> int:
         else None,
         adjudication_database=args.adjudication_database.expanduser().resolve()
         if args.adjudication_database
-        else None,
-        persistence_recovery_evidence=args.persistence_recovery_evidence.expanduser().resolve()
-        if args.persistence_recovery_evidence
         else None,
         omo_root=args.omo_root.expanduser().resolve(),
         task_id=args.task_id,

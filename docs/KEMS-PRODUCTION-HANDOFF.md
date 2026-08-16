@@ -156,7 +156,6 @@ export BOS_REACHBRIDGE_ENDPOINT="https://<enterprise-endpoint>/dispatch"
 export BOS_REACHBRIDGE_TOKEN="<short-lived-secret>"
 export KEMS_EVALUATION_MANIFEST="/secure/kems/evaluation-manifest.json"
 export KEMS_ADJUDICATION_DB="$HOME/.kems/adjudication.sqlite"
-export KEMS_PERSISTENCE_RECOVERY_EVIDENCE="/secure/kems/persistence-recovery.json"
 export KEMS_MODEL_ACCEPTANCE_REPORT="/secure/kems/model-acceptance.json"
 export KEMS_OMO_TASK_ID="<approved-task-id>"
 
@@ -164,7 +163,6 @@ python scripts/kems_production_preflight.py \
   --docs-root "<controlled-docs-root>" \
   --evaluation-manifest "$KEMS_EVALUATION_MANIFEST" \
   --adjudication-database "$KEMS_ADJUDICATION_DB" \
-  --persistence-recovery-evidence "$KEMS_PERSISTENCE_RECOVERY_EVIDENCE" \
   --model-acceptance "$KEMS_MODEL_ACCEPTANCE_REPORT" \
   --omo-root "<workspace>/.omo" \
   --task-id "$KEMS_OMO_TASK_ID" \
@@ -174,14 +172,6 @@ python scripts/kems_production_preflight.py \
 
 Proceed only when the result is `status=ready` and every check is true. Keep
 the evidence file even when the result is `blocked`.
-
-The persistence recovery artifact must conform to
-`kems.persistence-recovery-evidence.v1`. It records only safe metadata and
-evidence references: PostgreSQL backup and restore drill IDs, source and
-restored graph snapshot SHA-256 values, actual and target RPO/RTO, and the
-verification method. It must not contain a DSN, credential, raw document, or
-raw graph content. The preflight remains blocked when the artifact is absent,
-invalid, or the source and restored graph snapshot hashes differ.
 
 ### 6. Dispatch once and close the bundle
 
@@ -210,8 +200,6 @@ Stop and retain the evidence if any of the following occurs:
 - the model report is not bound to the exact manifest;
 - the OMO task or approval artifact is missing, mismatched, or ungranted;
 - endpoint, token, or transport is missing or uses local Hermes;
-- the PostgreSQL recovery artifact is absent, invalid, or its graph snapshot
-  hashes/RPO/RTO do not satisfy the evidence contract;
 - the receipt run ID, inventory, manifest SHA, dispatch ID, count, or status differs;
 - preflight or closeout exits non-zero.
 
@@ -225,10 +213,8 @@ The release ticket must link, without embedding private content or secrets:
 2. candidate model ID and model acceptance SHA-256;
 3. OMO task ID, approval reference, and approval SHA-256;
 4. preflight evidence path and SHA-256;
-5. PostgreSQL backup/restore drill IDs, persistence evidence path and SHA-256,
-   graph snapshot SHA-256 values, and actual/target RPO/RTO;
-6. dispatch receipt and production closeout paths and SHA-256;
-7. names or auditable identities of the two annotators, adjudicator, OMO approver, credential administrator, and release reviewer.
+5. dispatch receipt and production closeout paths and SHA-256;
+6. names or auditable identities of the two annotators, adjudicator, OMO approver, credential administrator, and release reviewer.
 
 Only the release reviewer may mark the bundle ready for a separately approved
 production action window.

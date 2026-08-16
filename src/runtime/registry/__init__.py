@@ -1,11 +1,4 @@
-"""Agent Registry — unified multi-machine agent coordination.
-
-HTTP contract notes:
-- POST /tasks returns fallback outcomes (dispatched / escalated / pending),
-  never assignment internals. Task-to-agent ownership is read via
-  GET /tasks assignments. See ADR-0368 for the TaskFallback response
-  contract that the registry tests align to.
-"""
+"""Agent Registry — unified multi-machine agent coordination."""
 
 from .dispatch import Dispatcher, TaskAssignment, TaskRequest, TaskStatus
 from .heartbeat import HeartbeatManager

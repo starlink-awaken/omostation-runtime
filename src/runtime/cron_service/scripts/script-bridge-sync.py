@@ -41,7 +41,7 @@ WORKSPACE = HOME / "Workspace"
 def list_workspace_scripts():
     """Scan all Workspace project scripts/ dirs. Returns {filename: project}"""
     result = {}
-    for project in SCRIPT_PREFIX_MAP:
+    for project, _ in SCRIPT_PREFIX_MAP.items():
         proj_dir = WORKSPACE / project / "scripts"
         if not proj_dir.is_dir():
             continue
