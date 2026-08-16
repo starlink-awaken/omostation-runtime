@@ -38,7 +38,12 @@ def handle_health() -> dict:
     if not script.exists():
         return {"status": "error", "detail": "health-check 脚本不存在"}
     r = subprocess.run(
-        ["python3", str(script), "--json"], capture_output=True, text=True, timeout=30, check=False)
+        ["python3", str(script), "--json"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
@@ -58,7 +63,9 @@ def handle_matrix_list() -> dict:
             ["python3", str(script), "--status"],
             capture_output=True,
             text=True,
-            timeout=10, check=False)
+            timeout=10,
+            check=False,
+        )
         try:
             return json.loads(r.stdout)
         except json.JSONDecodeError:
@@ -106,7 +113,9 @@ def handle_protocol_get(protocol_id: str) -> dict:
     for p in data.get("protocol_registry", []):
         if p["id"].lower() == protocol_id.lower():
             now = datetime.now(tz=timezone.utc)
-            intro = datetime.strptime(p["introduced"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            intro = datetime.strptime(p["introduced"], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             age_days = (now - intro).days
             decay = (
                 min(1.0, age_days / p["half_life_days"])
@@ -143,7 +152,12 @@ def handle_brief() -> dict:
     if not script.exists():
         return {"error": "ecos-brief.py 不存在"}
     r = subprocess.run(
-        ["python3", str(script), "--json"], capture_output=True, text=True, timeout=45, check=False)
+        ["python3", str(script), "--json"],
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
+    )
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
@@ -286,6 +300,33 @@ def handle_agent_execute(prompt: str) -> dict:
     return handle_agent_run_task(prompt)
 
 
+def handle_governance_preflight(
+    tool_name: str,
+    arguments: dict,
+    caller_layer: str = "L3",
+    caller_domain: str = "default",
+) -> dict:
+    """runtime_governance_preflight: MOF 运行时动作 Pre-flight 语义拦截与架构合规性检查."""
+    from runtime.governance.interceptor import GovernanceInterceptor
+
+    interceptor = GovernanceInterceptor()
+    allowed, diag = interceptor.intercept_tool_call(
+        tool_name=tool_name,
+        arguments=arguments,
+        caller_layer=caller_layer,
+        caller_domain=caller_domain,
+    )
+    if not allowed and diag:
+        return diag
+    return {
+        "status": "ALLOWED",
+        "tool_name": tool_name,
+        "caller_layer": caller_layer,
+        "caller_domain": caller_domain,
+        "note": "MOF L0 architecture constraints verified",
+    }
+
+
 # ── FastMCP server ──────────────────────────────────────────────────────────
 
 try:
@@ -320,6 +361,17 @@ try:
     @mcp.tool()
     def runtime_kv_get(key: str) -> dict:
         return handle_kv_get(key)
+
+    @mcp.tool()
+    def runtime_governance_preflight(
+        tool_name: str,
+        arguments: dict,
+        caller_layer: str = "L3",
+        caller_domain: str = "default",
+    ) -> dict:
+        return handle_governance_preflight(
+            tool_name, arguments, caller_layer, caller_domain
+        )
 
     # agent-runtime 整合工具 (调 executor 核心 API, 消除 cockpit 壳层)
     @mcp.tool()
@@ -395,6 +447,7 @@ def main():
             "runtime_ontology_get",
             "runtime_brief",
             "runtime_kv_get",
+            "runtime_governance_preflight",
             "runtime_agent_list_tools",
             "runtime_agent_list",
             "runtime_agent_status",
