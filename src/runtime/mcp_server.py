@@ -327,6 +327,33 @@ def handle_governance_preflight(
     }
 
 
+def handle_governance_guardrails(
+    domain: str = "default",
+    layer: str = "L3",
+    max_rules: int = 5,
+) -> dict:
+    """runtime_governance_guardrails: 生成注入 Agent System Prompt 的轻量架构约束块."""
+    from runtime.governance.interceptor import GovernanceInterceptor
+
+    interceptor = GovernanceInterceptor()
+    prompt = interceptor.get_guardrail_prompt(
+        domain=domain, layer=layer, max_rules=max_rules
+    )
+    return {
+        "domain": domain,
+        "layer": layer,
+        "guardrail_prompt": prompt,
+    }
+
+
+def handle_governance_explain(rule_id: str) -> dict:
+    """runtime_governance_explain: 查询指定 MOF 架构规则的详细动机与代码自愈范式."""
+    from runtime.governance.interceptor import GovernanceInterceptor
+
+    interceptor = GovernanceInterceptor()
+    return interceptor.explain_rule(rule_id)
+
+
 # ── FastMCP server ──────────────────────────────────────────────────────────
 
 try:
@@ -372,6 +399,18 @@ try:
         return handle_governance_preflight(
             tool_name, arguments, caller_layer, caller_domain
         )
+
+    @mcp.tool()
+    def runtime_governance_guardrails(
+        domain: str = "default",
+        layer: str = "L3",
+        max_rules: int = 5,
+    ) -> dict:
+        return handle_governance_guardrails(domain, layer, max_rules)
+
+    @mcp.tool()
+    def runtime_governance_explain(rule_id: str) -> dict:
+        return handle_governance_explain(rule_id)
 
     # agent-runtime 整合工具 (调 executor 核心 API, 消除 cockpit 壳层)
     @mcp.tool()
@@ -448,6 +487,8 @@ def main():
             "runtime_brief",
             "runtime_kv_get",
             "runtime_governance_preflight",
+            "runtime_governance_guardrails",
+            "runtime_governance_explain",
             "runtime_agent_list_tools",
             "runtime_agent_list",
             "runtime_agent_status",

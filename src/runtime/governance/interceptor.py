@@ -106,6 +106,14 @@ class GovernanceInterceptor:
                     allowed = False
                     diag = self._build_diagnostic(v)
 
+            # 1c. Anti-Escape check for Shell scripts written to disk
+            elif target_file.endswith((".sh", ".bash", ".zsh")):
+                cmd_res = self.command_inspector.inspect_command(code_content)
+                if not cmd_res.passed:
+                    v = cmd_res.violations[0]
+                    allowed = False
+                    diag = self._build_diagnostic(v)
+
         # 2. Shell command execution inspection
         elif tool_name in ("run_command", "execute_command"):
             command_line = str(
@@ -170,9 +178,46 @@ class GovernanceInterceptor:
                 remediation=v["remediation"],
             )
 
+    def get_guardrail_prompt(
+        self, domain: str = "default", layer: str = "L3", max_rules: int = 5
+    ) -> str:
+        """Synthesize active MOF guardrail block for Agent System Prompts."""
+        try:
+            from ecos.ssot.compiler.context_synthesizer import MOFContextSynthesizer
+
+            return MOFContextSynthesizer().synthesize_guardrails(
+                domain=domain, layer=layer, max_rules=max_rules
+            )
+        except ImportError:
+            return (
+                f'<mof_architecture_guardrails domain="{domain}" layer="{layer}">\n'
+                "- [E-L0-002: REQUIRED] 禁止跨层直接 import 私有模块，跨域必须通过 agora.client 统一路由。\n"
+                "- [E-CMD-001: REQUIRED] 禁止使用 pip install -g/--user 等全局污染命令，依赖必须使用 uv 管理。\n"
+                "- [E-PATH-001: REQUIRED] 文件写操作必须局限于当前 Domain 目录与指定公开产物路径。\n"
+                "</mof_architecture_guardrails>"
+            )
+
+    def explain_rule(self, rule_id: str) -> dict[str, Any]:
+        """Provide detailed rule explanation, motivation, and code recipe."""
+        try:
+            from ecos.ssot.compiler.context_synthesizer import MOFContextSynthesizer
+
+            res = MOFContextSynthesizer().explain_rule(rule_id)
+            if res:
+                return res
+        except ImportError:
+            pass
+        return {
+            "rule_id": rule_id,
+            "violation_code": rule_id,
+            "severity": "required",
+            "summary": "MOF L0 架构约束规则",
+            "remediation": "请遵循 L0 架构规范，使用标准 Agora 契约路由",
+        }
+
     @staticmethod
     def _build_diagnostic(v: Any) -> dict[str, Any]:
-        return {
+        diag: dict[str, Any] = {
             "status": "REJECTED",
             "error_type": "MOF_CONSTRAINT_VIOLATION",
             "violation": {
@@ -186,6 +231,10 @@ class GovernanceInterceptor:
                 "offending_symbol": getattr(v, "offending_symbol", None),
             },
         }
+        patch = getattr(v, "suggested_patch", None)
+        if patch is not None:
+            diag["violation"]["suggested_patch"] = patch
+        return diag
 
 
 # ── Standalone Fallbacks ──
