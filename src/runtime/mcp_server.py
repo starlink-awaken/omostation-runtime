@@ -498,6 +498,64 @@ def handle_pitfall_check(path: str = ".") -> dict:
         return {"error": f"{type(e).__name__}: {e}"}
 
 
+def handle_intent_compile(prompt: str, domain: str = "auto") -> dict:
+    """runtime_intent_compile: 将自然语言意图编译为 Policy/Fact/DAG 执行规格 (ADR-0195)."""
+    try:
+        _ensure_ecos_path()
+        from ecos.ssot.compiler.intent_compiler import IntentSpecCompiler
+
+        compiler = IntentSpecCompiler()
+        spec = compiler.compile(prompt, domain=domain)
+        return spec.to_dict()
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+def handle_shadow_challenge(text_or_file: str, domain: str = "auto", auto_patch: bool = True) -> dict:
+    """runtime_shadow_challenge: 针对方案或草稿执行影子红蓝对抗审议并自动打补丁 (ADR-0196)."""
+    try:
+        _ensure_ecos_path()
+        from ecos.ssot.compiler.shadow_challenger import ShadowChallenger
+
+        challenger = ShadowChallenger()
+        p = Path(text_or_file).expanduser().resolve()
+        if p.exists() and p.is_file():
+            report = challenger.challenge_file(p, domain=domain, auto_patch=auto_patch)
+        else:
+            report = challenger.challenge_text(text_or_file, domain=domain, auto_patch=auto_patch)
+        return report.to_dict()
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+def handle_cartridge_list() -> dict:
+    """runtime_cartridge_list: 列出所有已注册的长尾领域治理卡带 (ADR-0198)."""
+    try:
+        _ensure_ecos_path()
+        from ecos.ssot.compiler.domain_cartridge import DomainCartridgeManager
+
+        manager = DomainCartridgeManager()
+        cartridges = manager.list_cartridges()
+        return {"cartridges_count": len(cartridges), "cartridges": [c.to_dict() for c in cartridges]}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+def handle_cartridge_inspect(cartridge_id: str) -> dict:
+    """runtime_cartridge_inspect: 深度读取指定领域卡带的 Policy 与 SOP 规格 (ADR-0198)."""
+    try:
+        _ensure_ecos_path()
+        from ecos.ssot.compiler.domain_cartridge import DomainCartridgeManager
+
+        manager = DomainCartridgeManager()
+        c = manager.get_cartridge(cartridge_id)
+        if not c:
+            return {"error": f"Cartridge '{cartridge_id}' not found"}
+        return {"cartridge_id": cartridge_id, "data": c}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
 # ── FastMCP server ──────────────────────────────────────────────────────────
 
 try:
@@ -569,6 +627,22 @@ try:
     @mcp.tool()
     def runtime_pitfall_check(path: str = ".") -> dict:
         return handle_pitfall_check(path)
+
+    @mcp.tool()
+    def runtime_intent_compile(prompt: str, domain: str = "auto") -> dict:
+        return handle_intent_compile(prompt, domain)
+
+    @mcp.tool()
+    def runtime_shadow_challenge(text_or_file: str, domain: str = "auto", auto_patch: bool = True) -> dict:
+        return handle_shadow_challenge(text_or_file, domain, auto_patch)
+
+    @mcp.tool()
+    def runtime_cartridge_list() -> dict:
+        return handle_cartridge_list()
+
+    @mcp.tool()
+    def runtime_cartridge_inspect(cartridge_id: str) -> dict:
+        return handle_cartridge_inspect(cartridge_id)
 
     # agent-runtime 整合工具 (调 executor 核心 API, 消除 cockpit 壳层)
     @mcp.tool()
