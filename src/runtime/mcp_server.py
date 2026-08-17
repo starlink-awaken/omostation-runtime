@@ -436,6 +436,66 @@ def handle_documents_audit(path: str = "~/Documents", domain: str = "default") -
         }
     except Exception as e:  # noqa: BLE001
         return {"error": f"{type(e).__name__}: {e}"}
+def _ensure_ecos_path() -> None:
+    import sys
+
+    ecos_src = Path(__file__).resolve().parent.parent.parent.parent / "ecos" / "src"
+    if ecos_src.exists() and str(ecos_src) not in sys.path:
+        sys.path.insert(0, str(ecos_src))
+
+
+def handle_domain_compliance_audit(target_text_or_path: str, domain: str = "auto") -> dict:
+    """runtime_domain_compliance_audit: 审查业务规划、需求方案或文本的领域政策红线合规性 (ADR-0193)."""
+    try:
+        _ensure_ecos_path()
+        from ecos.ssot.compiler.policy_inspector import PolicyComplianceInspector
+
+        inspector = PolicyComplianceInspector()
+        p = Path(target_text_or_path).expanduser().resolve()
+        if p.exists() and p.is_file():
+            report = inspector.audit_file(p, domain=domain)
+        else:
+            report = inspector.audit_text(target_text_or_path, domain=domain)
+        return report.to_dict()
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+def handle_pitfall_check(path: str = ".") -> dict:
+    """runtime_pitfall_check: 静态扫描代码与配置文件中的已知架构反模式与踩坑特征 (ADR-0194)."""
+    try:
+        _ensure_ecos_path()
+        from ecos.ssot.compiler.pitfall_inspector import PitfallInspector
+
+        inspector = PitfallInspector()
+        target = Path(path).expanduser().resolve()
+        matches = []
+        if target.is_file():
+            res = inspector.scan_file(target)
+            matches.extend(res.matches)
+        elif target.is_dir():
+            for f in target.rglob("*.py"):
+                res = inspector.scan_file(f)
+                matches.extend(res.matches)
+        return {
+            "target": str(target),
+            "total_matches": len(matches),
+            "passed": len(matches) == 0,
+            "matches": [
+                {
+                    "pitfall_id": m.pitfall_id,
+                    "title": m.title,
+                    "severity": m.severity,
+                    "line": m.line_number,
+                    "snippet": m.matched_snippet,
+                    "lesson": m.lesson,
+                    "recipe": m.recipe,
+                }
+                for m in matches
+            ],
+        }
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 # ── FastMCP server ──────────────────────────────────────────────────────────
@@ -502,6 +562,14 @@ try:
     def runtime_documents_audit(path: str = "~/Documents", domain: str = "default") -> dict:
         return handle_documents_audit(path, domain)
 
+    @mcp.tool()
+    def runtime_domain_compliance_audit(target_text_or_path: str, domain: str = "auto") -> dict:
+        return handle_domain_compliance_audit(target_text_or_path, domain)
+
+    @mcp.tool()
+    def runtime_pitfall_check(path: str = ".") -> dict:
+        return handle_pitfall_check(path)
+
     # agent-runtime 整合工具 (调 executor 核心 API, 消除 cockpit 壳层)
     @mcp.tool()
     def runtime_agent_list_tools() -> dict:
@@ -560,6 +628,8 @@ def main():
             "ontology": handle_ontology,
             "brief": handle_brief,
             "documents_guardrails": handle_documents_guardrails,
+            "domain_compliance": lambda: handle_domain_compliance_audit("医疗平台预算1000万无专家论证", "work-weijian"),
+            "pitfall_check": handle_pitfall_check,
         }
         handler = handlers.get(args.test)
         if handler:
@@ -582,6 +652,8 @@ def main():
             "runtime_governance_explain",
             "runtime_documents_guardrails",
             "runtime_documents_audit",
+            "runtime_domain_compliance_audit",
+            "runtime_pitfall_check",
             "runtime_agent_list_tools",
             "runtime_agent_list",
             "runtime_agent_status",
