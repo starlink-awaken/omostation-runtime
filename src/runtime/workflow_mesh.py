@@ -8,7 +8,7 @@ Runtime 不依赖 OMO 的存储实现，只负责在被注入 sink 时产生稳�
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -29,11 +29,10 @@ def new_workflow_event(
         "event_type": event_type,
         "trace_id": trace_id or workflow_run_id,
         "workflow_run_id": workflow_run_id,
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "occurred_at": datetime.now(UTC).isoformat(),
         "producer": "runtime",
         "schema_version": "workflow-mesh/v1",
-        "idempotency_key": idempotency_key
-        or f"{workflow_run_id}:{event_type}:{step_run_id}",
+        "idempotency_key": idempotency_key or f"{workflow_run_id}:{event_type}:{step_run_id}",
         "payload": event_payload,
     }
 

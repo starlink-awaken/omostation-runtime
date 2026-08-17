@@ -61,11 +61,7 @@ def _resolve_llm_provider_and_model(
         route_role_request,  # type: ignore[reportMissingImports]
     )
 
-    providers = [
-        provider
-        for provider in detect_backends()
-        if getattr(provider, "provider_name", "") != "none"
-    ]
+    providers = [provider for provider in detect_backends() if getattr(provider, "provider_name", "") != "none"]
     route_role = _runtime_role_for_llm(tools)
     required_capabilities = _runtime_required_capabilities(tools)
     route_info: dict[str, Any] = {
@@ -80,9 +76,7 @@ def _resolve_llm_provider_and_model(
         return None, None, route_info
 
     providers_by_name = {provider.provider_name: provider for provider in providers}
-    selection = route_role_request(
-        route_role, required_capabilities=required_capabilities
-    )
+    selection = route_role_request(route_role, required_capabilities=required_capabilities)
     if selection is not None:
         route_info["selected_provider"] = selection.provider_name
         route_info["selected_model"] = selection.model.id
@@ -102,11 +96,7 @@ def _resolve_llm_provider_and_model(
         route_info["fallback_provider"] = provider.provider_name
         route_info["fallback_model"] = getattr(provider, "default_model", None)
 
-    explicit_model = (
-        requested_model
-        if requested_model and requested_model != DEFAULT_MODEL
-        else None
-    )
+    explicit_model = requested_model if requested_model and requested_model != DEFAULT_MODEL else None
     if explicit_model:
         route_info["explicit_model_override"] = explicit_model
         if "/" in explicit_model:
@@ -142,9 +132,7 @@ def _maybe_enforce_budget(
     context = request_context or {}
 
     # Extract budget from context or environment
-    raw_val = context.get("llm_budget_usd") or os.environ.get(
-        "RUNTIME_LLM_BUDGET_USD", ""
-    )
+    raw_val = context.get("llm_budget_usd") or os.environ.get("RUNTIME_LLM_BUDGET_USD", "")
     raw_budget = raw_val.strip() if isinstance(raw_val, str) else raw_val
 
     task_id = str(context.get("task_id") or "runtime-task")
@@ -162,28 +150,18 @@ def _maybe_enforce_budget(
             input_tokens=input_tokens,
             max_output_tokens=max_output_tokens,
             task_id=task_id,
-            local_budget_limit=float(raw_budget)
-            if raw_budget not in ("", None)
-            else None,
+            local_budget_limit=float(raw_budget) if raw_budget not in ("", None) else None,
         )
     except BudgetExhaustedError as e:
         import re
 
-        suffix = (
-            re.sub(r"[^A-Za-z0-9]+", "-", task_id).strip("-").upper()[:48] or "UNNAMED"
-        )
+        suffix = re.sub(r"[^A-Za-z0-9]+", "-", task_id).strip("-").upper()[:48] or "UNNAMED"
         route_info["budget_policy"] = {
             "task_id": e.task_id or task_id,
             "budget_usd": e.cap,
             "estimated_cost_usd": e.spent,
             "model": registry_model_id,
-            "debt_path": str(
-                WORKSPACE
-                / ".omo"
-                / "debt"
-                / "items"
-                / f"DEBT-OPC-P4-BUDGET-{suffix}.yaml"
-            ),
+            "debt_path": str(WORKSPACE / ".omo" / "debt" / "items" / f"DEBT-OPC-P4-BUDGET-{suffix}.yaml"),
         }
         return {
             "role": "assistant",
@@ -199,9 +177,7 @@ def _maybe_enforce_budget(
     return None
 
 
-def _log_execution(
-    task_id: str, status: str, summary: str, result: dict, duration_sec: float
-):
+def _log_execution(task_id: str, status: str, summary: str, result: dict, duration_sec: float):
     """写入执行日志到 JSONL 文件。R51 P0: AppendOnlyLog.append() 替换裸 open()"""
     entry = {
         # Python 3.14 isoformat() 返回 +00:00 而非 Z，用 strftime 硬编码 Z
@@ -274,9 +250,7 @@ class AgentRuntime:
             ToolSchema,
         )
 
-        provider, requested_model, route_info = _resolve_llm_provider_and_model(
-            self.model, tools=tools
-        )
+        provider, requested_model, route_info = _resolve_llm_provider_and_model(self.model, tools=tools)
         if provider is None:
             return {
                 "role": "assistant",
@@ -344,8 +318,7 @@ class AgentRuntime:
                 usage = {
                     "prompt_tokens": getattr(resp, "input_tokens", 0),
                     "completion_tokens": getattr(resp, "output_tokens", 0),
-                    "total_tokens": getattr(resp, "input_tokens", 0)
-                    + getattr(resp, "output_tokens", 0),
+                    "total_tokens": getattr(resp, "input_tokens", 0) + getattr(resp, "output_tokens", 0),
                 }
 
             model_id = f"{getattr(resp, 'provider', getattr(provider, 'provider_name', ''))}/{getattr(resp, 'model', req.model or '')}"
@@ -367,9 +340,7 @@ class AgentRuntime:
             record_llm_audit(
                 task_id=task_id,
                 role=route_info.get("role", "operator"),
-                provider=getattr(
-                    resp, "provider", getattr(provider, "provider_name", "")
-                ),
+                provider=getattr(resp, "provider", getattr(provider, "provider_name", "")),
                 model=getattr(resp, "model", req.model or ""),
                 input_tokens=int(usage.get("prompt_tokens", 0)),
                 output_tokens=int(usage.get("completion_tokens", 0)),
@@ -385,9 +356,7 @@ class AgentRuntime:
                 "tool_calls": [],
                 "finish_reason": getattr(resp, "finish_reason", "stop") or "stop",
                 "usage": usage,
-                "provider": getattr(
-                    resp, "provider", getattr(provider, "provider_name", "")
-                ),
+                "provider": getattr(resp, "provider", getattr(provider, "provider_name", "")),
                 "model": getattr(resp, "model", req.model or ""),
                 "route": route_info,
                 "audit": {
@@ -544,11 +513,7 @@ class AgentRuntime:
         log.info(f"🎯 Task starting (model={self.model})")
 
         mesh_errors: list[str] = []
-        run_id = (
-            workflow_run_id
-            or (context or {}).get("workflow_run_id")
-            or os.environ.get("WORKFLOW_RUN_ID")
-        )
+        run_id = workflow_run_id or (context or {}).get("workflow_run_id") or os.environ.get("WORKFLOW_RUN_ID")
         grant = admission or (context or {}).get("admission")
         if grant is None:
             raw_grant = os.environ.get("WORKFLOW_ADMISSION")
@@ -565,12 +530,7 @@ class AgentRuntime:
             run_id = grant.get("workflow_run_id")
         if event_sink is not None and not run_id:
             run_id = f"runtime-{uuid4().hex[:12]}"
-        run_trace_id = (
-            trace_id
-            or (context or {}).get("trace_id")
-            or os.environ.get("TRACE_ID")
-            or run_id
-        )
+        run_trace_id = trace_id or (context or {}).get("trace_id") or os.environ.get("TRACE_ID") or run_id
         base_step_run_id = f"{run_id}:runtime" if run_id else None
         if run_id is not None:
             try:
@@ -719,39 +679,23 @@ class AgentRuntime:
 
         max_turns = 30
         retry_max_attempts = max(1, int((retry_policy or {}).get("max_attempts", 1)))
-        retry_backoff_seconds = max(
-            0.0, float((retry_policy or {}).get("backoff_seconds", 0.0))
-        )
+        retry_backoff_seconds = max(0.0, float((retry_policy or {}).get("backoff_seconds", 0.0)))
         retry_count = 0
-        all_tool_calls: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("tool_calls", [])
-        )
-        effect_outcomes: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("effect_outcomes", [])
-        )
-        effect_receipts: list[dict[str, Any]] = list(
-            (checkpoint or {}).get("state", {}).get("effect_receipts", [])
-        )
+        all_tool_calls: list[dict[str, Any]] = list((checkpoint or {}).get("state", {}).get("tool_calls", []))
+        effect_outcomes: list[dict[str, Any]] = list((checkpoint or {}).get("state", {}).get("effect_outcomes", []))
+        effect_receipts: list[dict[str, Any]] = list((checkpoint or {}).get("state", {}).get("effect_receipts", []))
         usage = dict((checkpoint or {}).get("state", {}).get("usage", {}))
         start_turn = int((checkpoint or {}).get("next_turn", 0))
 
         def remember_effect(payload: dict[str, Any]) -> None:
             """Keep one latest safe summary per effect key in resumable state."""
             key = payload.get("effect_key")
-            effect_outcomes[:] = [
-                existing
-                for existing in effect_outcomes
-                if existing.get("effect_key") != key
-            ]
+            effect_outcomes[:] = [existing for existing in effect_outcomes if existing.get("effect_key") != key]
             effect_outcomes.append(payload)
 
         def remember_receipt(receipt: dict[str, Any]) -> None:
             receipt_id = receipt.get("receipt_id")
-            effect_receipts[:] = [
-                existing
-                for existing in effect_receipts
-                if existing.get("receipt_id") != receipt_id
-            ]
+            effect_receipts[:] = [existing for existing in effect_receipts if existing.get("receipt_id") != receipt_id]
             effect_receipts.append(receipt)
 
         for turn in range(start_turn, max_turns):
@@ -840,9 +784,7 @@ class AgentRuntime:
 
             if finish == "stop" or not tcs:
                 result = response.get("content", "")
-                log.info(
-                    f"✅ Task done (turn={turn + 1}, tokens={usage.get('total_tokens', '?')})"
-                )
+                log.info(f"✅ Task done (turn={turn + 1}, tokens={usage.get('total_tokens', '?')})")
                 emit(
                     "CheckpointSaved",
                     {
@@ -913,23 +855,13 @@ class AgentRuntime:
                         tool_name = tc.get("function", {}).get("name", "tool")
                         receipt = effect_outcome.external_receipt(
                             trace_id=run_trace_id or effect_key,
-                            resource_id=str(
-                                (context or {}).get(
-                                    "resource_id", f"runtime-tool:{tool_name}"
-                                )
-                            ),
+                            resource_id=str((context or {}).get("resource_id", f"runtime-tool:{tool_name}")),
                             operation=str((context or {}).get("operation", tool_name)),
-                            provenance_ref=str(
-                                (context or {}).get(
-                                    "provenance_ref", f"runtime://effect/{effect_key}"
-                                )
-                            ),
+                            provenance_ref=str((context or {}).get("provenance_ref", f"runtime://effect/{effect_key}")),
                             policy_digest=str(
                                 (context or {}).get(
                                     "policy_digest",
-                                    (grant or {}).get(
-                                        "policy_digest", "runtime-effect/v1"
-                                    )
+                                    (grant or {}).get("policy_digest", "runtime-effect/v1")
                                     if isinstance(grant, dict)
                                     else "runtime-effect/v1",
                                 )
@@ -942,10 +874,7 @@ class AgentRuntime:
                             "role": "tool",
                             "tool_call_id": tc.get("id", ""),
                             "content": json.dumps(
-                                {
-                                    "error_code": effect_outcome.error_code
-                                    or "EFFECT_EXECUTION_FAILED"
-                                },
+                                {"error_code": effect_outcome.error_code or "EFFECT_EXECUTION_FAILED"},
                                 ensure_ascii=False,
                             ),
                         }

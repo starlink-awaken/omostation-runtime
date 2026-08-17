@@ -15,7 +15,7 @@ import json
 import re
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from http.cookiejar import CookieJar
 from pathlib import Path
 
@@ -33,11 +33,11 @@ def perform_seeyon_login() -> tuple[urllib.request.OpenerDirector | None, str]:
     """物理自动向致远 OA 发起登录报文，建立带 Cookie 的 Session."""
     cookie_jar = CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
-    
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Content-Type": "application/x-www-form-urlencoded",
-        "Referer": SEEYON_MAIN_URL
+        "Referer": SEEYON_MAIN_URL,
     }
 
     try:
@@ -47,11 +47,9 @@ def perform_seeyon_login() -> tuple[urllib.request.OpenerDirector | None, str]:
     except Exception as e:  # noqa: BLE001
         return None, f"网络访问异常: {e}"
 
-    login_data = urllib.parse.urlencode({
-        "login_username": USERNAME,
-        "login_password": PASSWORD,
-        "authorization": ""
-    }).encode("utf-8")
+    login_data = urllib.parse.urlencode(
+        {"login_username": USERNAME, "login_password": PASSWORD, "authorization": ""}
+    ).encode("utf-8")
 
     try:
         req_post = urllib.request.Request(SEEYON_LOGIN_URL, data=login_data, headers=headers)
@@ -72,7 +70,7 @@ def fetch_seeyon_real_pending_documents(opener: urllib.request.OpenerDirector) -
     pending_url = f"{SEEYON_BASE_URL}/collaboration/collaboration.do?method=listPending"
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        "Referer": SEEYON_MAIN_URL
+        "Referer": SEEYON_MAIN_URL,
     }
 
     try:
@@ -80,27 +78,29 @@ def fetch_seeyon_real_pending_documents(opener: urllib.request.OpenerDirector) -
         res = opener.open(req, timeout=8)
         html = res.read().decode("utf-8", errors="ignore")
 
-        match = re.search(r'\$\.ctx\.fillmaps\s*=\s*(\{.*?\});', html, re.DOTALL)
+        match = re.search(r"\$\.ctx\.fillmaps\s*=\s*(\{.*?\});", html, re.DOTALL)
         if match:
             json_str = match.group(1)
             data_obj = json.loads(json_str)
             pending_list = data_obj.get("listPending", {}).get("data", [])
-            
+
             for item in pending_list:
                 subject = item.get("subject", "").strip()
                 start_member = item.get("startMemberName", "未知发件人").strip()
                 node_name = item.get("nodeName", "协同/待办").strip()
                 affair_id = item.get("affairId", "")
                 summary_id = item.get("summaryId", "")
-                
+
                 if subject:
-                    items.append({
-                        "subject": subject,
-                        "sender": start_member,
-                        "node": node_name,
-                        "affair_id": str(affair_id),
-                        "summary_id": str(summary_id)
-                    })
+                    items.append(
+                        {
+                            "subject": subject,
+                            "sender": start_member,
+                            "node": node_name,
+                            "affair_id": str(affair_id),
+                            "summary_id": str(summary_id),
+                        }
+                    )
     except Exception as e:  # noqa: BLE001
         print(f"⚠️ 解析致远 OA 真实公文节点异常: {e}")
 
@@ -111,7 +111,7 @@ def run_seeyon_auto_login_pipeline() -> bool:
     print("🏛️ [Seeyon Real Document Engine] 启动致远 OA (10.216.16.151) 账号 [夏明星] 真实待办公文提取流水线...")
 
     opener, status = perform_seeyon_login()
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
     if opener and status == "LOGIN_SUCCESS":
         tasks = fetch_seeyon_real_pending_documents(opener)
@@ -119,9 +119,9 @@ def run_seeyon_auto_login_pipeline() -> bool:
         lines = [
             f"# 致远 OA (10.216.16.151) 账号 [夏明星] 真实待办公文与批示通知 — {now_str}\n\n",
             "> 数据源: 致远 OA 协同办公系统 (物理全自动登录 $.ctx.fillmaps 节点解密)\n",
-            f"> 提取时间: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
+            f"> 提取时间: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n",
         ]
-        
+
         for idx, t in enumerate(tasks, 1):
             lines.append(f"### 待办公文 {idx}: {t['subject']}\n")
             lines.append(f"- **发起人/拟稿**: `{t['sender']}`\n")

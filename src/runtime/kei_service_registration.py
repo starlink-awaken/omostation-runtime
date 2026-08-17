@@ -16,7 +16,7 @@ Usage:
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -70,7 +70,7 @@ def _audit(action: str, status: str, details: str) -> None:
     audit_dir.mkdir(parents=True, exist_ok=True)
     audit_file = audit_dir / "kei-service-registration.jsonl"
     record = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "action": action,
         "extension_id": EXTENSION_ID,
         "status": status,
@@ -107,41 +107,33 @@ def validate_service_entry(entry: dict, source: str = "unknown") -> dict:
         result["errors"].append("Service entry missing required 'name' field")
         result["valid"] = False
     elif not isinstance(name, str) or not re.match(r"^[a-zA-Z0-9._-]+$", name):
-        result["errors"].append(
-            f"Service name '{name}' contains invalid characters (use [a-zA-Z0-9._-])"
-        )
+        result["errors"].append(f"Service name '{name}' contains invalid characters (use [a-zA-Z0-9._-])")
         result["valid"] = False
 
     # Check required fields
     for field in REQUIRED_SERVICE_FIELDS:
         if field not in entry or entry[field] is None:
-            result["errors"].append(
-                f"Service '{name or '?'}' missing required field: {field}"
-            )
+            result["errors"].append(f"Service '{name or '?'}' missing required field: {field}")
             result["valid"] = False
 
     # Validate type
     svc_type = entry.get("type", "")
     if svc_type and svc_type not in VALID_TYPES:
         result["warnings"].append(
-            f"Service '{name}' has unrecognized type '{svc_type}'. "
-            f"Valid types: {', '.join(sorted(VALID_TYPES))}"
+            f"Service '{name}' has unrecognized type '{svc_type}'. Valid types: {', '.join(sorted(VALID_TYPES))}"
         )
 
     # Validate status
     status = entry.get("status", "")
     if status and status not in VALID_STATUSES:
         result["warnings"].append(
-            f"Service '{name}' has unrecognized status '{status}'. "
-            f"Valid statuses: {', '.join(sorted(VALID_STATUSES))}"
+            f"Service '{name}' has unrecognized status '{status}'. Valid statuses: {', '.join(sorted(VALID_STATUSES))}"
         )
 
     # Warn about missing recommended fields
     for field in RECOMMENDED_SERVICE_FIELDS:
         if field not in entry or entry[field] is None:
-            result["warnings"].append(
-                f"Service '{name}' missing recommended field: {field}"
-            )
+            result["warnings"].append(f"Service '{name}' missing recommended field: {field}")
 
     # Validate port format if provided
     port = entry.get("port")
@@ -149,15 +141,11 @@ def validate_service_entry(entry: dict, source: str = "unknown") -> dict:
         try:
             p = int(port)
             if p < 1 or p > 65535:
-                result["errors"].append(
-                    f"Service '{name}' has invalid port {port} (must be 1-65535)"
-                )
+                result["errors"].append(f"Service '{name}' has invalid port {port} (must be 1-65535)")
                 result["valid"] = False
         except (ValueError, TypeError):
             if port is not None and port != "null":
-                result["warnings"].append(
-                    f"Service '{name}' has non-numeric port '{port}'"
-                )
+                result["warnings"].append(f"Service '{name}' has non-numeric port '{port}'")
 
     # Log audit
     if result["valid"]:
@@ -347,7 +335,7 @@ def validate_all() -> dict:
         dict with overall validation result.
     """
     results = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "extension_id": EXTENSION_ID,
         "extension_version": EXTENSION_VERSION,
         "matrix_yaml": None,
@@ -372,9 +360,7 @@ def validate_all() -> dict:
     if MATRIX_D_DIR.exists():
         md_result = validate_matrix_d()
         results["matrix_d"] = md_result
-        results["total_services"] += sum(
-            fr.get("service_count", 0) for fr in md_result.get("file_results", [])
-        )
+        results["total_services"] += sum(fr.get("service_count", 0) for fr in md_result.get("file_results", []))
         if not md_result["valid"]:
             results["overall_valid"] = False
             results["total_errors"] += len(md_result["errors"])
@@ -405,9 +391,7 @@ def main():
     """CLI entry point for manual validation."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="KEI Service Registration — validate matrix.yaml/d entries"
-    )
+    parser = argparse.ArgumentParser(description="KEI Service Registration — validate matrix.yaml/d entries")
     parser.add_argument(
         "files",
         nargs="*",

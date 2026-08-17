@@ -35,13 +35,9 @@ _EVIDENCE_PROJECTIONS = frozenset(
         "sanyi-status-consistency-v1",
     }
 )
-_KEMS_CHECK_SCOPES = frozenset(
-    {"inbox", "knowledge", "entities", "control", "buffer_inbox"}
-)
+_KEMS_CHECK_SCOPES = frozenset({"inbox", "knowledge", "entities", "control", "buffer_inbox"})
 _CONTROL_HEALTH_STATUSES = frozenset({"ok", "attention", "critical", "invalid"})
-_FACTS_VIEW_STATUSES = frozenset(
-    {"current", "stale_30d", "stale_60d", "missing", "invalid"}
-)
+_FACTS_VIEW_STATUSES = frozenset({"current", "stale_30d", "stale_60d", "missing", "invalid"})
 _MODEL_FRESHNESS_STATUSES = frozenset({"ok", "attention", "unavailable"})
 _MODEL_FRESHNESS_ERRORS = frozenset(
     {
@@ -104,9 +100,7 @@ _MODEL_FRESHNESS_DIRECTORY_ERRORS = frozenset(
         "models_directory_empty",
     }
 )
-_MODEL_FRESHNESS_REVIEWED_ERRORS = frozenset(
-    {"model_last_reviewed_missing", "model_last_reviewed_invalid"}
-)
+_MODEL_FRESHNESS_REVIEWED_ERRORS = frozenset({"model_last_reviewed_missing", "model_last_reviewed_invalid"})
 _CONTROLLER_SHADOW_LEGACY_RULE_IDS = (
     "CR01",
     "CR02",
@@ -122,9 +116,7 @@ _CONTROLLER_SHADOW_LEGACY_RULE_IDS = (
 )
 _CONTROLLER_SHADOW_OBSERVED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
 _CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS = tuple(
-    rule_id
-    for rule_id in _CONTROLLER_SHADOW_LEGACY_RULE_IDS
-    if rule_id not in _CONTROLLER_SHADOW_OBSERVED_RULE_IDS
+    rule_id for rule_id in _CONTROLLER_SHADOW_LEGACY_RULE_IDS if rule_id not in _CONTROLLER_SHADOW_OBSERVED_RULE_IDS
 )
 
 
@@ -164,9 +156,7 @@ class JobResult:
 
     def as_dict(self) -> dict[str, object]:
         result = asdict(self)
-        result["evidence_path"] = (
-            str(self.evidence_path) if self.evidence_path else None
-        )
+        result["evidence_path"] = str(self.evidence_path) if self.evidence_path else None
         result["status"] = self.status
         return result
 
@@ -200,9 +190,7 @@ class JobRegistry:
         try:
             return self._jobs[job_id]
         except KeyError as exc:
-            raise ValueError(
-                f"Documents-plane job is not registered: {job_id}"
-            ) from exc
+            raise ValueError(f"Documents-plane job is not registered: {job_id}") from exc
 
 
 def _validate_spec(spec: JobSpec) -> None:
@@ -246,9 +234,7 @@ def _evidence_path(state_root: Path, spec: JobSpec) -> Path:
     return state_root / "control" / "evidence" / spec.job_id / spec.evidence_path
 
 
-def _validate_job_paths(
-    spec: JobSpec, *, documents_root: Path, state_root: Path
-) -> None:
+def _validate_job_paths(spec: JobSpec, *, documents_root: Path, state_root: Path) -> None:
     for read_path in spec.reads:
         if read_path != ".":
             resolve_documents_read_path(documents_root, read_path)
@@ -300,9 +286,7 @@ def _prepare_private_layout(state_root: Path, spec: JobSpec) -> _PrivateLayout:
                 os.close(runs_fd)
             finally:
                 os.close(control_fd)
-            evidence_parent_fd, evidence_name = _open_relative_parent(
-                job_evidence_fd, Path(spec.evidence_path)
-            )
+            evidence_parent_fd, evidence_name = _open_relative_parent(job_evidence_fd, Path(spec.evidence_path))
             os.close(job_evidence_fd)
             job_evidence_fd = None
 
@@ -364,12 +348,7 @@ def _facts_audit_evidence(stdout: str) -> dict[str, object]:
 
     normalized_types: dict[str, int] = {}
     for fact_type, count in by_type.items():
-        if (
-            not isinstance(fact_type, str)
-            or not isinstance(count, int)
-            or isinstance(count, bool)
-            or count < 0
-        ):
+        if not isinstance(fact_type, str) or not isinstance(count, int) or isinstance(count, bool) or count < 0:
             raise ValueError("facts-audit evidence has an invalid schema")
         normalized_types[fact_type] = count
     if sum(normalized_types.values()) != facts_total:
@@ -400,10 +379,7 @@ def _kems_check_evidence(stdout: str) -> dict[str, object]:
         or status not in {"ok", "changed"}
         or baseline not in {"initialized", "existing"}
         or not isinstance(changed_scopes, list)
-        or not all(
-            isinstance(scope, str) and scope in _KEMS_CHECK_SCOPES
-            for scope in changed_scopes
-        )
+        or not all(isinstance(scope, str) and scope in _KEMS_CHECK_SCOPES for scope in changed_scopes)
         or len(set(changed_scopes)) != len(changed_scopes)
     ):
         raise ValueError("KEMS check evidence has an invalid schema")
@@ -432,10 +408,7 @@ def _control_health_evidence(stdout: str) -> dict[str, object]:
         or payload.get("facts_view_status") not in _FACTS_VIEW_STATUSES
         or not isinstance(counts, dict)
         or set(counts) != {"red", "warning", "ok"}
-        or not all(
-            isinstance(count, int) and not isinstance(count, bool) and count >= 0
-            for count in counts.values()
-        )
+        or not all(isinstance(count, int) and not isinstance(count, bool) and count >= 0 for count in counts.values())
     ):
         raise ValueError("control-health evidence has an invalid schema")
     return {
@@ -463,16 +436,11 @@ def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
         or payload.get("legacy_controller_replaced") is not False
         or payload.get("cutover_ready") is not False
         or payload.get("legacy_rule_ids") != list(_CONTROLLER_SHADOW_LEGACY_RULE_IDS)
-        or payload.get("observed_rule_ids")
-        != list(_CONTROLLER_SHADOW_OBSERVED_RULE_IDS)
-        or payload.get("unobserved_rule_ids")
-        != list(_CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS)
+        or payload.get("observed_rule_ids") != list(_CONTROLLER_SHADOW_OBSERVED_RULE_IDS)
+        or payload.get("unobserved_rule_ids") != list(_CONTROLLER_SHADOW_UNOBSERVED_RULE_IDS)
         or not isinstance(counts, dict)
         or set(counts) != {"red", "warning", "ok"}
-        or not all(
-            isinstance(count, int) and not isinstance(count, bool) and count >= 0
-            for count in counts.values()
-        )
+        or not all(isinstance(count, int) and not isinstance(count, bool) and count >= 0 for count in counts.values())
         or not isinstance(freshness, dict)
         or set(freshness)
         != {
@@ -483,8 +451,7 @@ def _controller_shadow_evidence(stdout: str) -> dict[str, object]:
             "unreadable_regular_file_count",
         }
         or not all(
-            isinstance(count, int) and not isinstance(count, bool) and count >= 0
-            for count in freshness.values()
+            isinstance(count, int) and not isinstance(count, bool) and count >= 0 for count in freshness.values()
         )
     ):
         raise ValueError("controller shadow evidence has an invalid schema")
@@ -513,9 +480,7 @@ def _valid_iso_date(value: object, *, optional: bool = False) -> bool:
         return False
 
 
-def _unavailable_model_freshness_is_consistent(
-    payload: dict[str, object], error: object
-) -> bool:
+def _unavailable_model_freshness_is_consistent(payload: dict[str, object], error: object) -> bool:
     facts_reviewed = payload["facts_last_reviewed"]
     model_count = payload["model_markdown_count"]
     fresh_count = payload["fresh_model_count"]
@@ -523,11 +488,7 @@ def _unavailable_model_freshness_is_consistent(
     invalid_count = payload["invalid_reviewed_count"]
     unreadable_count = payload["unreadable_regular_file_count"]
     no_model_observation = (
-        model_count == 0
-        and fresh_count == 0
-        and stale_count == 0
-        and invalid_count == 0
-        and unreadable_count == 0
+        model_count == 0 and fresh_count == 0 and stale_count == 0 and invalid_count == 0 and unreadable_count == 0
     )
     if error in _MODEL_FRESHNESS_PRE_FACTS_ERRORS:
         return facts_reviewed is None and no_model_observation
@@ -599,17 +560,12 @@ def _model_freshness_evidence(stdout: str) -> dict[str, object]:
         or not _valid_iso_date(payload.get("checked_on"))
         or not _valid_iso_date(payload.get("facts_last_reviewed"), optional=True)
         or not all(
-            isinstance(payload.get(field), int)
-            and not isinstance(payload.get(field), bool)
-            and payload[field] >= 0
+            isinstance(payload.get(field), int) and not isinstance(payload.get(field), bool) and payload[field] >= 0
             for field in count_fields
         )
         or (status == "unavailable") != (error in _MODEL_FRESHNESS_ERRORS)
         or (status != "unavailable" and error is not None)
-        or (
-            status == "unavailable"
-            and not _unavailable_model_freshness_is_consistent(payload, error)
-        )
+        or (status == "unavailable" and not _unavailable_model_freshness_is_consistent(payload, error))
     ):
         raise ValueError("model-freshness evidence has an invalid schema")
     model_count = payload["model_markdown_count"]
@@ -732,9 +688,7 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _model_freshness_evidence(stdout)
     if spec.evidence_projection == "sanyi-status-consistency-v1":
         return _sanyi_status_evidence(stdout)
-    raise ValueError(
-        "job evidence projection is not supported"
-    )  # pragma: no cover - validated at registration
+    raise ValueError("job evidence projection is not supported")  # pragma: no cover - validated at registration
 
 
 def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
@@ -789,16 +743,12 @@ def _persist_evidence(layout: _PrivateLayout, result: JobResult) -> None:
         raise
 
 
-def _failure_result(
-    spec: JobSpec, error: OSError, *, owner_result: JobResult | None = None
-) -> JobResult:
+def _failure_result(spec: JobSpec, error: OSError, *, owner_result: JobResult | None = None) -> JobResult:
     message = str(error)
     if owner_result is not None and owner_result.exit_code != 0:
         return replace(owner_result, evidence_error=message)
     if owner_result is not None:
-        return replace(
-            owner_result, exit_code=_RUNTIME_IO_FAILURE, evidence_error=message
-        )
+        return replace(owner_result, exit_code=_RUNTIME_IO_FAILURE, evidence_error=message)
     return JobResult(
         spec.job_id,
         spec.owner,
@@ -823,14 +773,8 @@ def run_job(
     """Validate and invoke a registered owner without exposing Runtime control paths."""
     spec, command = registry.resolve(job_id)
     _validate_spec(spec)
-    documents = (
-        Path(documents_root).expanduser().resolve()
-        if documents_root
-        else documents_content_root()
-    )
-    state = (
-        Path(state_root).expanduser().resolve() if state_root else runtime_state_root()
-    )
+    documents = Path(documents_root).expanduser().resolve() if documents_root else documents_content_root()
+    state = Path(state_root).expanduser().resolve() if state_root else runtime_state_root()
     _validate_job_paths(spec, documents_root=documents, state_root=state)
     if dry_run:
         return JobResult(spec.job_id, spec.owner, True, 0, "", "", False, None)
@@ -870,9 +814,7 @@ def run_job(
             except (TypeError, ValueError) as exc:
                 result = replace(result, evidence_error=str(exc))
                 if command_result.exit_code == 0:
-                    result = _failure_result(
-                        spec, OSError(str(exc)), owner_result=result
-                    )
+                    result = _failure_result(spec, OSError(str(exc)), owner_result=result)
             else:
                 result = replace(result, evidence_summary=evidence_summary)
         try:
@@ -886,8 +828,6 @@ def run_job(
             close_error = exc
     if close_error is not None:
         return _failure_result(spec, close_error, owner_result=result)
-    if (
-        result is None
-    ):  # pragma: no cover - defensive; unexpected errors propagate above
+    if result is None:  # pragma: no cover - defensive; unexpected errors propagate above
         raise RuntimeError("owner execution completed without a result")
     return result

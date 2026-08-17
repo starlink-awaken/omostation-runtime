@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from runtime.registry.dispatch import (
     Dispatcher,
     TaskAssignment,
@@ -23,13 +24,24 @@ def dispatcher(store: RegistryStore) -> Dispatcher:
     return Dispatcher(store)
 
 
-def _reg(store: RegistryStore, agent_id: str, *, caps: list[str] | None = None,
-         status: AgentStatus = AgentStatus.IDLE, active: int = 0) -> None:
-    store.register_agent(AgentInfo(
-        agent_id=agent_id, name=agent_id,
-        capabilities=[Capability(name=c) for c in (caps or [])],
-        status=status, active_tasks=active, max_concurrency=2,
-    ))
+def _reg(
+    store: RegistryStore,
+    agent_id: str,
+    *,
+    caps: list[str] | None = None,
+    status: AgentStatus = AgentStatus.IDLE,
+    active: int = 0,
+) -> None:
+    store.register_agent(
+        AgentInfo(
+            agent_id=agent_id,
+            name=agent_id,
+            capabilities=[Capability(name=c) for c in (caps or [])],
+            status=status,
+            active_tasks=active,
+            max_concurrency=2,
+        )
+    )
 
 
 # ── TaskRequest / TaskAssignment ────────────────────────────────────────────

@@ -8,7 +8,7 @@ network requests, and sub-process execution, and writes audit records to a JSONL
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -35,7 +35,7 @@ def _load_kei_rules(config_path: str = "kei.yaml", role: str = "default") -> dic
                 "execution": {"allow_subprocess": False},
             },
         }
-    with open(path, "r") as f:
+    with open(path) as f:
         data = yaml.safe_load(f) or {}
 
     # Extract global permissions
@@ -60,13 +60,9 @@ _RULES = _load_kei_rules(
     os.environ.get("KEI_CONFIG_PATH", "kei.yaml"),
     os.environ.get("ECOS_EXECUTION_ROLE", "default"),
 )
-_workspace_root = (
-    Path(__file__).resolve().parents[4]
-)  # runtime/src/runtime/kei_sandbox.py → workspace root
+_workspace_root = Path(__file__).resolve().parents[4]  # runtime/src/runtime/kei_sandbox.py → workspace root
 _DEFAULT_AUDIT = _workspace_root / "runtime" / "data" / "kei_audit.jsonl"
-_AUDIT_FILE = Path(
-    os.environ.get("KEI_AUDIT_FILE", str(_DEFAULT_AUDIT))
-)  # Set by enable_sandbox()
+_AUDIT_FILE = Path(os.environ.get("KEI_AUDIT_FILE", str(_DEFAULT_AUDIT)))  # Set by enable_sandbox()
 _IN_AUDIT = False  # Recursion guard
 
 
@@ -85,7 +81,7 @@ def record_audit(action: str, extension_id: str, status: str, details: str) -> N
 
     _IN_AUDIT = True
     record = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "action": action,
         "extension_id": extension_id,
         "status": status,
@@ -115,13 +111,9 @@ def _audit_hook(event: str, args: tuple):
     if event == "subprocess.Popen":
         cmd = " ".join(str(a) for a in args[0]) if args else "unknown"
         if not perms.get("execution", {}).get("allow_subprocess", True):
-            record_audit(
-                "reject", "ecos.kernel.sandbox", "blocked", f"Subprocess blocked: {cmd}"
-            )
+            record_audit("reject", "ecos.kernel.sandbox", "blocked", f"Subprocess blocked: {cmd}")
             raise PermissionError("KEI Sandbox: subprocess execution is blocked.")
-        record_audit(
-            "execute", "ecos.kernel.sandbox", "pass", f"Subprocess allowed: {cmd}"
-        )
+        record_audit("execute", "ecos.kernel.sandbox", "pass", f"Subprocess allowed: {cmd}")
 
     elif event == "socket.connect":
         # args[0] is socket, args[1] is address (host, port)
@@ -135,9 +127,7 @@ def _audit_hook(event: str, args: tuple):
                     "blocked",
                     f"Network connection blocked to {host}",
                 )
-                raise PermissionError(
-                    f"KEI Sandbox: Network connection to {host} is blocked."
-                )
+                raise PermissionError(f"KEI Sandbox: Network connection to {host} is blocked.")
             record_audit(
                 "execute",
                 "ecos.kernel.sandbox",
@@ -163,9 +153,7 @@ def _audit_hook(event: str, args: tuple):
                         "blocked",
                         f"Write blocked: {file_path} (mode={mode})",
                     )
-                    raise PermissionError(
-                        f"KEI Sandbox: Write access to {file_path} is blocked."
-                    )
+                    raise PermissionError(f"KEI Sandbox: Write access to {file_path} is blocked.")
             record_audit(
                 "execute",
                 "ecos.kernel.sandbox",
@@ -184,34 +172,22 @@ def _audit_hook(event: str, args: tuple):
                         "blocked",
                         f"Read blocked: {file_path}",
                     )
-                    raise PermissionError(
-                        f"KEI Sandbox: Read access to {file_path} is blocked."
-                    )
-            record_audit(
-                "validate", "ecos.kernel.sandbox", "pass", f"Read allowed: {file_path}"
-            )
+                    raise PermissionError(f"KEI Sandbox: Read access to {file_path} is blocked.")
+            record_audit("validate", "ecos.kernel.sandbox", "pass", f"Read allowed: {file_path}")
 
     elif event == "os.system":
         cmd = str(args[0]) if args else "unknown"
         if not perms.get("execution", {}).get("allow_subprocess", True):
-            record_audit(
-                "reject", "ecos.kernel.sandbox", "blocked", f"os.system blocked: {cmd}"
-            )
+            record_audit("reject", "ecos.kernel.sandbox", "blocked", f"os.system blocked: {cmd}")
             raise PermissionError("KEI Sandbox: os.system execution is blocked.")
-        record_audit(
-            "execute", "ecos.kernel.sandbox", "pass", f"os.system allowed: {cmd}"
-        )
+        record_audit("execute", "ecos.kernel.sandbox", "pass", f"os.system allowed: {cmd}")
 
     elif event == "os.exec":
         cmd = " ".join(str(a) for a in args) if args else "unknown"
         if not perms.get("execution", {}).get("allow_subprocess", True):
-            record_audit(
-                "reject", "ecos.kernel.sandbox", "blocked", f"os.exec blocked: {cmd}"
-            )
+            record_audit("reject", "ecos.kernel.sandbox", "blocked", f"os.exec blocked: {cmd}")
             raise PermissionError("KEI Sandbox: os.exec execution is blocked.")
-        record_audit(
-            "execute", "ecos.kernel.sandbox", "pass", f"os.exec allowed: {cmd}"
-        )
+        record_audit("execute", "ecos.kernel.sandbox", "pass", f"os.exec allowed: {cmd}")
 
     elif event == "urllib.Request":
         url = str(args[0]) if args else "unknown"
@@ -229,9 +205,7 @@ def _audit_hook(event: str, args: tuple):
                     f"urllib request blocked: {url}",
                 )
                 raise PermissionError(f"KEI Sandbox: HTTP request to {url} is blocked.")
-        record_audit(
-            "execute", "ecos.kernel.sandbox", "pass", f"urllib request allowed: {url}"
-        )
+        record_audit("execute", "ecos.kernel.sandbox", "pass", f"urllib request allowed: {url}")
 
     elif event == "http.client":
         # args[0] is (host, port) tuple for http.client connections
@@ -245,12 +219,8 @@ def _audit_hook(event: str, args: tuple):
                     "blocked",
                     f"http.client blocked: {host}",
                 )
-                raise PermissionError(
-                    f"KEI Sandbox: HTTP connection to {host} is blocked."
-                )
-            record_audit(
-                "execute", "ecos.kernel.sandbox", "pass", f"http.client allowed: {host}"
-            )
+                raise PermissionError(f"KEI Sandbox: HTTP connection to {host} is blocked.")
+            record_audit("execute", "ecos.kernel.sandbox", "pass", f"http.client allowed: {host}")
 
     # ── Phase 15: Deep FS Mutation Interception ──
     elif event in ("os.remove", "os.unlink", "os.rename", "os.mkdir", "os.rmdir"):
@@ -263,9 +233,7 @@ def _audit_hook(event: str, args: tuple):
                     "blocked",
                     f"FS mutation blocked: {event} missing destination",
                 )
-                raise PermissionError(
-                    f"KEI Sandbox: {event} missing destination argument."
-                )
+                raise PermissionError(f"KEI Sandbox: {event} missing destination argument.")
             paths = [os.path.abspath(str(args[0])), os.path.abspath(str(args[1]))]
         else:
             paths = [os.path.abspath(str(args[0]))]
@@ -273,11 +241,7 @@ def _audit_hook(event: str, args: tuple):
         allowed_writes = perms.get("filesystem", {}).get("allow_write", ["*"])
         if "*" not in allowed_writes:
             allowed_writes = [os.path.expandvars(p) for p in allowed_writes]
-            blocked = [
-                p
-                for p in paths
-                if not any(p.startswith(prefix) for prefix in allowed_writes)
-            ]
+            blocked = [p for p in paths if not any(p.startswith(prefix) for prefix in allowed_writes)]
             if blocked:
                 detail = ", ".join(blocked)
                 record_audit(
@@ -286,9 +250,7 @@ def _audit_hook(event: str, args: tuple):
                     "blocked",
                     f"FS mutation blocked: {event} on {detail}",
                 )
-                raise PermissionError(
-                    f"KEI Sandbox: {event} access to {detail} is blocked."
-                )
+                raise PermissionError(f"KEI Sandbox: {event} access to {detail} is blocked.")
         record_audit(
             "execute",
             "ecos.kernel.sandbox",
@@ -297,9 +259,7 @@ def _audit_hook(event: str, args: tuple):
         )
 
 
-def enable_sandbox(
-    config_path: str = "kei.yaml", audit_file: str | None = None, role: str = "default"
-) -> None:
+def enable_sandbox(config_path: str = "kei.yaml", audit_file: str | None = None, role: str = "default") -> None:
     """Enable the KEI Sandbox.
 
     Args:

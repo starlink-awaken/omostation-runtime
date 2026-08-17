@@ -39,9 +39,7 @@ def _check_path_sandbox(path: Path) -> Path:
             break
     if not allowed:
         allowed_names = [str(d) for d in ALLOWED_PATHS]
-        raise PermissionError(
-            f"Access denied: {p} is outside allowed paths ({', '.join(allowed_names)})"
-        )
+        raise PermissionError(f"Access denied: {p} is outside allowed paths ({', '.join(allowed_names)})")
     return p
 
 
@@ -183,11 +181,8 @@ class Tools:
 
             args = shlex.split(command)
             r = subprocess.run(
-                args,
-                capture_output=True,
-                text=True,
-                cwd=cwd or str(ECOS_DIR),
-                timeout=timeout, check=False)
+                args, capture_output=True, text=True, cwd=cwd or str(ECOS_DIR), timeout=timeout, check=False
+            )
             return {
                 "exit_code": r.returncode,
                 "stdout": r.stdout[:5000],

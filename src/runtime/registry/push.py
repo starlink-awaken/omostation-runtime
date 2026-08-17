@@ -96,10 +96,7 @@ class PushTrigger:
         self._vclock += 1
         results: list[PushResult] = []
 
-        tasks = [
-            self._push_to_peer(peer_id, url, delta, local_node_id)
-            for peer_id, url in self._peers.items()
-        ]
+        tasks = [self._push_to_peer(peer_id, url, delta, local_node_id) for peer_id, url in self._peers.items()]
         if tasks:
             results = list(await asyncio.gather(*tasks, return_exceptions=False))
 
@@ -148,9 +145,7 @@ class PushTrigger:
         for attempt in range(self._retry_limit):
             try:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
-                    resp = await client.post(
-                        f"{base_url}/sync/delta", json=body
-                    )
+                    resp = await client.post(f"{base_url}/sync/delta", json=body)
                     if resp.status_code < 400:
                         result.success = True
                         result.status_code = resp.status_code

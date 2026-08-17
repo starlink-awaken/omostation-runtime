@@ -95,9 +95,7 @@ def test_default_cli_runs_control_health_with_bounded_runtime_receipt(
     assert json.loads(initial["stdout"])["status"] == "ok"
     assert not (domain / "_runtime" / "巡检报告").exists()
 
-    (domain / "_control" / "signals.md").write_text(
-        "- type: 🔴\n- message: do not leak this text\n", encoding="utf-8"
-    )
+    (domain / "_control" / "signals.md").write_text("- type: 🔴\n- message: do not leak this text\n", encoding="utf-8")
     critical_code = main(
         ["documents", "run", "documents-weijian-control-health", "--json"],
         environ=environ,

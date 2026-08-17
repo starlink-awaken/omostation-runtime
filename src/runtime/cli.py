@@ -198,9 +198,7 @@ def cmd_protocol_validate(name: str, message_json: str) -> int:
 
 def cmd_kei_dashboard() -> int:
     """Show KEI sandbox audit summary."""
-    audit_dir = (
-        Path(os.environ.get("RUNTIME_HOME", str(Path.home() / "runtime"))) / "data"
-    )
+    audit_dir = Path(os.environ.get("RUNTIME_HOME", str(Path.home() / "runtime"))) / "data"
     audit_file = audit_dir / "kei_audit.jsonl"
     if not audit_file.exists():
         print("⚠️  No KEI audit data found (runtime/data/kei_audit.jsonl)")
@@ -260,8 +258,7 @@ def cmd_dashboard() -> int:
     debt_open = sum(
         1
         for f in debt_items
-        if "lifecycle_state: scheduled" in f.read_text()
-        or "lifecycle_state: open" in f.read_text()
+        if "lifecycle_state: scheduled" in f.read_text() or "lifecycle_state: open" in f.read_text()
     )
 
     # Phase from system state
@@ -277,9 +274,7 @@ def cmd_dashboard() -> int:
     print(f"|  eCOS Dashboard{'':>42}|")
     print(f"|  Phase {phase}{'':>37}|")
     print(f"+{'-' * 56}+")
-    print(
-        f"|  Services:   {len(services):3d} total ({active_svc:2d} running, {failed_svc:2d} failed){'':>8}|"
-    )
+    print(f"|  Services:   {len(services):3d} total ({active_svc:2d} running, {failed_svc:2d} failed){'':>8}|")
     print(f"|  Protocols:  {proto_total:3d} total ({proto_active:2d} active){'':>13}|")
     print(f"|  Debts:      {debt_total:3d} total ({debt_open:2d} pending){'':>13}|")
     print(f"+{'-' * 56}+")
@@ -350,7 +345,6 @@ def cmd_board(proposal: str, mode: str, session_id: str) -> int:
 # ─── Main ───────────────────────────────────────────────────────────────────
 
 
-
 def main(argv: list[str] | None = None) -> int:
     print("⚠️ Runtime 独立 CLI 已弃用，请使用 cockpit 替代", file=sys.stderr)
     parser = argparse.ArgumentParser(
@@ -385,9 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     proto_sub.add_parser("list", help="List all protocols")
     pg = proto_sub.add_parser("get", help="Get protocol details")
     pg.add_argument("name")
-    pv = proto_sub.add_parser(
-        "validate", help="Validate a protocol message against registry"
-    )
+    pv = proto_sub.add_parser("validate", help="Validate a protocol message against registry")
     pv.add_argument("name", help="Protocol name (MCP, ACP, A2A...)")
     pv.add_argument("message", help="JSON message to validate")
 
@@ -395,25 +387,19 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="Quick system summary")
 
     # dashboard
-    sub.add_parser(
-        "dashboard", help="eCOS Dashboard — aggregated system health overview"
-    )
+    sub.add_parser("dashboard", help="eCOS Dashboard — aggregated system health overview")
 
     # taskobject
     to_p = sub.add_parser("taskobject", help="TaskObject v1 envelope dispatch")
     to_sub = to_p.add_subparsers(dest="to_cmd")
     to_dispatch = to_sub.add_parser("dispatch", help="Dispatch a TaskObject envelope")
-    to_dispatch.add_argument(
-        "envelope_file", help="Path to JSON envelope file (use '-' for stdin)"
-    )
+    to_dispatch.add_argument("envelope_file", help="Path to JSON envelope file (use '-' for stdin)")
 
     # mcp
     sub.add_parser("mcp", help="Run L3 CLIAdapter (MCP Server over stdio)")
 
     # kei
-    kei_p = sub.add_parser(
-        "kei", help="Kernel Extension Interface (Sandbox) management"
-    )
+    kei_p = sub.add_parser("kei", help="Kernel Extension Interface (Sandbox) management")
     kei_sub = kei_p.add_subparsers(dest="kei_cmd")
     kei_val = kei_sub.add_parser("validate", help="Validate a KEI manifest")
     kei_val.add_argument("path", help="Path to kei.yaml")
@@ -425,12 +411,8 @@ def main(argv: list[str] | None = None) -> int:
     add_i0_subparser(sub)
 
     # board
-    board_p = sub.add_parser(
-        "board", help="Execute B.D.S.K. Virtual Board consensus cycle"
-    )
-    board_p.add_argument(
-        "proposal", help="Proposal or question (can include @Builder/@Devil/@Sage/@Keeper)"
-    )
+    board_p = sub.add_parser("board", help="Execute B.D.S.K. Virtual Board consensus cycle")
+    board_p.add_argument("proposal", help="Proposal or question (can include @Builder/@Devil/@Sage/@Keeper)")
     board_p.add_argument(
         "--mode",
         default="auto",
@@ -516,7 +498,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         parser.print_help()
         return 1
-
 
 
 if __name__ == "__main__":

@@ -49,11 +49,7 @@ def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]
     # Direct summary from snapshot data — omo.omo_state_schema was removed in
     # refactor; P82-S4 死 import 清理 (try/except 死块移除, 直接 summary, 非补实现).
     services = snapshot.get("services", {}) or {}
-    daemons = {
-        k: v
-        for k, v in services.items()
-        if isinstance(v, dict) and v.get("type") == "daemon"
-    }
+    daemons = {k: v for k, v in services.items() if isinstance(v, dict) and v.get("type") == "daemon"}
     total = len(daemons)
     if total <= 0:
         return {
@@ -78,8 +74,7 @@ def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]
         "degraded": [
             k
             for k, v in daemons.items()
-            if str((v.get("runtime") or {}).get("status") or "").lower() == "degraded"
-            and not _daemon_is_online(v)
+            if str((v.get("runtime") or {}).get("status") or "").lower() == "degraded" and not _daemon_is_online(v)
         ],
         "source": "runtime_daemon_de_false_positive",
     }

@@ -45,6 +45,7 @@ class TestTaskFallbackManagerUnit:
 
         req = TaskRequest(name="t1", required_capabilities=["coding"])
         import asyncio
+
         event = asyncio.run(fm.submit_with_fallback(req))
 
         assert event.result == FallbackResult.DISPATCHED
@@ -58,6 +59,7 @@ class TestTaskFallbackManagerUnit:
 
         req = TaskRequest(name="doomed", required_capabilities=["coding"])
         import asyncio
+
         event = asyncio.run(fm.submit_with_fallback(req))
 
         assert event.result == FallbackResult.ESCALATED
@@ -77,11 +79,13 @@ class TestTaskFallbackManagerUnit:
 
         async def _run():
             import asyncio
+
             asyncio.create_task(_add_agent_later())
             req = TaskRequest(name="patient", required_capabilities=["coding"])
             return await fm.submit_with_fallback(req)
 
         import asyncio
+
         event = asyncio.run(_run())
 
         assert event.result == FallbackResult.DISPATCHED
@@ -94,6 +98,7 @@ class TestTaskFallbackManagerUnit:
         fm = TaskFallbackManager(dispatcher, max_retries=0, base_delay=0.01)
 
         import asyncio
+
         # Escalate a task
         req = TaskRequest(name="stuck", required_capabilities=["coding"])
         event = asyncio.run(fm.submit_with_fallback(req))

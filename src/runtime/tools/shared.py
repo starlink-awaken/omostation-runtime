@@ -34,9 +34,7 @@ def _estimate_cost(tokens_used: int, model: str = _DEFAULT_MODEL) -> float:
     # Conservative estimate: 75% input, 25% output
     input_tokens = int(tokens_used * 0.75)
     output_tokens = tokens_used - input_tokens
-    cost = (input_tokens / 1000) * rates["input"] + (output_tokens / 1000) * rates[
-        "output"
-    ]
+    cost = (input_tokens / 1000) * rates["input"] + (output_tokens / 1000) * rates["output"]
     return round(cost, 6)
 
 
@@ -101,18 +99,11 @@ def _run_script(script_name: str, *args: str) -> str:
     env = os.environ.copy()
     env["RUNTIME_HOME"] = str(RUNTIME_HOME)
     try:
-        r = subprocess.run(
-            [str(script), *args],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=env, check=False)
+        r = subprocess.run([str(script), *args], capture_output=True, text=True, timeout=30, env=env, check=False)
         return (
             r.stdout.strip()
             if r.returncode == 0
-            else (
-                f"❌ Error (exit={r.returncode}): {r.stderr.strip() or r.stdout.strip()}"
-            )
+            else (f"❌ Error (exit={r.returncode}): {r.stderr.strip() or r.stdout.strip()}")
         )
     except subprocess.TimeoutExpired:
         return "❌ Timeout (30s)"

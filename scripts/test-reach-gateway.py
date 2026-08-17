@@ -18,7 +18,7 @@ def main() -> int:
         title="【Hermes 中转测试】",
         body="公文草案抓取完成，物理通过 Hermes 守护进程中转流发！",
         action_url="http://localhost:8183/action/approve?id=RELAY-20260731",
-        target_channels=["mac_native", "hermes_relay"]
+        target_channels=["mac_native", "hermes_relay"],
     )
 
     print("--- 物理测试: 通过 Hermes 作为 Relay 中转站发起触达 ---")

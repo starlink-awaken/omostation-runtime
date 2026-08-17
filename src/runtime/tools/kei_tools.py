@@ -11,9 +11,7 @@ def _kei_list() -> str:
     exts = data.get("extensions", [])
     lines = [f"{'ID':40s} {'TYPE':16s} {'STATUS':12s}", "-" * 75]
     for e in exts:
-        lines.append(
-            f"{e['id']:40s} {e.get('type', '?'):16s} {e.get('status', '?'):12s}"
-        )
+        lines.append(f"{e['id']:40s} {e.get('type', '?'):16s} {e.get('status', '?'):12s}")
     lines.append(f"\nTotal: {len(exts)} extensions registered")
     return "\n".join(lines)
 

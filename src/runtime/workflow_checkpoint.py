@@ -7,7 +7,7 @@ record and must remain free of prompts and model output.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +15,7 @@ from runtime.executor.io import AppendOnlyLog
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class WorkflowCheckpointStore:
@@ -38,8 +38,7 @@ class WorkflowCheckpointStore:
     ) -> dict[str, Any]:
         """Persist one resumable boundary and return the durable record."""
         record = {
-            "checkpoint_id": checkpoint_id
-            or f"{workflow_run_id}:{step_run_id}:{next_turn}",
+            "checkpoint_id": checkpoint_id or f"{workflow_run_id}:{step_run_id}:{next_turn}",
             "workflow_run_id": workflow_run_id,
             "step_run_id": step_run_id,
             "attempt": attempt,
@@ -62,8 +61,7 @@ class WorkflowCheckpointStore:
         matches = [
             record
             for record in self._log.read_all()
-            if record.get("workflow_run_id") == workflow_run_id
-            and record.get("step_run_id") == step_run_id
+            if record.get("workflow_run_id") == workflow_run_id and record.get("step_run_id") == step_run_id
         ]
         return matches[-1] if matches else None
 

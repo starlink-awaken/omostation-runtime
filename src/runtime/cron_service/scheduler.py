@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from . import config, db
 from .health_scan import run_scan_if_due
@@ -118,14 +118,14 @@ def _next_cron_ts(schedule: str, after: datetime | float) -> float | None:
     try:
         if isinstance(after, datetime):
             if after.tzinfo is not None:
-                base = after.astimezone(timezone.utc).replace(tzinfo=None)
+                base = after.astimezone(UTC).replace(tzinfo=None)
             else:
                 base = after
         else:
-            base = datetime.fromtimestamp(after, tz=timezone.utc).replace(tzinfo=None)
+            base = datetime.fromtimestamp(after, tz=UTC).replace(tzinfo=None)
         cron = croniter(schedule, base)
         next_dt = cron.get_next(datetime)
-        return next_dt.replace(tzinfo=timezone.utc).timestamp()
+        return next_dt.replace(tzinfo=UTC).timestamp()
     except Exception:
         logger.warning(
             "croniter failed for schedule=%r, last_run=%r",
@@ -233,20 +233,13 @@ def _run_job_sync(job_id: str) -> None:
             script = str(candidate)
             logger.debug("Resolved script %s → %s", job.script, script)
         else:
-            logger.warning(
-                "Script %s not found in SCRIPTS_DIR=%s", job.script, SCRIPTS_DIR
-            )
+            logger.warning("Script %s not found in SCRIPTS_DIR=%s", job.script, SCRIPTS_DIR)
 
     logger.info("Running job %s (script=%s)", job_id, script)
     import subprocess
 
     try:
-        result = subprocess.run(
-            script,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=120, check=False)
+        result = subprocess.run(script, shell=True, capture_output=True, text=True, timeout=120, check=False)
         status = "ok" if result.returncode == 0 else "error"
         record_run(job_id, status, result.stdout or "", result.stderr or "")
         _bus_emit_cron_fired(

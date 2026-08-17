@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+
 from runtime.registry.failover import FailoverEvent, FailoverManager
 
 
@@ -89,7 +90,9 @@ class TestFailoverManager:
 
     def test_get_events(self):
         fm = FailoverManager(MagicMock(), MagicMock())
-        fm._events = [FailoverEvent(agent_id=f"a{i}", event_type="test", old_status="idle", new_status="idle") for i in range(15)]
+        fm._events = [
+            FailoverEvent(agent_id=f"a{i}", event_type="test", old_status="idle", new_status="idle") for i in range(15)
+        ]
         events = fm.get_events(limit=5)
         assert len(events) == 5
 

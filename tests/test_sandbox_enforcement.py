@@ -63,10 +63,7 @@ finally:
         env={**os.environ, "PYTHONPATH": "src"},
         check=False,
     )
-    assert (
-        "SUCCESS: KEI Sandbox: Network connection to 8.8.8.8 is blocked."
-        in result.stdout
-    )
+    assert "SUCCESS: KEI Sandbox: Network connection to 8.8.8.8 is blocked." in result.stdout
 
 
 def test_sandbox_write_blocked():
@@ -97,10 +94,7 @@ finally:
         env={**os.environ, "PYTHONPATH": "src"},
         check=False,
     )
-    assert (
-        "SUCCESS: KEI Sandbox: Write access to /tmp/blocked_file.txt is blocked."
-        in result.stdout
-    )
+    assert "SUCCESS: KEI Sandbox: Write access to /tmp/blocked_file.txt is blocked." in result.stdout
 
 
 def _run_sandboxed_subprocess(mutation_code: str) -> str:
@@ -142,10 +136,7 @@ def test_sandbox_mkdir_blocked():
     except PermissionError as e:
         print(f'SUCCESS mkdir: {e}')
 """)
-    assert (
-        "SUCCESS mkdir: KEI Sandbox: os.mkdir access to /tmp/kei_blocked_dir is blocked."
-        in stdout
-    )
+    assert "SUCCESS mkdir: KEI Sandbox: os.mkdir access to /tmp/kei_blocked_dir is blocked." in stdout
 
 
 def test_sandbox_rmdir_blocked():
@@ -157,10 +148,7 @@ def test_sandbox_rmdir_blocked():
     except PermissionError as e:
         print(f'SUCCESS rmdir: {e}')
 """)
-    assert (
-        "SUCCESS rmdir: KEI Sandbox: os.rmdir access to /tmp/kei_blocked_dir is blocked."
-        in stdout
-    )
+    assert "SUCCESS rmdir: KEI Sandbox: os.rmdir access to /tmp/kei_blocked_dir is blocked." in stdout
 
 
 def test_sandbox_remove_blocked():
@@ -172,10 +160,7 @@ def test_sandbox_remove_blocked():
     except PermissionError as e:
         print(f'SUCCESS remove: {e}')
 """)
-    assert (
-        "SUCCESS remove: KEI Sandbox: os.remove access to /tmp/kei_blocked_file.txt is blocked."
-        in stdout
-    )
+    assert "SUCCESS remove: KEI Sandbox: os.remove access to /tmp/kei_blocked_file.txt is blocked." in stdout
 
 
 def test_sandbox_rename_blocked_for_destination():
@@ -187,7 +172,4 @@ def test_sandbox_rename_blocked_for_destination():
     except PermissionError as e:
         print(f'SUCCESS rename: {e}')
 """)
-    assert (
-        "SUCCESS rename: KEI Sandbox: os.rename access to /tmp/kei_blocked_dest.txt is blocked."
-        in stdout
-    )
+    assert "SUCCESS rename: KEI Sandbox: os.rename access to /tmp/kei_blocked_dest.txt is blocked." in stdout

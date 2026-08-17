@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 REQUIRED_FIELDS = ["ts", "task_id", "status", "summary"]
@@ -94,7 +94,7 @@ def main() -> int:
         density = drift / total if total > 0 else 0.0
         grade = _health_grade(density)
         payload = {
-            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "drift_count": drift,
             "total_records": total,
             "debt_density": round(density, 6),

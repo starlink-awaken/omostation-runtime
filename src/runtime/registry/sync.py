@@ -179,9 +179,7 @@ class GossipSync:
             except Exception:
                 logger.exception("Gossip sync tick failed")
             try:
-                await asyncio.wait_for(
-                    asyncio.Event().wait(), timeout=self._interval
-                )
+                await asyncio.wait_for(asyncio.Event().wait(), timeout=self._interval)
             except TimeoutError:
                 continue
 
@@ -202,7 +200,7 @@ class GossipSync:
                 peer.reachable = True
                 peer.last_contact = datetime.now(UTC)
                 peer.last_sync = datetime.now(UTC)
-            except (httpx.HTTPError, OSError, asyncio.TimeoutError) as e:
+            except (TimeoutError, httpx.HTTPError, OSError) as e:
                 peer.consecutive_failures += 1
                 if peer.consecutive_failures >= 3:
                     peer.reachable = False
@@ -218,7 +216,7 @@ class GossipSync:
             try:
                 pushed = await self._push_to_peer(peer, local_agents)
                 result.pushed += pushed
-            except (httpx.HTTPError, OSError, asyncio.TimeoutError) as e:
+            except (TimeoutError, httpx.HTTPError, OSError) as e:
                 result.errors.append(f"push-{peer.node_id}: {type(e).__name__}")
 
         result.duration_ms = (time.time() - start) * 1000
@@ -244,7 +242,7 @@ class GossipSync:
                 continue
             try:
                 pushed += await self._push_to_peer(peer, agents)
-            except (httpx.HTTPError, OSError, asyncio.TimeoutError):
+            except (TimeoutError, httpx.HTTPError, OSError):
                 peer.consecutive_failures += 1
                 if peer.consecutive_failures >= 3:
                     peer.reachable = False

@@ -58,9 +58,7 @@ def software_dev_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "infrastructure",
             "description": "Shared infrastructure: CI/CD, database, networking, monitoring",
             "archetype": ProjectArchetype.SOFTWARE_DEV,
-            "goals": _filter_goals_by_keywords(
-                g, ["infra", "deploy", "ci", "cd", "monitor", "database", "config"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["infra", "deploy", "ci", "cd", "monitor", "database", "config"]),
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 10,
             "tags": ["infrastructure", "foundation"],
@@ -71,9 +69,7 @@ def software_dev_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "user-system",
             "description": "User auth, authorization, profiles, session management",
             "archetype": ProjectArchetype.SOFTWARE_DEV,
-            "goals": _filter_goals_by_keywords(
-                g, ["user", "auth", "login", "profile", "account", "permission"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["user", "auth", "login", "profile", "account", "permission"]),
             "dependencies": [infra.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 9,
@@ -85,9 +81,7 @@ def software_dev_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "product-system",
             "description": "Product catalog, categories, inventory management",
             "archetype": ProjectArchetype.SOFTWARE_DEV,
-            "goals": _filter_goals_by_keywords(
-                g, ["product", "catalog", "inventory", "content", "item"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["product", "catalog", "inventory", "content", "item"]),
             "dependencies": [infra.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 8,
@@ -99,9 +93,7 @@ def software_dev_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "order-system",
             "description": "Order processing, payment, cart, fulfillment",
             "archetype": ProjectArchetype.SOFTWARE_DEV,
-            "goals": _filter_goals_by_keywords(
-                g, ["order", "payment", "cart", "checkout", "fulfill"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["order", "payment", "cart", "checkout", "fulfill"]),
             "dependencies": [infra.id, user_sys.id, prod_sys.id],
             "estimated_complexity": ComplexityLevel.ADVANCED,
             "priority": 7,
@@ -113,9 +105,7 @@ def software_dev_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "search-system",
             "description": "Search indexing, filtering, sorting, recommendations",
             "archetype": ProjectArchetype.SOFTWARE_DEV,
-            "goals": _filter_goals_by_keywords(
-                g, ["search", "filter", "sort", "recommend", "index"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["search", "filter", "sort", "recommend", "index"]),
             "dependencies": [infra.id, prod_sys.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 6,
@@ -127,9 +117,7 @@ def software_dev_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "admin-system",
             "description": "Admin dashboard, analytics, reporting, user management",
             "archetype": ProjectArchetype.SOFTWARE_DEV,
-            "goals": _filter_goals_by_keywords(
-                g, ["admin", "dashboard", "analytics", "report", "manage"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["admin", "dashboard", "analytics", "report", "manage"]),
             "dependencies": [infra.id, user_sys.id, prod_sys.id, order_sys.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 5,
@@ -146,9 +134,7 @@ def creative_writing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "worldbuilding",
             "description": "World creation: setting, geography, history, culture, rules",
             "archetype": ProjectArchetype.CREATIVE_WRITING,
-            "goals": _filter_goals_by_keywords(
-                g, ["world", "setting", "geography", "culture", "history", "rules"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["world", "setting", "geography", "culture", "history", "rules"]),
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 10,
             "tags": ["foundation", "world"],
@@ -180,9 +166,7 @@ def creative_writing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "plot-architecture",
             "description": "Plot structure: story arcs, conflict, pacing, themes",
             "archetype": ProjectArchetype.CREATIVE_WRITING,
-            "goals": _filter_goals_by_keywords(
-                g, ["plot", "story", "arc", "conflict", "theme", "structure"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["plot", "story", "arc", "conflict", "theme", "structure"]),
             "dependencies": [wb.id, cd.id],
             "estimated_complexity": ComplexityLevel.ADVANCED,
             "priority": 8,
@@ -194,9 +178,7 @@ def creative_writing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "chapter-writing",
             "description": "Chapter drafting: scene composition, dialogue, prose, transitions",
             "archetype": ProjectArchetype.CREATIVE_WRITING,
-            "goals": _filter_goals_by_keywords(
-                g, ["chapter", "scene", "dialogue", "write", "draft", "prose"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["chapter", "scene", "dialogue", "write", "draft", "prose"]),
             "dependencies": [pa.id],
             "estimated_complexity": ComplexityLevel.ADVANCED,
             "priority": 7,
@@ -208,9 +190,7 @@ def creative_writing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "quality-review",
             "description": "Editorial review: consistency, style, pacing, polish",
             "archetype": ProjectArchetype.CREATIVE_WRITING,
-            "goals": _filter_goals_by_keywords(
-                g, ["review", "edit", "quality", "consistency", "polish"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["review", "edit", "quality", "consistency", "polish"]),
             "dependencies": [cw.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 6,
@@ -227,9 +207,7 @@ def visual_production_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "screenplay",
             "description": "Script writing: narrative, dialogue, scene directions",
             "archetype": ProjectArchetype.VISUAL_PRODUCTION,
-            "goals": _filter_goals_by_keywords(
-                g, ["script", "screenplay", "dialogue", "scene", "narrative"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["script", "screenplay", "dialogue", "scene", "narrative"]),
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 10,
             "tags": ["pre-production", "script"],
@@ -240,9 +218,7 @@ def visual_production_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "visual-design",
             "description": "Visual language: art direction, color, typography, mood boards",
             "archetype": ProjectArchetype.VISUAL_PRODUCTION,
-            "goals": _filter_goals_by_keywords(
-                g, ["visual", "design", "art", "color", "style", "mood"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["visual", "design", "art", "color", "style", "mood"]),
             "dependencies": [sp.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 9,
@@ -254,9 +230,7 @@ def visual_production_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "storyboard",
             "description": "Storyboarding: shot composition, camera angles, timing, flow",
             "archetype": ProjectArchetype.VISUAL_PRODUCTION,
-            "goals": _filter_goals_by_keywords(
-                g, ["storyboard", "shot", "camera", "composition", "flow"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["storyboard", "shot", "camera", "composition", "flow"]),
             "dependencies": [sp.id, vd.id],
             "estimated_complexity": ComplexityLevel.ADVANCED,
             "priority": 8,
@@ -268,9 +242,7 @@ def visual_production_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "production",
             "description": "Asset creation: rendering, animation, compositing, sound",
             "archetype": ProjectArchetype.VISUAL_PRODUCTION,
-            "goals": _filter_goals_by_keywords(
-                g, ["render", "animate", "composite", "sound", "asset", "produce"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["render", "animate", "composite", "sound", "asset", "produce"]),
             "dependencies": [sb.id],
             "estimated_complexity": ComplexityLevel.ADVANCED,
             "priority": 7,
@@ -282,9 +254,7 @@ def visual_production_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "quality-review",
             "description": "QA: visual consistency, audio sync, color grading, approval",
             "archetype": ProjectArchetype.VISUAL_PRODUCTION,
-            "goals": _filter_goals_by_keywords(
-                g, ["review", "quality", "consistency", "approval", "final"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["review", "quality", "consistency", "approval", "final"]),
             "dependencies": [prod.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 6,
@@ -301,9 +271,7 @@ def document_processing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "analysis",
             "description": "Document analysis: structure detection, classification, metadata extraction",
             "archetype": ProjectArchetype.DOCUMENT_PROCESSING,
-            "goals": _filter_goals_by_keywords(
-                g, ["analyze", "detect", "classify", "extract", "schema"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["analyze", "detect", "classify", "extract", "schema"]),
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 10,
             "tags": ["analysis", "foundation"],
@@ -314,9 +282,7 @@ def document_processing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "processing",
             "description": "Content processing: transformation, normalization, enrichment",
             "archetype": ProjectArchetype.DOCUMENT_PROCESSING,
-            "goals": _filter_goals_by_keywords(
-                g, ["process", "transform", "normalize", "enrich", "convert"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["process", "transform", "normalize", "enrich", "convert"]),
             "dependencies": [analysis.id],
             "estimated_complexity": ComplexityLevel.STANDARD,
             "priority": 8,
@@ -328,9 +294,7 @@ def document_processing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "formatting",
             "description": "Output formatting: template, layout, styling, export",
             "archetype": ProjectArchetype.DOCUMENT_PROCESSING,
-            "goals": _filter_goals_by_keywords(
-                g, ["format", "template", "layout", "style", "export"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["format", "template", "layout", "style", "export"]),
             "dependencies": [processing.id],
             "estimated_complexity": ComplexityLevel.SIMPLE,
             "priority": 6,
@@ -342,9 +306,7 @@ def document_processing_strategy(config: ProjectConfig) -> list[SubProject]:
             "name": "validation",
             "description": "Output validation: schema compliance, data integrity, acceptance",
             "archetype": ProjectArchetype.DOCUMENT_PROCESSING,
-            "goals": _filter_goals_by_keywords(
-                g, ["validate", "verify", "test", "compliance", "integrity"]
-            ),
+            "goals": _filter_goals_by_keywords(g, ["validate", "verify", "test", "compliance", "integrity"]),
             "dependencies": [formatting.id],
             "estimated_complexity": ComplexityLevel.SIMPLE,
             "priority": 5,

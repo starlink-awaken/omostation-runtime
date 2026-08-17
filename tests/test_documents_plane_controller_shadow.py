@@ -117,9 +117,7 @@ def test_controller_shadow_job_refuses_binding_contract_drift(tmp_path: Path) ->
     )
 
     with pytest.raises(DocumentsPlanePathError, match="invalid contract"):
-        _controller_shadow_job_spec(
-            {"DOCUMENTS_DOMAIN_PROJECTS_REGISTRY": str(registry)}
-        )
+        _controller_shadow_job_spec({"DOCUMENTS_DOMAIN_PROJECTS_REGISTRY": str(registry)})
 
 
 def test_controller_shadow_job_records_observation_without_cutover_outside_documents(
@@ -134,14 +132,7 @@ def test_controller_shadow_job_records_observation_without_cutover_outside_docum
     documents_root = tmp_path / "Documents"
     domain = _domain(documents_root)
     source_root = Path(__file__).parents[1] / "src"
-    registry_path = (
-        tmp_path
-        / "workspace"
-        / ".omo"
-        / "_truth"
-        / "registry"
-        / "documents-domain-projects.yaml"
-    )
+    registry_path = tmp_path / "workspace" / ".omo" / "_truth" / "registry" / "documents-domain-projects.yaml"
     registry_path.parent.mkdir(parents=True)
     registry_path.write_text(
         """runtime_jobs:

@@ -186,9 +186,7 @@ _DOMAIN_SCHEMA: Schema = Schema(
     required=True,
     properties={
         "name": Schema(type="string", required=True, min_length=1, max_length=100),
-        "description": Schema(
-            type="string", required=True, min_length=10, max_length=500
-        ),
+        "description": Schema(type="string", required=True, min_length=10, max_length=500),
         "archetype": Schema(
             type="string",
             required=True,
@@ -201,9 +199,7 @@ _DOMAIN_SCHEMA: Schema = Schema(
                 "custom",
             ],
         ),
-        "version": Schema(
-            type="string", required=True, pattern=r"^\d+\.\d+\.\d+(-[a-z0-9.]+)?$"
-        ),
+        "version": Schema(type="string", required=True, pattern=r"^\d+\.\d+\.\d+(-[a-z0-9.]+)?$"),
     },
     additional_properties=True,
 )
@@ -215,9 +211,7 @@ def validate_schema(value: Any, schema: Schema, path: str = "$") -> ValidationRe
     warnings: list[str] = []
 
     if schema.required and value is None:
-        errors.append(
-            ValidationError("Required field is missing", path, expected=schema.type)
-        )
+        errors.append(ValidationError("Required field is missing", path, expected=schema.type))
         return ValidationResult(valid=False, errors=errors, warnings=warnings)
 
     if value is None:
@@ -254,24 +248,14 @@ def validate_schema(value: Any, schema: Schema, path: str = "$") -> ValidationRe
                 )
             )
         if schema.pattern and not re.match(schema.pattern, value):
-            errors.append(
-                ValidationError("Value does not match required pattern", path, value)
-            )
+            errors.append(ValidationError("Value does not match required pattern", path, value))
 
     # Number validations
     if schema.type == "number" and isinstance(value, (int, float)):
         if schema.min is not None and value < schema.min:
-            errors.append(
-                ValidationError(
-                    f"Minimum value is {schema.min}, got {value}", path, value
-                )
-            )
+            errors.append(ValidationError(f"Minimum value is {schema.min}, got {value}", path, value))
         if schema.max is not None and value > schema.max:
-            errors.append(
-                ValidationError(
-                    f"Maximum value is {schema.max}, got {value}", path, value
-                )
-            )
+            errors.append(ValidationError(f"Maximum value is {schema.max}, got {value}", path, value))
 
     # Enum validation
     if schema.enum is not None and value not in schema.enum:
@@ -502,9 +486,7 @@ def build_default_profiles() -> dict[Archetype, DomainMetricProfile]:
     return profiles
 
 
-def _evaluate_pass_fail(
-    value: float, target: float, direction: MetricDirection
-) -> bool:
+def _evaluate_pass_fail(value: float, target: float, direction: MetricDirection) -> bool:
     if direction == "higher-is-better":
         return value >= target
     return value <= target
@@ -534,20 +516,14 @@ def _build_summary(
     total: int,
 ) -> str:
     measured = passed + failed
-    parts = [
-        f'Quality report for archetype "{archetype}": overall score {score:.1f}/100.'
-    ]
+    parts = [f'Quality report for archetype "{archetype}": overall score {score:.1f}/100.']
     if measured == 0:
         parts.append(f"No metrics have been measured yet (0/{total}).")
     else:
-        parts.append(
-            f"{measured}/{total} metrics measured: {passed} passed, {failed} failed."
-        )
+        parts.append(f"{measured}/{total} metrics measured: {passed} passed, {failed} failed.")
     if not_measured > 0 and measured > 0:
         parts.append(f"{not_measured} metric(s) still awaiting measurement.")
-    parts.append(
-        "Status: PASSED." if score >= MINIMUM_PASS_SCORE else "Status: FAILED."
-    )
+    parts.append("Status: PASSED." if score >= MINIMUM_PASS_SCORE else "Status: FAILED.")
     return " ".join(parts)
 
 
@@ -573,9 +549,7 @@ class DomainRegistry:
             defaults = DomainDefaults(
                 complexity=user_defaults.get("complexity", defaults.complexity),
                 token_budget=user_defaults.get("token_budget", defaults.token_budget),
-                max_concurrent_agents=user_defaults.get(
-                    "max_concurrent_agents", defaults.max_concurrent_agents
-                ),
+                max_concurrent_agents=user_defaults.get("max_concurrent_agents", defaults.max_concurrent_agents),
             )
 
         return DomainConfig(
@@ -650,12 +624,8 @@ class DomainMetrics:
     def get_profile(self, archetype: Archetype) -> DomainMetricProfile | None:
         return self._profiles.get(archetype)
 
-    def set_profile(
-        self, archetype: Archetype, metrics: list[MetricDefinition]
-    ) -> None:
-        self._profiles[archetype] = DomainMetricProfile(
-            archetype=archetype, metrics=list(metrics)
-        )
+    def set_profile(self, archetype: Archetype, metrics: list[MetricDefinition]) -> None:
+        self._profiles[archetype] = DomainMetricProfile(archetype=archetype, metrics=list(metrics))
 
     def add_metric(self, archetype: Archetype, metric: MetricDefinition) -> None:
         profile = self._profiles.get(archetype)
@@ -688,14 +658,10 @@ class DomainMetrics:
             passed=passed,
             details=details,
         )
-        self._measurements.setdefault(project_id, {}).setdefault(
-            metric_name, []
-        ).append(measurement)
+        self._measurements.setdefault(project_id, {}).setdefault(metric_name, []).append(measurement)
         return measurement
 
-    def get_measurements(
-        self, project_id: str, metric_name: str | None = None
-    ) -> list[MetricMeasurement]:
+    def get_measurements(self, project_id: str, metric_name: str | None = None) -> list[MetricMeasurement]:
         project_map = self._measurements.get(project_id)
         if not project_map:
             return []
@@ -706,9 +672,7 @@ class DomainMetrics:
             result.extend(ms)
         return result
 
-    def get_latest_measurement(
-        self, project_id: str, metric_name: str
-    ) -> MetricMeasurement | None:
+    def get_latest_measurement(self, project_id: str, metric_name: str) -> MetricMeasurement | None:
         measurements = self.get_measurements(project_id, metric_name)
         return measurements[-1] if measurements else None
 
@@ -723,9 +687,7 @@ class DomainMetrics:
         for d in definitions:
             latest = self.get_latest_measurement(project_id, d.name)
             if latest is None:
-                report_metrics.append(
-                    {"definition": d, "measurement": None, "status": "not-measured"}
-                )
+                report_metrics.append({"definition": d, "measurement": None, "status": "not-measured"})
                 continue
             passed = _evaluate_pass_fail(latest.value, d.target, d.direction)
             report_metrics.append(

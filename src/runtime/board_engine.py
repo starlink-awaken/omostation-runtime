@@ -81,29 +81,29 @@ class ConsensusResult:
 class PersonaRouter:
     """Parses @Persona mentions and routes proposals to appropriate Board mode."""
 
-    MENTION_PATTERN: ClassVar[re.Pattern[str]] = re.compile(
-        r"@(?P<role>Builder|Devil|Sage|Keeper)\b", re.IGNORECASE
-    )
+    MENTION_PATTERN: ClassVar[re.Pattern[str]] = re.compile(r"@(?P<role>Builder|Devil|Sage|Keeper)\b", re.IGNORECASE)
 
     # Keywords triggering Mode-A deep debate (immutable frozenset)
-    MODE_A_KEYWORDS: ClassVar[frozenset[str]] = frozenset({
-        "架构",
-        "战略",
-        "重构",
-        "迁移",
-        "安全性",
-        "底层",
-        "并发",
-        "协议",
-        "核心",
-        "architecture",
-        "strategy",
-        "refactor",
-        "security",
-        "protocol",
-        "kernel",
-        "governance",
-    })
+    MODE_A_KEYWORDS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "架构",
+            "战略",
+            "重构",
+            "迁移",
+            "安全性",
+            "底层",
+            "并发",
+            "协议",
+            "核心",
+            "architecture",
+            "strategy",
+            "refactor",
+            "security",
+            "protocol",
+            "kernel",
+            "governance",
+        }
+    )
 
     @classmethod
     def parse_at_mention(cls, text: str) -> tuple[PersonaRole | None, str]:

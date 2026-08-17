@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 DOCS_ROOT = Path("/Users/xiamingxing/Documents")
@@ -46,12 +46,12 @@ def fetch_seeyon_oa_pending_tasks() -> list[dict[str, str]]:
         return []
 
     print(f"✅ 成功物理连接 9222 CDP 端口 (Browser: {cdp_info.get('Browser', 'Chrome')})")
-    
+
     # 获取所有 Tabs 窗口
     try:
         req = urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json/list", timeout=3)
         tabs = json.loads(req.read().decode("utf-8"))
-        
+
         target_tab = None
         for tab in tabs:
             url = tab.get("url", "")
@@ -60,13 +60,17 @@ def fetch_seeyon_oa_pending_tasks() -> list[dict[str, str]]:
                 break
 
         if target_tab:
-            print(f"🎯 物理锁定致远 OA 登录页面窗口 ──► [{target_tab.get('title', '致远OA')}] ({target_tab.get('url')})")
-            items.append({
-                "title": target_tab.get("title", "致远OA待办公文"),
-                "url": target_tab.get("url", SEEYON_URL),
-                "status": "已捕抓已登录 Session 页面",
-                "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-            })
+            print(
+                f"🎯 物理锁定致远 OA 登录页面窗口 ──► [{target_tab.get('title', '致远OA')}] ({target_tab.get('url')})"
+            )
+            items.append(
+                {
+                    "title": target_tab.get("title", "致远OA待办公文"),
+                    "url": target_tab.get("url", SEEYON_URL),
+                    "status": "已捕抓已登录 Session 页面",
+                    "time": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
         else:
             print("ℹ️ CDP 窗口列表中暂未找到 10.216.16.151 致远 OA 页面，请确保在 Chrome 中打开该页面。")
     except Exception as e:  # noqa: BLE001
@@ -79,13 +83,13 @@ def run_seeyon_oa_ingest_pipeline() -> bool:
     print("🏛️ [Seeyon OA Protocol] 启动致远 OA (10.216.16.151) 网页待办公文 CDP 抓取流水线...")
 
     tasks = fetch_seeyon_oa_pending_tasks()
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
     if tasks:
         target_file = INBOX_DIR / f"{now_str}-auto-seeyon-oa-pending.md"
         lines = [
             f"# 致远 OA (10.216.16.151) 网页版待办公文与批示 — {now_str}\n\n",
-            "> 数据源: 网页版致远 OA (CDP Session 物理共享)\n\n"
+            "> 数据源: 网页版致远 OA (CDP Session 物理共享)\n\n",
         ]
         for t in tasks:
             lines.append(f"- **[{t['time']}]** 公文/待办标题: [{t['title']}]({t['url']}) | 状态: `{t['status']}`")
@@ -100,7 +104,7 @@ def run_seeyon_oa_ingest_pipeline() -> bool:
             f"# 致远 OA (10.216.16.151) 网页版待办公文与批示 — {now_str}\n\n",
             "> 状态: 致远 OA CDP 静默抓取适配器已就绪 (网络物理可达 HTTP 302)\n",
             "- 🌐 目标地址: http://10.216.16.151/seeyon/main.do?method=main\n",
-            "- 🛡️ 鉴权机制: Chrome CDP Session 共享 (免重新输入密码/Ukey)\n"
+            "- 🛡️ 鉴权机制: Chrome CDP Session 共享 (免重新输入密码/Ukey)\n",
         ]
         target_file.write_text("\n".join(lines), encoding="utf-8")
         print(f"✅ 致远 OA CDP 适配器就绪写盘 ──► {target_file.name}")

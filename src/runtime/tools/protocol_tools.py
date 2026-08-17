@@ -11,9 +11,7 @@ def _protocol_list() -> str:
     ]
     for p in L0_PROTOCOLS:
         icon = icons.get(p.status, "❓")
-        parts.append(
-            f"{icon} {p.name:22s} {p.version:12s} {p.category:22s} {p.status:10s}"
-        )
+        parts.append(f"{icon} {p.name:22s} {p.version:12s} {p.category:22s} {p.status:10s}")
     parts.append(f"\nTotal: {len(L0_PROTOCOLS)} protocols")
     return "\n".join(parts)
 

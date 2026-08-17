@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
+
 from runtime.documents_plane.commands import run_owner_command
 
 
@@ -57,9 +58,7 @@ def test_owner_command_replaces_non_utf8_output_without_losing_exit_code(
     assert result.stderr == "\ufffd"
 
 
-def test_owner_command_reports_timeout_without_raising(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_owner_command_reports_timeout_without_raising(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _disable_sandbox(monkeypatch)
     result = run_owner_command(
         [sys.executable, "-c", "import time; time.sleep(1)"],
@@ -173,9 +172,7 @@ def test_owner_refuses_symlink_work_parent_without_writing_documents(
     assert list(documents_root.iterdir()) == []
 
 
-def test_timeout_kills_entire_owner_process_group(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_timeout_kills_entire_owner_process_group(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _disable_sandbox(monkeypatch)
     state_root = tmp_path / "state"
     delayed_write = state_root / "late-write.txt"
@@ -188,9 +185,7 @@ def test_timeout_kills_entire_owner_process_group(
         f"[sys.executable, '-c', {child!r}, {str(delayed_write)!r}]); time.sleep(10)"
     )
 
-    result = run_owner_command(
-        [sys.executable, "-c", parent], timeout=0.05, state_root=state_root
-    )
+    result = run_owner_command([sys.executable, "-c", parent], timeout=0.05, state_root=state_root)
     time.sleep(0.5)
 
     assert result.exit_code == 124
@@ -206,9 +201,7 @@ def test_descendant_cleanup_swallows_probe_timeout(
     monkeypatch.setattr(
         commands.subprocess,
         "run",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            subprocess.TimeoutExpired("pgrep", 0.01)
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired("pgrep", 0.01)),
     )
 
     commands._terminate_direct_children(12345)
@@ -291,9 +284,7 @@ Path({str(state_write)!r}).write_text('allowed', encoding='utf-8')
 raise SystemExit(0 if blocked else 1)
 """
 
-    result = run_owner_command(
-        [sys.executable, "-c", script], timeout=1, state_root=state_root
-    )
+    result = run_owner_command([sys.executable, "-c", script], timeout=1, state_root=state_root)
 
     assert result.exit_code == 0
     assert not documents_write.exists()

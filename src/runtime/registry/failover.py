@@ -132,9 +132,7 @@ class FailoverManager:
     def _find_alternative(self, failed_agent):
         """Find a healthy agent with matching capabilities."""
         healthy = [
-            a
-            for a in self._store.list_agents()
-            if a.status.value != "offline" and a.agent_id != failed_agent.agent_id
+            a for a in self._store.list_agents() if a.status.value != "offline" and a.agent_id != failed_agent.agent_id
         ]
         if not healthy:
             return None

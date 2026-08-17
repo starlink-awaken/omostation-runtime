@@ -106,9 +106,7 @@ def test_interceptor_rejects_unsafe_commands():
 
 def test_interceptor_replace_file_content_inspection():
     interceptor = GovernanceInterceptor()
-    bad_replace_chunk = (
-        "import runtime.private.credentials as creds\napi_key = creds.KEY"
-    )
+    bad_replace_chunk = "import runtime.private.credentials as creds\napi_key = creds.KEY"
 
     allowed, diag = interceptor.intercept_tool_call(
         tool_name="replace_file_content",
@@ -208,9 +206,7 @@ def test_mcp_server_guardrails_and_explain_handlers():
         handle_governance_guardrails,
     )
 
-    guardrail_res = handle_governance_guardrails(
-        domain="runtime", layer="L3", max_rules=3
-    )
+    guardrail_res = handle_governance_guardrails(domain="runtime", layer="L3", max_rules=3)
     assert "guardrail_prompt" in guardrail_res
     assert "<mof_architecture_guardrails" in guardrail_res["guardrail_prompt"]
 

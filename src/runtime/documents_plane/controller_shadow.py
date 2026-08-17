@@ -34,9 +34,7 @@ _LEGACY_RULE_IDS = (
     "CR30",
 )
 _OBSERVED_RULE_IDS = ("CR01", "CR02", "CR03", "CR05")
-_UNOBSERVED_RULE_IDS = tuple(
-    rule_id for rule_id in _LEGACY_RULE_IDS if rule_id not in _OBSERVED_RULE_IDS
-)
+_UNOBSERVED_RULE_IDS = tuple(rule_id for rule_id in _LEGACY_RULE_IDS if rule_id not in _OBSERVED_RULE_IDS)
 _SIGNAL_TYPE = re.compile(r"(?m)^\s*(?:-\s*)?type:\s*(🔴|⚠️|✅)\s*$")
 _LAST_REVIEWED = re.compile(r"(?mi)^last-reviewed:\s*(\d{4}-\d{2}-\d{2})\s*$")
 
@@ -84,13 +82,9 @@ def _regular_markdown_files(domain_root: Path) -> Iterator[Path]:
         except OSError as exc:
             raise ValueError(f"controller shadow plane is unreadable: {plane}") from exc
         if not stat.S_ISDIR(mode):
-            raise ValueError(
-                f"controller shadow plane must be a direct directory: {plane}"
-            )
+            raise ValueError(f"controller shadow plane must be a direct directory: {plane}")
         for current, directory_names, file_names in os.walk(root, followlinks=False):
-            directory_names[:] = sorted(
-                name for name in directory_names if not name.startswith(".")
-            )
+            directory_names[:] = sorted(name for name in directory_names if not name.startswith("."))
             for name in sorted(file_names):
                 if not name.endswith(".md"):
                     continue
@@ -142,9 +136,7 @@ def _signal_counts(domain_root: Path) -> dict[str, int]:
     }
 
 
-def inspect_controller_shadow(
-    domain_root: Path, *, today: date | None = None
-) -> ControllerShadow:
+def inspect_controller_shadow(domain_root: Path, *, today: date | None = None) -> ControllerShadow:
     """Observe four safe inputs and inventory every legacy rule without execution."""
     try:
         domain_mode = domain_root.lstat().st_mode
@@ -175,9 +167,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command != "inspect":  # pragma: no cover - argparse owns this boundary
         return 2
     try:
-        domain = resolve_documents_read_path(
-            documents_content_root(), args.domain_relative
-        )
+        domain = resolve_documents_read_path(documents_content_root(), args.domain_relative)
         result = inspect_controller_shadow(domain)
     except (DocumentsPlanePathError, OSError, ValueError) as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))

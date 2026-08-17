@@ -28,9 +28,7 @@ class AppendOnlyLog:
     def __init__(self, path: str | Path, *, lock_path: str | Path | None = None):
         self.path = Path(path)
         self._lock = threading.Lock()
-        self._lock_path = (
-            Path(lock_path) if lock_path else self.path.with_suffix(".lock")
-        )
+        self._lock_path = Path(lock_path) if lock_path else self.path.with_suffix(".lock")
 
     def append(
         self,
@@ -44,9 +42,7 @@ class AppendOnlyLog:
             record = record.model_dump()
         if schema is not None:
             schema.model_validate(record)  # fail-fast
-        line = (
-            json.dumps(record, ensure_ascii=False, sort_keys=True, **json_kwargs) + "\n"
-        )
+        line = json.dumps(record, ensure_ascii=False, sort_keys=True, **json_kwargs) + "\n"
         with self._lock, open(self.path, "a", encoding="utf-8") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:

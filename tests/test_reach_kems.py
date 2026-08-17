@@ -46,9 +46,7 @@ def test_dispatch_fails_without_explicit_transport(
         dispatch_manifest(manifest())
 
 
-def test_local_hermes_dispatch_is_idempotent(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
-) -> None:
+def test_local_hermes_dispatch_is_idempotent(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     import reach_gateway
 
     relay = tmp_path / "relay.json"
@@ -76,9 +74,7 @@ def test_http_dispatch_requires_and_confirms_dispatch_id(
             length = int(self.headers["Content-Length"])
             received["body"] = json.loads(self.rfile.read(length).decode("utf-8"))
             received["idempotency_key"] = self.headers["Idempotency-Key"]
-            payload = json.dumps(
-                {"dispatch_id": received["body"]["dispatch_id"], "status": "accepted"}
-            ).encode()
+            payload = json.dumps({"dispatch_id": received["body"]["dispatch_id"], "status": "accepted"}).encode()
             self.send_response(202)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))

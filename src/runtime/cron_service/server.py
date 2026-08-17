@@ -74,10 +74,7 @@ async def _check_api_key(request: Request, call_next):
     """Check Bearer token if CRON_SERVICE_API_KEY is set (skip /health)."""
     if _CRON_SERVICE_API_KEY and request.url.path != "/health":
         auth = request.headers.get("Authorization", "")
-        if not (
-            auth.startswith("Bearer ")
-            and auth[len("Bearer ") :] == _CRON_SERVICE_API_KEY
-        ):
+        if not (auth.startswith("Bearer ") and auth[len("Bearer ") :] == _CRON_SERVICE_API_KEY):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
     return await call_next(request)
 
@@ -96,9 +93,7 @@ async def health():
     broken = 0
     if hermes_scripts.is_dir():
         try:
-            broken = sum(
-                1 for f in hermes_scripts.iterdir() if f.is_symlink() and not f.exists()
-            )
+            broken = sum(1 for f in hermes_scripts.iterdir() if f.is_symlink() and not f.exists())
         except Exception:  # noqa: BLE001, S110  # defensive fallback
             pass  # defensive fallback
 
@@ -108,15 +103,11 @@ async def health():
 
     # Health scan status
     health_scan_due = should_scan()
-    system_health_path = (
-        Path.home() / "Workspace" / ".omo" / "state" / "system_health.yaml"
-    )
+    system_health_path = Path.home() / "Workspace" / ".omo" / "state" / "system_health.yaml"
     health_scan_mtime = None
     if system_health_path.exists():
         try:
-            health_scan_mtime = datetime.fromtimestamp(
-                system_health_path.stat().st_mtime, UTC
-            ).isoformat()
+            health_scan_mtime = datetime.fromtimestamp(system_health_path.stat().st_mtime, UTC).isoformat()
         except Exception:  # noqa: BLE001, S110  # defensive fallback
             pass  # defensive fallback
 
@@ -289,12 +280,8 @@ def run_http():
 
 def main():
     parser = argparse.ArgumentParser(description="cron-service")
-    parser.add_argument(
-        "--http", action="store_true", help="Run HTTP API server (default: stdio MCP)"
-    )
-    parser.add_argument(
-        "--init-db", action="store_true", help="Initialize database and exit"
-    )
+    parser.add_argument("--http", action="store_true", help="Run HTTP API server (default: stdio MCP)")
+    parser.add_argument("--init-db", action="store_true", help="Initialize database and exit")
     args = parser.parse_args()
 
     if args.init_db:

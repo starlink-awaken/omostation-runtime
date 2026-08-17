@@ -95,9 +95,7 @@ def _write_baseline(state_path: Path, hashes: Mapping[str, str]) -> None:
     )
 
 
-def check_kems(
-    domain_root: Path, *, extra_inbox: Path | None, state_path: Path
-) -> KemsCheck:
+def check_kems(domain_root: Path, *, extra_inbox: Path | None, state_path: Path) -> KemsCheck:
     """Scan legacy KEMS scopes and persist only the baseline under Runtime state."""
     if not domain_root.is_dir():
         raise ValueError("domain root is missing")
@@ -118,9 +116,7 @@ def check_kems(
         changed = tuple(
             scope
             for scope, fingerprint in hashes.items()
-            if previous.get(scope)
-            and previous[scope] != fingerprint
-            and fingerprint != "not_found"
+            if previous.get(scope) and previous[scope] != fingerprint and fingerprint != "not_found"
         )
     _write_baseline(state_path, hashes)
     return KemsCheck("changed" if changed else "ok", baseline, changed)

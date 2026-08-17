@@ -60,3 +60,14 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
 ]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "PLE", "RUF100"]
+ignore = ["S101", "S603", "S607", "S108", "S110", "S112", "S310", "S314", "S608", "S602", "S103", "S105", "S605", "S324", "S104", "E402", "E501", "SIM115", "N813", "UP047", "F401", "F841", "N806", "W291", "W292", "E741", "RUF100", "S311", "N999", "UP022", "E722", "S102", "UP042", "F403", "E701", "E702"]
+
+[tool.ruff.format]
+quote-style = "double"

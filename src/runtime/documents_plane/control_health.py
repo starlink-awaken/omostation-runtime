@@ -57,9 +57,7 @@ def _signal_counts(signals: str) -> dict[str, int]:
     }
 
 
-def _facts_view_freshness(
-    facts_view: str | None, *, today: date
-) -> tuple[str, str | None, int | None]:
+def _facts_view_freshness(facts_view: str | None, *, today: date) -> tuple[str, str | None, int | None]:
     if facts_view is None:
         return "missing", None, None
     match = _LAST_REVIEWED.search(facts_view)
@@ -77,9 +75,7 @@ def _facts_view_freshness(
     return "current", reviewed.isoformat(), age_days
 
 
-def inspect_control_health(
-    domain_root: Path, *, today: date | None = None
-) -> ControlHealth:
+def inspect_control_health(domain_root: Path, *, today: date | None = None) -> ControlHealth:
     """Inspect stable controller inputs without running controller subcommands."""
     if not domain_root.is_dir():
         raise ValueError("domain root is missing")
@@ -118,9 +114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command != "inspect":  # pragma: no cover - argparse owns this boundary
         return 2
     try:
-        domain = resolve_documents_read_path(
-            documents_content_root(), args.domain_relative
-        )
+        domain = resolve_documents_read_path(documents_content_root(), args.domain_relative)
         result = inspect_control_health(domain)
     except (DocumentsPlanePathError, OSError, ValueError) as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))

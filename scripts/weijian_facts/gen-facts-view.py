@@ -104,16 +104,10 @@ def render(domain_root: Path) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True, type=Path, help="Documents 域根目录")
-    parser.add_argument(
-        "--out", type=Path, help="生成视图路径（默认 _entities/facts.md）"
-    )
+    parser.add_argument("--out", type=Path, help="生成视图路径（默认 _entities/facts.md）")
     args = parser.parse_args()
     domain = args.root.expanduser().resolve()
-    output = (
-        args.out.expanduser().resolve()
-        if args.out
-        else domain / "_entities" / "facts.md"
-    )
+    output = args.out.expanduser().resolve() if args.out else domain / "_entities" / "facts.md"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(render(domain) + "\n", encoding="utf-8")
     print(f"generated {output}")

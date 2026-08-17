@@ -17,9 +17,7 @@ from typing import Any
 class PreFlightViolationError(Exception):
     """Raised when an Agent action violates MOF governance constraints."""
 
-    def __init__(
-        self, rule_id: str, violation_code: str, summary: str, remediation: str
-    ) -> None:
+    def __init__(self, rule_id: str, violation_code: str, summary: str, remediation: str) -> None:
         super().__init__(f"[{rule_id} / {violation_code}] {summary}: {remediation}")
         self.rule_id = rule_id
         self.violation_code = violation_code
@@ -77,9 +75,7 @@ class GovernanceInterceptor:
             "replace_file_content",
             "multi_replace_file_content",
         ):
-            target_file = str(
-                arguments.get("TargetFile") or arguments.get("target_file") or ""
-            )
+            target_file = str(arguments.get("TargetFile") or arguments.get("target_file") or "")
             code_content = str(
                 arguments.get("CodeContent")
                 or arguments.get("ReplacementContent")
@@ -88,9 +84,7 @@ class GovernanceInterceptor:
             )
 
             # 1a. Check path boundary & Documents dual-plane rules
-            path_res = self.path_inspector.inspect_write(
-                target_file, caller_domain=caller_domain
-            )
+            path_res = self.path_inspector.inspect_write(target_file, caller_domain=caller_domain)
             if not path_res.passed:
                 v = path_res.violations[0]
                 allowed = False
@@ -98,9 +92,7 @@ class GovernanceInterceptor:
 
             # 1b. Check AST for Python code
             elif target_file.endswith(".py") or "import " in code_content:
-                violations = self.ast_inspector.inspect_code(
-                    code_content, caller_layer=caller_layer
-                )
+                violations = self.ast_inspector.inspect_code(code_content, caller_layer=caller_layer)
                 if violations:
                     v = violations[0]
                     allowed = False
@@ -116,9 +108,7 @@ class GovernanceInterceptor:
 
         # 2. Shell command execution inspection
         elif tool_name in ("run_command", "execute_command"):
-            command_line = str(
-                arguments.get("CommandLine") or arguments.get("command_line") or ""
-            )
+            command_line = str(arguments.get("CommandLine") or arguments.get("command_line") or "")
             cmd_res = self.command_inspector.inspect_command(command_line)
             if not cmd_res.passed:
                 v = cmd_res.violations[0]
@@ -178,16 +168,12 @@ class GovernanceInterceptor:
                 remediation=v["remediation"],
             )
 
-    def get_guardrail_prompt(
-        self, domain: str = "default", layer: str = "L3", max_rules: int = 5
-    ) -> str:
+    def get_guardrail_prompt(self, domain: str = "default", layer: str = "L3", max_rules: int = 5) -> str:
         """Synthesize active MOF guardrail block for Agent System Prompts."""
         try:
             from ecos.ssot.compiler.context_synthesizer import MOFContextSynthesizer
 
-            return MOFContextSynthesizer().synthesize_guardrails(
-                domain=domain, layer=layer, max_rules=max_rules
-            )
+            return MOFContextSynthesizer().synthesize_guardrails(domain=domain, layer=layer, max_rules=max_rules)
         except ImportError:
             return (
                 f'<mof_architecture_guardrails domain="{domain}" layer="{layer}">\n'
@@ -202,9 +188,7 @@ class GovernanceInterceptor:
         try:
             from ecos.ssot.compiler.context_synthesizer import MOFContextSynthesizer
 
-            return MOFContextSynthesizer().synthesize_documents_guardrails(
-                domain_id=domain_id
-            )
+            return MOFContextSynthesizer().synthesize_documents_guardrails(domain_id=domain_id)
         except ImportError:
             return (
                 f'<documents_dual_plane_guardrails domain="{domain_id}">\n'
@@ -286,11 +270,7 @@ class _FallbackAstInspector:
                                 alias.name,
                             )
                         )
-            elif (
-                isinstance(node, ast.ImportFrom)
-                and node.module
-                and self._matches(node.module)
-            ):
+            elif isinstance(node, ast.ImportFrom) and node.module and self._matches(node.module):
                 violations.append(
                     _SimpleViolation(
                         "X1-C02",
@@ -329,10 +309,7 @@ class _FallbackPathInspector:
             )
         )
         if is_doc:
-            if any(
-                norm.endswith(ext)
-                for ext in (".py", ".sh", ".bash", ".js", ".ts", ".rb", ".go")
-            ):
+            if any(norm.endswith(ext) for ext in (".py", ".sh", ".bash", ".js", ".ts", ".rb", ".go")):
                 return _SimpleEvalResult(
                     False,
                     [
@@ -369,9 +346,7 @@ class _FallbackPathInspector:
 
 class _FallbackCommandInspector:
     def inspect_command(self, command_line: str) -> Any:
-        if re.search(
-            r"\bpip\s+install\s+(-g|--global|--user)\b", command_line, re.IGNORECASE
-        ):
+        if re.search(r"\bpip\s+install\s+(-g|--global|--user)\b", command_line, re.IGNORECASE):
             return _SimpleEvalResult(
                 False,
                 [

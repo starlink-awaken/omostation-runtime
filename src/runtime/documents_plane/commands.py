@@ -32,11 +32,7 @@ class CommandResult:
 
 def normalize_argv(argv: Sequence[str]) -> tuple[str, ...]:
     """Accept only a non-empty argv list; shell strings are intentionally refused."""
-    if (
-        isinstance(argv, str)
-        or not argv
-        or not all(isinstance(value, str) and value for value in argv)
-    ):
+    if isinstance(argv, str) or not argv or not all(isinstance(value, str) and value for value in argv):
         raise ValueError("owner command must be a non-empty argv list of strings")
     return tuple(argv)
 
@@ -49,18 +45,13 @@ def _sbpl_quote(path: Path) -> str:
     return str(path).replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _sandbox_argv(
-    command: tuple[str, ...], allowed_write_roots: Sequence[Path]
-) -> tuple[str, ...] | None:
+def _sandbox_argv(command: tuple[str, ...], allowed_write_roots: Sequence[Path]) -> tuple[str, ...] | None:
     """Build a macOS-only no-shell argv; other platforms must fail closed."""
     sandbox_exec = "/usr/bin/sandbox-exec"
     if sys.platform != "darwin" or not os.path.isfile(sandbox_exec):
         return None
     profile_rules = ["(version 1)", "(allow default)", "(deny file-write*)"]
-    profile_rules.extend(
-        f'(allow file-write* (subpath "{_sbpl_quote(root)}"))'
-        for root in allowed_write_roots
-    )
+    profile_rules.extend(f'(allow file-write* (subpath "{_sbpl_quote(root)}"))' for root in allowed_write_roots)
     return (sandbox_exec, "-p", "\n".join(profile_rules), *command)
 
 
@@ -165,9 +156,7 @@ def _terminate_direct_children(parent_pid: int) -> None:
             pass
 
 
-def _timeout_result(
-    process: subprocess.Popen[bytes], *, command: tuple[str, ...], timeout: float
-) -> CommandResult:
+def _timeout_result(process: subprocess.Popen[bytes], *, command: tuple[str, ...], timeout: float) -> CommandResult:
     """Bounded kill/reap path; detached pipe holders cannot stall Runtime forever."""
     _terminate_direct_children(process.pid)
     try:
@@ -225,9 +214,7 @@ def run_owner_command(
         output_root.mkdir(parents=True, exist_ok=True)
         output_root, documents = require_disjoint_roots(output_root, documents)
         fresh_work = _create_fresh_work_root(output_root, work_root)
-        cwd, environment = _execution_environment(
-            fresh_work, output_root, documents, environ
-        )
+        cwd, environment = _execution_environment(fresh_work, output_root, documents, environ)
     except OSError as exc:
         return CommandResult(
             argv=command,
@@ -266,13 +253,9 @@ def run_owner_command(
             start_new_session=True,
         )
     except FileNotFoundError:
-        return CommandResult(
-            command, 127, "", f"owner command not found: {command[0]}\n", False
-        )
+        return CommandResult(command, 127, "", f"owner command not found: {command[0]}\n", False)
     except OSError as exc:
-        return CommandResult(
-            command, 74, "", f"owner process setup failed: {exc}\n", False, str(exc)
-        )
+        return CommandResult(command, 74, "", f"owner process setup failed: {exc}\n", False, str(exc))
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:

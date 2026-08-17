@@ -1,4 +1,5 @@
 """G-CONV.3: summarize_system_health_snapshot de-false-positive + single-source."""
+
 from __future__ import annotations
 
 from runtime.adapters.omo import _daemon_is_online, summarize_system_health_snapshot
@@ -41,20 +42,12 @@ def test_idle_daemon_counts_online():
 def test_only_running_would_have_been_075():
     """Regression: old code used status=='running' only → idle ollama made 0.75."""
     assert _daemon_is_online({"runtime": {"status": "idle"}, "health_check": "healthy"})
-    assert _daemon_is_online(
-        {"runtime": {"status": "running"}, "health_check": "unhealthy (probe)"}
-    )
-    assert _daemon_is_online(
-        {"runtime": {"status": "degraded"}, "health_check": "healthy (probe)"}
-    )
-    assert not _daemon_is_online(
-        {"runtime": {"status": "dead"}, "health_check": "unhealthy"}
-    )
+    assert _daemon_is_online({"runtime": {"status": "running"}, "health_check": "unhealthy (probe)"})
+    assert _daemon_is_online({"runtime": {"status": "degraded"}, "health_check": "healthy (probe)"})
+    assert not _daemon_is_online({"runtime": {"status": "dead"}, "health_check": "unhealthy"})
 
 
 def test_zero_daemons_ratio_none():
-    summary = summarize_system_health_snapshot(
-        {"services": {"x": {"type": "cli", "runtime": {"status": "running"}}}}
-    )
+    summary = summarize_system_health_snapshot({"services": {"x": {"type": "cli", "runtime": {"status": "running"}}}})
     assert summary["total_services"] == 0
     assert summary["ratio"] is None

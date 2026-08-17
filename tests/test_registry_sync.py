@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from runtime.registry.sync import GossipSync, Peer, SyncResult
 
 # ── Fixtures ──────────────────────────────────────────────────
@@ -310,6 +311,7 @@ async def test_on_push_callback_exception_is_caught():
     """A failing on_push callback must not crash the push flow."""
     store = MagicMock()
     from runtime.registry.models import AgentInfo
+
     agent = AgentInfo(name="test", node_id="node-a")
     store.list_agents.return_value = [agent]
     store.get_agent.return_value = None

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
+
 from runtime.registry.push import PushResult, PushTrigger
 
 
@@ -45,11 +46,13 @@ class TestPushTriggerE2E:
             received.append(peer_id)
             return PushResult(peer_id=peer_id, success=True, status_code=200)
 
-        trigger = PushTrigger(peers={
-            "peer-1": "http://p1:8000",
-            "peer-2": "http://p2:8000",
-            "peer-3": "http://p3:8000",
-        })
+        trigger = PushTrigger(
+            peers={
+                "peer-1": "http://p1:8000",
+                "peer-2": "http://p2:8000",
+                "peer-3": "http://p3:8000",
+            }
+        )
         trigger._push_to_peer = _mock_push  # type: ignore
 
         results = await trigger.push_delta({"type": "heartbeat", "agent_id": "a1"}, "self")

@@ -6,7 +6,7 @@ import argparse
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -39,9 +39,7 @@ def _contains_forbidden_key(value: object) -> bool:
 
 
 def _canonical_manifest(manifest: dict[str, Any]) -> bytes:
-    return json.dumps(
-        manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    return json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _manifest_contract(manifest: dict[str, Any]) -> tuple[str, str, str, int]:
@@ -59,9 +57,7 @@ def _manifest_contract(manifest: dict[str, Any]) -> tuple[str, str, str, int]:
         if not isinstance(document, dict):
             raise ReceiptError("manifest document must be an object")
         source_ref = document.get("source_ref")
-        if not isinstance(source_ref, str) or not source_ref.startswith(
-            "vault://redacted/"
-        ):
+        if not isinstance(source_ref, str) or not source_ref.startswith("vault://redacted/"):
             raise ReceiptError("manifest source_ref must be redacted")
     canonical = dict(manifest)
     canonical.pop("manifest_sha256", None)
@@ -100,7 +96,7 @@ def build_receipt(
         "status": status,
         "transport": mode,
         # timezone.utc is required here because this script supports system Python 3.9.
-        "recorded_at": recorded_at or datetime.now(timezone.utc).isoformat(),
+        "recorded_at": recorded_at or datetime.now(UTC).isoformat(),
     }
 
 

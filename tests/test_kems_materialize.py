@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location("kems_materialize", Path(__file__).parents[1] / "scripts" / "kems-materialize.py")
+_SPEC = importlib.util.spec_from_file_location(
+    "kems_materialize", Path(__file__).parents[1] / "scripts" / "kems-materialize.py"
+)
 assert _SPEC and _SPEC.loader
 kems_materialize = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(kems_materialize)

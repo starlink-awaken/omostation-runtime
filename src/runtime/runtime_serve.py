@@ -58,9 +58,7 @@ def _action_run_task(args: dict[str, Any]) -> dict[str, Any]:
     task = args.get("task", args.get("name", ""))
     task_id = f"task-{uuid.uuid4().hex[:8]}"
     try:
-        result = (
-            executor.execute(task) if hasattr(executor, "execute") else {"echo": task}
-        )
+        result = executor.execute(task) if hasattr(executor, "execute") else {"echo": task}
     except Exception as exc:  # noqa: BLE001  # defensive fallback
         result = {"_execute_error": f"{type(exc).__name__}: {exc}"}
     _TASK_STATE[task_id] = {

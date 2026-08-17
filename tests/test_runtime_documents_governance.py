@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from runtime.governance.interceptor import GovernanceInterceptor
 from runtime.mcp_server import (
     handle_documents_audit,

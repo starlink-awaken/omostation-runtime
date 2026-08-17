@@ -10,9 +10,7 @@ from runtime.board_engine import (
 
 
 def test_persona_router_explicit_mention():
-    role, cleaned = PersonaRouter.parse_at_mention(
-        "@Devil 我们是否要重构底层的控制面通信索引？"
-    )
+    role, cleaned = PersonaRouter.parse_at_mention("@Devil 我们是否要重构底层的控制面通信索引？")
     assert role == PersonaRole.DEVIL
     assert cleaned == "我们是否要重构底层的控制面通信索引？"
 
@@ -35,9 +33,7 @@ def test_auto_route_mode_b():
 
 def test_execute_mode_a_full_debate():
     engine = BoardConsensusEngine(session_id="test-mode-a")
-    res = engine.execute(
-        "@Sage 进行全栈控制面系统重构与架构评审", mode=BoardMode.MODE_A
-    )
+    res = engine.execute("@Sage 进行全栈控制面系统重构与架构评审", mode=BoardMode.MODE_A)
     assert res.mode == BoardMode.MODE_A.value
     assert res.status == "CONSENSUS_REACHED"
     assert len(res.transcript) == 4

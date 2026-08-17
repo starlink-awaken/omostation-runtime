@@ -77,12 +77,8 @@ def test_inspect_model_freshness_reports_only_aggregate_attention(
 def test_readme_is_excluded_and_equal_or_later_models_are_fresh(tmp_path: Path) -> None:
     domain = _write_domain(tmp_path)
     models = domain / "_entities" / "models"
-    models.joinpath("stale-model.md").write_text(
-        "last-reviewed: 2026-08-13\n", encoding="utf-8"
-    )
-    models.joinpath("README.md").write_text(
-        "last-reviewed: invalid\nmodel body documentation\n", encoding="utf-8"
-    )
+    models.joinpath("stale-model.md").write_text("last-reviewed: 2026-08-13\n", encoding="utf-8")
+    models.joinpath("README.md").write_text("last-reviewed: invalid\nmodel body documentation\n", encoding="utf-8")
 
     result = inspect_model_freshness(domain, today=date(2026, 8, 14))
 
@@ -133,9 +129,7 @@ def test_facts_contract_failures_are_unavailable_without_identity(
         ("symlink", "models_directory_not_direct"),
     ],
 )
-def test_models_directory_contract_failures_are_unavailable(
-    tmp_path: Path, mutation: str, expected_error: str
-) -> None:
+def test_models_directory_contract_failures_are_unavailable(tmp_path: Path, mutation: str, expected_error: str) -> None:
     domain = _write_domain(tmp_path)
     models = domain / "_entities" / "models"
     for path in models.iterdir():
@@ -159,9 +153,7 @@ def test_entities_symlink_cannot_read_valid_content_outside_domain(
     external = tmp_path / "external-private-content"
     external_models = external / "models"
     external_models.mkdir(parents=True)
-    external.joinpath("facts.md").write_text(
-        "last-reviewed: 2026-08-13\nexternal facts body\n", encoding="utf-8"
-    )
+    external.joinpath("facts.md").write_text("last-reviewed: 2026-08-13\nexternal facts body\n", encoding="utf-8")
     external_models.joinpath("external-private-model.md").write_text(
         "last-reviewed: 2026-08-14\nexternal model body\n", encoding="utf-8"
     )
@@ -217,9 +209,7 @@ def test_model_contract_failures_are_unavailable_without_identity(
     assert result.unreadable_regular_file_count == unreadable_count
 
 
-@pytest.mark.parametrize(
-    ("reviewed", "expected_exit"), [("2026-08-14", 0), ("2026-08-12", 1)]
-)
+@pytest.mark.parametrize(("reviewed", "expected_exit"), [("2026-08-14", 0), ("2026-08-12", 1)])
 def test_cli_prints_sorted_bounded_json_and_maps_status_to_exit_code(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -229,12 +219,8 @@ def test_cli_prints_sorted_bounded_json_and_maps_status_to_exit_code(
 ) -> None:
     domain = _write_domain(tmp_path)
     models = domain / "_entities" / "models"
-    models.joinpath("fresh-model.md").write_text(
-        f"last-reviewed: {reviewed}\n", encoding="utf-8"
-    )
-    models.joinpath("stale-model.md").write_text(
-        f"last-reviewed: {reviewed}\n", encoding="utf-8"
-    )
+    models.joinpath("fresh-model.md").write_text(f"last-reviewed: {reviewed}\n", encoding="utf-8")
+    models.joinpath("stale-model.md").write_text(f"last-reviewed: {reviewed}\n", encoding="utf-8")
     monkeypatch.setenv("DOCUMENTS_CONTENT_ROOT", str(tmp_path / "Documents"))
 
     exit_code = main(["inspect", "--domain-relative", "@工作文档/卫健委"])

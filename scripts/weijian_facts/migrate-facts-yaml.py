@@ -47,9 +47,7 @@ def _summary(statement: str) -> str:
 def parse_legacy(source: Path) -> list[dict[str, object]]:
     lines = source.read_text(encoding="utf-8").splitlines()
     start = next(i for i, line in enumerate(lines) if line.strip() == "## 活跃事实")
-    end = next(
-        i for i, line in enumerate(lines) if line.strip() == "## 事实生命周期规则"
-    )
+    end = next(i for i, line in enumerate(lines) if line.strip() == "## 事实生命周期规则")
     sequence: Counter[str] = Counter()
     facts: list[dict[str, object]] = []
     for line in lines[start:end]:
@@ -88,11 +86,7 @@ def parse_legacy(source: Path) -> list[dict[str, object]]:
                 "trust": trust,
                 "verified_at": verified,
                 "expiry": expiry,
-                "entity_ids": [
-                    item.strip()
-                    for item in entities.split(",")
-                    if item.strip() and item.strip() != "-"
-                ],
+                "entity_ids": [item.strip() for item in entities.split(",") if item.strip() and item.strip() != "-"],
                 "status": "active",
             }
         )

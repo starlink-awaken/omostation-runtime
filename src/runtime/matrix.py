@@ -145,9 +145,7 @@ def _parse_entry(raw: dict) -> ServiceEntry:
 
     depends_raw = raw.get("depends_on", "")
     depends_on = (
-        [d.strip() for d in depends_raw.strip("[]").split(",")]
-        if depends_raw and depends_raw != "null"
-        else []
+        [d.strip() for d in depends_raw.strip("[]").split(",")] if depends_raw and depends_raw != "null" else []
     )
 
     return ServiceEntry(
@@ -197,9 +195,8 @@ def health_check_url(url: str | None) -> str:
 
     try:
         r = subprocess.run(
-            ["curl", "-sf", "-o", "/dev/null", "--max-time", "2", url],
-            capture_output=True,
-            timeout=5, check=False)
+            ["curl", "-sf", "-o", "/dev/null", "--max-time", "2", url], capture_output=True, timeout=5, check=False
+        )
         return "healthy" if r.returncode == 0 else "unreachable"
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return "error"

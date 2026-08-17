@@ -127,7 +127,14 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     @app.post("/agents", response_model=AgentResponse, status_code=201)
     def register_agent(req: RegisterAgentRequest) -> AgentResponse:
         caps = [Capability(name=c.name, tags=c.tags, cost_eu=c.cost_eu) for c in req.capabilities]
-        agent = AgentInfo(name=req.name, node_id=req.node_id, endpoint=req.endpoint, capabilities=caps, max_concurrency=req.max_concurrency, metadata=req.metadata)
+        agent = AgentInfo(
+            name=req.name,
+            node_id=req.node_id,
+            endpoint=req.endpoint,
+            capabilities=caps,
+            max_concurrency=req.max_concurrency,
+            metadata=req.metadata,
+        )
         _get_store().register_agent(agent)
         _get_sync().notify_local_mutation()
         return _agent_to_response(agent)
@@ -137,7 +144,9 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
         return [_agent_to_response(a) for a in _get_store().list_agents()]
 
     @app.get("/agents/find", response_model=list[AgentResponse])
-    def find_agents(capability: str | None = Query(None), status: str | None = Query(None), node_id: str | None = Query(None)) -> list[AgentResponse]:
+    def find_agents(
+        capability: str | None = Query(None), status: str | None = Query(None), node_id: str | None = Query(None)
+    ) -> list[AgentResponse]:
         caps = [capability] if capability else None
         st = AgentStatus(status) if status else None
         return [_agent_to_response(a) for a in _get_store().find_agents(caps, st, node_id)]
@@ -189,7 +198,9 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     @app.post("/tasks", status_code=201)
     async def submit_task(req: SubmitTaskRequest) -> dict:
         assert _fallback is not None
-        request = TaskRequest(name=req.name, required_capabilities=req.required_capabilities, priority=req.priority, payload=req.payload)
+        request = TaskRequest(
+            name=req.name, required_capabilities=req.required_capabilities, priority=req.priority, payload=req.payload
+        )
         event = await _fallback.submit_with_fallback(request)
         if event.result == FallbackResult.DISPATCHED:
             assignment = _dispatcher.get_assignment(event.task_id)
@@ -207,11 +218,23 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     def list_tasks(status: str | None = Query(None)) -> list[dict]:
         st = TaskStatus(status) if status else None
         assignments = _dispatcher.get_assignments(st)
-        return [{"task_id": a.task_id, "agent_id": a.agent_id, "agent_name": a.agent_name, "status": a.status.value, "assigned_at": a.assigned_at.isoformat()} for a in assignments]
+        return [
+            {
+                "task_id": a.task_id,
+                "agent_id": a.agent_id,
+                "agent_name": a.agent_name,
+                "status": a.status.value,
+                "assigned_at": a.assigned_at.isoformat(),
+            }
+            for a in assignments
+        ]
 
     @app.get("/tasks/pending")
     def list_pending_tasks() -> list[dict]:
-        return [{"task_id": t.task_id, "name": t.name, "required_capabilities": t.required_capabilities} for t in _dispatcher.get_pending()]
+        return [
+            {"task_id": t.task_id, "name": t.name, "required_capabilities": t.required_capabilities}
+            for t in _dispatcher.get_pending()
+        ]
 
     @app.post("/tasks/{task_id}/complete")
     def complete_task(task_id: str) -> dict:
@@ -232,7 +255,10 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
     @app.post("/tasks/dispatch-pending")
     def dispatch_pending() -> dict:
         assigned = _dispatcher.dispatch_pending()
-        return {"dispatched": len(assigned), "assignments": [{"task_id": a.task_id, "agent_id": a.agent_id} for a in assigned]}
+        return {
+            "dispatched": len(assigned),
+            "assignments": [{"task_id": a.task_id, "agent_id": a.agent_id} for a in assigned],
+        }
 
     @app.post("/sync/delta")
     def apply_sync_delta(req: SyncDeltaRequest) -> dict:
@@ -276,7 +302,9 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
         store = _store
         agents = store.list_agents()
         healthy = [a for a in agents if a.status != AgentStatus.OFFLINE]
-        return HealthResponse(status="ok", agents=len(agents), nodes=len(store.list_nodes()), healthy_agents=len(healthy))
+        return HealthResponse(
+            status="ok", agents=len(agents), nodes=len(store.list_nodes()), healthy_agents=len(healthy)
+        )
 
     @app.get("/tasks/fallback/status")
     def fallback_status() -> dict:
@@ -306,17 +334,28 @@ def create_app(persist_path: str | None = None, node_id: str = "local") -> FastA
 
 def _agent_to_response(a: AgentInfo) -> AgentResponse:
     return AgentResponse(
-        agent_id=a.agent_id, name=a.name, node_id=a.node_id, endpoint=a.endpoint,
+        agent_id=a.agent_id,
+        name=a.name,
+        node_id=a.node_id,
+        endpoint=a.endpoint,
         capabilities=[CapabilitySchema(name=c.name, tags=c.tags, cost_eu=c.cost_eu) for c in a.capabilities],
-        status=a.status.value, max_concurrency=a.max_concurrency, active_tasks=a.active_tasks,
-        load_ratio=round(a.load_ratio, 3), last_heartbeat=a.last_heartbeat.isoformat(),
+        status=a.status.value,
+        max_concurrency=a.max_concurrency,
+        active_tasks=a.active_tasks,
+        load_ratio=round(a.load_ratio, 3),
+        last_heartbeat=a.last_heartbeat.isoformat(),
     )
 
 
 def _node_to_response(n: NodeInfo) -> NodeResponse:
     return NodeResponse(
-        node_id=n.node_id, host=n.host, port=n.port, role=n.role.value,
-        health=n.health, load_score=n.load_score, last_heartbeat=n.last_heartbeat.isoformat(),
+        node_id=n.node_id,
+        host=n.host,
+        port=n.port,
+        role=n.role.value,
+        health=n.health,
+        load_score=n.load_score,
+        last_heartbeat=n.last_heartbeat.isoformat(),
     )
 
 

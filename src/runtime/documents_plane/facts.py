@@ -82,9 +82,7 @@ def _facts_files(facts_dir: Path) -> tuple[tuple[Path, ...], tuple[str, ...]]:
     return tuple(files), tuple(errors)
 
 
-def _validate_fact(
-    fact: object, *, source_name: str, errors: list[str], warnings: list[str]
-) -> dict[str, Any] | None:
+def _validate_fact(fact: object, *, source_name: str, errors: list[str], warnings: list[str]) -> dict[str, Any] | None:
     if not isinstance(fact, dict):
         errors.append(f"{source_name}: fact must be a mapping")
         return None
@@ -134,15 +132,11 @@ def audit_facts(domain_root: Path) -> FactAudit:
         except (OSError, UnicodeError, yaml.YAMLError) as exc:
             errors.append(f"{path.name}: cannot load YAML: {exc}")
             continue
-        if not isinstance(document, dict) or not isinstance(
-            document.get("facts"), list
-        ):
+        if not isinstance(document, dict) or not isinstance(document.get("facts"), list):
             errors.append(f"{path.name}: facts must be a list")
             continue
         for fact in document["facts"]:
-            validated = _validate_fact(
-                fact, source_name=path.name, errors=errors, warnings=warnings
-            )
+            validated = _validate_fact(fact, source_name=path.name, errors=errors, warnings=warnings)
             if validated is not None:
                 all_facts.append(validated)
 
@@ -161,10 +155,7 @@ def audit_facts(domain_root: Path) -> FactAudit:
             if not isinstance(index, dict):
                 errors.append("_index.yaml: expected mapping")
             elif index.get("facts_total") != len(all_facts):
-                errors.append(
-                    "facts_total mismatch: "
-                    f"index={index.get('facts_total')!r}, actual={len(all_facts)}"
-                )
+                errors.append(f"facts_total mismatch: index={index.get('facts_total')!r}, actual={len(all_facts)}")
             elif index.get("by_type") is not None and index["by_type"] != by_type:
                 errors.append("by_type mismatch between index and facts files")
 
@@ -187,9 +178,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command != "audit":  # pragma: no cover - argparse owns this boundary
         return 2
     try:
-        domain = resolve_documents_read_path(
-            documents_content_root(), args.domain_relative
-        )
+        domain = resolve_documents_read_path(documents_content_root(), args.domain_relative)
     except DocumentsPlanePathError as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         return 2

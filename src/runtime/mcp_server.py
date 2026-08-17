@@ -382,9 +382,7 @@ def handle_governance_guardrails(
     from runtime.governance.interceptor import GovernanceInterceptor
 
     interceptor = GovernanceInterceptor()
-    prompt = interceptor.get_guardrail_prompt(
-        domain=domain, layer=layer, max_rules=max_rules
-    )
+    prompt = interceptor.get_guardrail_prompt(domain=domain, layer=layer, max_rules=max_rules)
     return {
         "domain": domain,
         "layer": layer,
@@ -482,9 +480,7 @@ try:
         caller_layer: str = "L3",
         caller_domain: str = "default",
     ) -> dict:
-        return handle_governance_preflight(
-            tool_name, arguments, caller_layer, caller_domain
-        )
+        return handle_governance_preflight(tool_name, arguments, caller_layer, caller_domain)
 
     @mcp.tool()
     def runtime_governance_guardrails(

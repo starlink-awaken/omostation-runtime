@@ -95,9 +95,7 @@ def _read_regular_file(
         return None, unreadable_error
 
 
-def inspect_model_freshness(
-    domain_root: Path, *, today: date | None = None
-) -> ModelFreshness:
+def inspect_model_freshness(domain_root: Path, *, today: date | None = None) -> ModelFreshness:
     """Compare first-level model review dates with the facts review baseline."""
     checked_on = datetime.now(UTC).date() if today is None else today
     try:
@@ -157,11 +155,7 @@ def inspect_model_freshness(
         )
     try:
         model_paths = sorted(
-            (
-                path
-                for path in models_dir.iterdir()
-                if path.suffix == ".md" and path.name != "README.md"
-            ),
+            (path for path in models_dir.iterdir() if path.suffix == ".md" and path.name != "README.md"),
             key=lambda path: path.name,
         )
     except OSError:
@@ -192,9 +186,7 @@ def inspect_model_freshness(
                 model_error,
                 facts_last_reviewed=facts_reviewed_text,
                 model_markdown_count=model_count,
-                unreadable_regular_file_count=int(
-                    model_error == "model_file_unreadable"
-                ),
+                unreadable_regular_file_count=int(model_error == "model_file_unreadable"),
             )
         reviewed, model_reviewed_error = _reviewed_on(text or "")
         if model_reviewed_error is not None:
@@ -240,9 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command != "inspect":  # pragma: no cover - argparse owns this boundary
         return 2
     try:
-        domain = resolve_documents_read_path(
-            documents_content_root(), args.domain_relative
-        )
+        domain = resolve_documents_read_path(documents_content_root(), args.domain_relative)
         result = inspect_model_freshness(domain)
     except (DocumentsPlanePathError, OSError, ValueError):
         result = _unavailable(datetime.now(UTC).date(), "domain_path_invalid")

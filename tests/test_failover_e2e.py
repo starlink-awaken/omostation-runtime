@@ -12,6 +12,7 @@ Wires real RegistryStore + Dispatcher + FailoverManager together
 from __future__ import annotations
 
 import pytest
+
 from runtime.registry.dispatch import Dispatcher, TaskRequest
 from runtime.registry.failover import FailoverManager
 from runtime.registry.models import AgentInfo, AgentStatus, Capability

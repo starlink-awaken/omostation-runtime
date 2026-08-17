@@ -15,7 +15,7 @@ import threading
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ _UNAVAILABLE_EXCEPTIONS = (TimeoutError, ConnectionError)
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _digest(value: Any) -> str:
@@ -98,9 +98,7 @@ class EffectOutcome:
     ) -> dict[str, Any]:
         """Build a credential-free receipt accepted by OMO's receipt broker."""
         if self.status not in _RECEIPT_STATES:
-            raise ValueError(
-                f"effect status {self.status!r} cannot become external evidence"
-            )
+            raise ValueError(f"effect status {self.status!r} cannot become external evidence")
         if self.status == "succeeded" and not self.result_digest:
             raise ValueError("successful effect requires a result digest")
         return {
@@ -164,9 +162,7 @@ def _effect_from_record(record: Mapping[str, Any], *, replayed: bool) -> EffectO
     )
 
 
-def _compensation_from_record(
-    record: Mapping[str, Any], *, replayed: bool
-) -> CompensationOutcome:
+def _compensation_from_record(record: Mapping[str, Any], *, replayed: bool) -> CompensationOutcome:
     return CompensationOutcome(
         effect_key=str(record["effect_key"]),
         status=str(record["status"]),
@@ -182,14 +178,10 @@ def _compensation_from_record(
 class WorkflowEffectStore:
     """Append-only effect journal with process-safe replay and compensation."""
 
-    def __init__(
-        self, path: str | Path, *, lock_path: str | Path | None = None
-    ) -> None:
+    def __init__(self, path: str | Path, *, lock_path: str | Path | None = None) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.lock_path = (
-            Path(lock_path) if lock_path else self.path.with_suffix(".lock")
-        )
+        self.lock_path = Path(lock_path) if lock_path else self.path.with_suffix(".lock")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         self._log = AppendOnlyLog(self.path)
         self._thread_lock = threading.RLock()
@@ -214,8 +206,7 @@ class WorkflowEffectStore:
         matches = [
             record
             for record in self._records_unlocked()
-            if record.get("effect_key") == effect_key
-            and record.get("record_type", "effect") == "effect"
+            if record.get("effect_key") == effect_key and record.get("record_type", "effect") == "effect"
         ]
         return matches[-1] if matches else None
 
@@ -223,19 +214,14 @@ class WorkflowEffectStore:
         matches = [
             record
             for record in self._records_unlocked()
-            if record.get("effect_key") == effect_key
-            and record.get("record_type") == "compensation"
+            if record.get("effect_key") == effect_key and record.get("record_type") == "compensation"
         ]
         return matches[-1] if matches else None
 
     def get(self, effect_key: str) -> dict[str, Any] | None:
         """Return the latest local journal record for diagnostics/replay."""
         with self._exclusive():
-            records = [
-                record
-                for record in self._records_unlocked()
-                if record.get("effect_key") == effect_key
-            ]
+            records = [record for record in self._records_unlocked() if record.get("effect_key") == effect_key]
             return records[-1] if records else None
 
     def execute_once_with_outcome(
@@ -320,9 +306,7 @@ class WorkflowEffectStore:
             self._log.append(record)
             return _compensation_from_record(record, replayed=False)
 
-    def execute_once(
-        self, effect_key: str, effect: Callable[[], dict[str, Any]]
-    ) -> dict[str, Any]:
+    def execute_once(self, effect_key: str, effect: Callable[[], dict[str, Any]]) -> dict[str, Any]:
         """Backward-compatible result API used by existing Runtime callers."""
         outcome = self.execute_once_with_outcome(effect_key, effect)
         if outcome.status not in _RECEIPT_STATES:

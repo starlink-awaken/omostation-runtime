@@ -15,11 +15,7 @@ class DocumentsPlanePathError(ValueError):
 def documents_content_root(environ: Mapping[str, str] | None = None) -> Path:
     """Return the read-only Documents root without creating or writing it."""
     env = os.environ if environ is None else environ
-    return (
-        Path(env.get("DOCUMENTS_CONTENT_ROOT", str(Path.home() / "Documents")))
-        .expanduser()
-        .resolve()
-    )
+    return Path(env.get("DOCUMENTS_CONTENT_ROOT", str(Path.home() / "Documents"))).expanduser().resolve()
 
 
 def runtime_state_root(environ: Mapping[str, str] | None = None) -> Path:
@@ -48,10 +44,7 @@ def _identity_parts(path: Path) -> tuple[str, ...]:
 def _identity_within(path: Path, root: Path) -> bool:
     path_parts = _identity_parts(path)
     root_parts = _identity_parts(root)
-    return (
-        len(path_parts) >= len(root_parts)
-        and path_parts[: len(root_parts)] == root_parts
-    )
+    return len(path_parts) >= len(root_parts) and path_parts[: len(root_parts)] == root_parts
 
 
 def _nearest_existing_ancestor(path: Path) -> Path:
@@ -61,9 +54,7 @@ def _nearest_existing_ancestor(path: Path) -> Path:
     return current
 
 
-def require_disjoint_roots(
-    state_root: str | Path, documents_root: str | Path
-) -> tuple[Path, Path]:
+def require_disjoint_roots(state_root: str | Path, documents_root: str | Path) -> tuple[Path, Path]:
     """Resolve and require strictly separate Runtime-state and Documents roots."""
     state = Path(state_root).expanduser().resolve()
     documents = Path(documents_root).expanduser().resolve()
@@ -75,42 +66,26 @@ def require_disjoint_roots(
             same_anchor = os.path.samefile(state_anchor, documents_anchor)
         except OSError:
             same_anchor = True
-    if (
-        _identity_within(state, documents)
-        or _identity_within(documents, state)
-        or same_anchor
-    ):
-        raise DocumentsPlanePathError(
-            "OMOSTATION_RUNTIME_STATE_ROOT and DOCUMENTS_CONTENT_ROOT must not overlap"
-        )
+    if _identity_within(state, documents) or _identity_within(documents, state) or same_anchor:
+        raise DocumentsPlanePathError("OMOSTATION_RUNTIME_STATE_ROOT and DOCUMENTS_CONTENT_ROOT must not overlap")
     return state, documents
 
 
 def _relative_path(value: str | Path, *, label: str) -> Path:
     path = Path(value)
     if path.is_absolute() or ".." in path.parts:
-        raise DocumentsPlanePathError(
-            f"{label} must be a relative, non-traversing path"
-        )
+        raise DocumentsPlanePathError(f"{label} must be a relative, non-traversing path")
     if path == Path("."):
-        raise DocumentsPlanePathError(
-            f"{label} must name a file or directory below its root"
-        )
+        raise DocumentsPlanePathError(f"{label} must name a file or directory below its root")
     return path
 
 
-def resolve_documents_read_path(
-    documents_root: str | Path, relative_path: str | Path
-) -> Path:
+def resolve_documents_read_path(documents_root: str | Path, relative_path: str | Path) -> Path:
     """Resolve a read target and reject traversal or symlink escapes."""
     root = Path(documents_root).expanduser().resolve()
-    candidate = (
-        root / _relative_path(relative_path, label="Documents read path")
-    ).resolve()
+    candidate = (root / _relative_path(relative_path, label="Documents read path")).resolve()
     if not _is_within(candidate, root):
-        raise DocumentsPlanePathError(
-            "Documents read path escapes DOCUMENTS_CONTENT_ROOT"
-        )
+        raise DocumentsPlanePathError("Documents read path escapes DOCUMENTS_CONTENT_ROOT")
     return candidate
 
 
@@ -122,19 +97,13 @@ def resolve_runtime_write_path(
 ) -> Path:
     """Resolve a Runtime write target while refusing Documents and all escapes."""
     state, documents = require_disjoint_roots(state_root, documents_root)
-    candidate = (
-        state / _relative_path(relative_path, label="Runtime write path")
-    ).resolve()
+    candidate = (state / _relative_path(relative_path, label="Runtime write path")).resolve()
     if not _is_within(candidate, state) or _is_within(candidate, documents):
-        raise DocumentsPlanePathError(
-            "Runtime write path escapes OMOSTATION_RUNTIME_STATE_ROOT"
-        )
+        raise DocumentsPlanePathError("Runtime write path escapes OMOSTATION_RUNTIME_STATE_ROOT")
     return candidate
 
 
-def ensure_runtime_state_root(
-    state_root: str | Path, *, documents_root: str | Path
-) -> Path:
+def ensure_runtime_state_root(state_root: str | Path, *, documents_root: str | Path) -> Path:
     """Create the approved Runtime write root after containment validation."""
     state, documents = require_disjoint_roots(state_root, documents_root)
     state.mkdir(parents=True, exist_ok=True)

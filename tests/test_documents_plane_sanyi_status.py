@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+
 from runtime.documents_plane.sanyi_status import inspect_sanyi_status
 
 
@@ -28,9 +29,7 @@ def _write_domain(
     facts_path.write_text(
         "facts:\n"
         + "".join(
-            "  - fid: fact-private\n"
-            f"    entity_ids: [{entity_id}]\n"
-            f"    verified_at: '{verified_at}'\n"
+            f"  - fid: fact-private\n    entity_ids: [{entity_id}]\n    verified_at: '{verified_at}'\n"
             for entity_id, verified_at in selected_facts
         ),
         encoding="utf-8",
@@ -56,18 +55,12 @@ def _mutate_domain(root: Path, mutation: str) -> Path:
         facts_path.write_text("facts: [\n", encoding="utf-8")
     elif mutation == "invalid_verified_at":
         facts_path.write_text(
-            "facts:\n"
-            "  - fid: fact-private\n"
-            "    entity_ids: [proj-syld]\n"
-            "    verified_at: 'not-a-date'\n",
+            "facts:\n  - fid: fact-private\n    entity_ids: [proj-syld]\n    verified_at: 'not-a-date'\n",
             encoding="utf-8",
         )
     elif mutation == "empty_scope":
         facts_path.write_text(
-            "facts:\n"
-            "  - fid: fact-private\n"
-            "    entity_ids: [unrelated]\n"
-            "    verified_at: '2026-08-13'\n",
+            "facts:\n  - fid: fact-private\n    entity_ids: [unrelated]\n    verified_at: '2026-08-13'\n",
             encoding="utf-8",
         )
     else:  # pragma: no cover - helper guard
@@ -106,12 +99,8 @@ def test_inspect_sanyi_status_reports_aggregate_attention_only(tmp_path: Path) -
         "empty_scope",
     ],
 )
-def test_inspect_sanyi_status_fails_closed_without_identity(
-    tmp_path: Path, mutation: str
-) -> None:
-    result = inspect_sanyi_status(
-        _documents_root(_mutate_domain(tmp_path, mutation)), today=date(2026, 8, 14)
-    )
+def test_inspect_sanyi_status_fails_closed_without_identity(tmp_path: Path, mutation: str) -> None:
+    result = inspect_sanyi_status(_documents_root(_mutate_domain(tmp_path, mutation)), today=date(2026, 8, 14))
 
     assert result.status == "unavailable"
     assert result.dashboard_last_reviewed is None
@@ -136,12 +125,7 @@ def test_inspect_sanyi_status_refuses_input_replaced_by_symlink_before_open(
     outside.write_text(
         "---\nlast-reviewed: '2099-01-01'\n---\n# outside-private\n"
         if input_name == "dashboard"
-        else (
-            "facts:\n"
-            "  - fid: outside-private\n"
-            "    entity_ids: [proj-syld]\n"
-            "    verified_at: '2026-08-13'\n"
-        ),
+        else ("facts:\n  - fid: outside-private\n    entity_ids: [proj-syld]\n    verified_at: '2026-08-13'\n"),
         encoding="utf-8",
     )
     original_open = os.open

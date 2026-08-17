@@ -29,7 +29,7 @@ def load_yaml(path: Path) -> dict:
     if not path.exists():
         print(f"ERROR: File not found: {path}")
         sys.exit(1)
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not data:
         print(f"ERROR: Empty or invalid YAML: {path}")
@@ -41,15 +41,9 @@ def validate_usage(protocol: dict, errors: list[str]) -> None:
     """Check that protocol has a valid usage field."""
     usage = protocol.get("usage")
     if not usage:
-        errors.append(
-            f"  [{protocol['name']}] Missing 'usage' field "
-            f"(required: one of {sorted(VALID_USAGES)})"
-        )
+        errors.append(f"  [{protocol['name']}] Missing 'usage' field (required: one of {sorted(VALID_USAGES)})")
     elif usage not in VALID_USAGES:
-        errors.append(
-            f"  [{protocol['name']}] Invalid usage '{usage}' — "
-            f"must be one of {sorted(VALID_USAGES)}"
-        )
+        errors.append(f"  [{protocol['name']}] Invalid usage '{usage}' — must be one of {sorted(VALID_USAGES)}")
 
 
 def validate_transport(protocol: dict, errors: list[str]) -> None:
@@ -59,8 +53,7 @@ def validate_transport(protocol: dict, errors: list[str]) -> None:
         errors.append(f"  [{protocol['name']}] Missing 'transport' field")
     elif isinstance(transport, list) and len(transport) == 0:
         errors.append(
-            f"  [{protocol['name']}] 'transport' is empty list — "
-            f"should specify at least one transport mechanism"
+            f"  [{protocol['name']}] 'transport' is empty list — should specify at least one transport mechanism"
         )
 
 

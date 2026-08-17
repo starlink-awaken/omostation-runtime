@@ -89,7 +89,9 @@ def load_arch_health() -> dict:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=str(workspace / "projects" / "ecos"), check=False)
+            cwd=str(workspace / "projects" / "ecos"),
+            check=False,
+        )
         changed = [line for line in result.stdout.splitlines() if line.strip()]
         git["uncommitted"] = len(changed)
         git["status"] = "clean" if not changed else "dirty"
@@ -104,11 +106,11 @@ def load_arch_health() -> dict:
             capture_output=True,
             text=True,
             timeout=15,
-            cwd=str(workspace / "projects" / "ecos"), check=False)
-        ruff["check"] = "passed" if result.returncode == 0 else "failed"
-        ruff["errors"] = (
-            len(result.stdout.splitlines()) if result.returncode != 0 else 0
+            cwd=str(workspace / "projects" / "ecos"),
+            check=False,
         )
+        ruff["check"] = "passed" if result.returncode == 0 else "failed"
+        ruff["errors"] = len(result.stdout.splitlines()) if result.returncode != 0 else 0
     except Exception as e:  # noqa: BLE001  # defensive fallback
         ruff["error"] = str(e)
 
@@ -167,7 +169,9 @@ def load_arch_health() -> dict:
             ],
             capture_output=True,
             text=True,
-            timeout=10, check=False)
+            timeout=10,
+            check=False,
+        )
         if result.returncode == 0:
             backends = json.loads(result.stdout.strip())
             mcp["total"] = len(backends)
@@ -218,13 +222,9 @@ def load_arch_health() -> dict:
         }
 
         # Weighted total
-        total = sum(
-            d["score"] * d["weight"] / 100 for d in convergence["dimensions"].values()
-        )
+        total = sum(d["score"] * d["weight"] / 100 for d in convergence["dimensions"].values())
         convergence["score"] = round(total)
-        convergence["grade"] = (
-            "GOOD" if total >= 80 else "WARNING" if total >= 60 else "LOW"
-        )
+        convergence["grade"] = "GOOD" if total >= 80 else "WARNING" if total >= 60 else "LOW"
     except Exception:  # noqa: BLE001, S110  # defensive fallback
         pass  # defensive fallback
 

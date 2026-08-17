@@ -33,9 +33,7 @@ def test_kems_check_keeps_baseline_outside_documents_and_reports_changes(
     domain = _domain(documents_root)
     state_path = tmp_path / "runtime" / "kems" / "weijian-check.json"
 
-    initial = check_kems(
-        domain, extra_inbox=documents_root / "_inbox", state_path=state_path
-    )
+    initial = check_kems(domain, extra_inbox=documents_root / "_inbox", state_path=state_path)
 
     assert initial.status == "ok"
     assert initial.baseline == "initialized"
@@ -45,9 +43,7 @@ def test_kems_check_keeps_baseline_outside_documents_and_reports_changes(
 
     control = domain / "_control" / "STATUS.md"
     control.write_text("changed", encoding="utf-8")
-    changed = check_kems(
-        domain, extra_inbox=documents_root / "_inbox", state_path=state_path
-    )
+    changed = check_kems(domain, extra_inbox=documents_root / "_inbox", state_path=state_path)
 
     assert changed.status == "changed"
     assert changed.baseline == "existing"
@@ -108,9 +104,7 @@ def test_default_cli_runs_weijian_kems_check_with_runtime_only_receipt(
         "status": "ok",
     }
     assert not (domain / "_control" / ".kems_check_state.json").exists()
-    assert (
-        tmp_path / "state" / "owner-output" / "documents-weijian-kems-check" / "kems"
-    ).is_dir()
+    assert (tmp_path / "state" / "owner-output" / "documents-weijian-kems-check" / "kems").is_dir()
 
     (domain / "_control" / "STATUS.md").write_text("changed", encoding="utf-8")
     changed_code = main(

@@ -98,12 +98,8 @@ class AgentExecutor:
                     if asyncio.iscoroutinefunction(self._execute_fn)
                     else self._execute_fn(exec_ctx)
                 )
-                state.output = (
-                    result.get("output") if isinstance(result, dict) else str(result)
-                )
-                state.token_usage = (
-                    result.get("tokens", 0) if isinstance(result, dict) else 0
-                )
+                state.output = result.get("output") if isinstance(result, dict) else str(result)
+                state.token_usage = result.get("tokens", 0) if isinstance(result, dict) else 0
                 state.status = AgentExecutionStatus.COMPLETED
                 state.completed_at = time.time()
                 state.error = None

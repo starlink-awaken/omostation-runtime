@@ -194,9 +194,7 @@ class PluginSandboxConfig:
     enabled: bool = True
     allow_read_paths: list[str] = field(default_factory=list)
     allow_write_paths: list[str] = field(default_factory=list)
-    deny_paths: list[str] = field(
-        default_factory=lambda: ["/etc", "/sys", "/proc", "/root"]
-    )
+    deny_paths: list[str] = field(default_factory=lambda: ["/etc", "/sys", "/proc", "/root"])
     allow_network: bool = False
     allow_domains: list[str] = field(default_factory=list)
     allow_spawn: bool = False

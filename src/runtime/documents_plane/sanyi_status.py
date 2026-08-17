@@ -102,9 +102,7 @@ def _open_directory(path: Path, *, unavailable: str) -> int:
     return descriptor
 
 
-def _read_documents_regular_file(
-    documents_root: Path, relative_parts: tuple[str, ...], *, unavailable: str
-) -> str:
+def _read_documents_regular_file(documents_root: Path, relative_parts: tuple[str, ...], *, unavailable: str) -> str:
     """Read one fixed Documents input through no-follow directory descriptors."""
     nofollow = getattr(os, "O_NOFOLLOW", None)
     directory = getattr(os, "O_DIRECTORY", None)
@@ -115,9 +113,7 @@ def _read_documents_regular_file(
     try:
         for component in relative_parts[:-1]:
             try:
-                before = os.stat(
-                    component, dir_fd=directory_descriptor, follow_symlinks=False
-                )
+                before = os.stat(component, dir_fd=directory_descriptor, follow_symlinks=False)
                 if not stat.S_ISDIR(before.st_mode):
                     raise _InspectionError(unavailable)
                 next_descriptor = os.open(
@@ -139,9 +135,7 @@ def _read_documents_regular_file(
 
         filename = relative_parts[-1]
         try:
-            before = os.stat(
-                filename, dir_fd=directory_descriptor, follow_symlinks=False
-            )
+            before = os.stat(filename, dir_fd=directory_descriptor, follow_symlinks=False)
             if not stat.S_ISREG(before.st_mode):
                 raise _InspectionError(unavailable)
             file_descriptor = os.open(
@@ -196,14 +190,8 @@ def _dashboard_last_reviewed(documents_root: Path) -> date:
         closing_index = lines.index("---", 1)
     except ValueError as exc:
         raise _InspectionError("dashboard_invalid") from exc
-    candidates = [
-        match
-        for line in lines[1:closing_index]
-        if (match := _LAST_REVIEWED.fullmatch(line)) is not None
-    ]
-    declared = [
-        line for line in lines[1:closing_index] if line.startswith("last-reviewed:")
-    ]
+    candidates = [match for line in lines[1:closing_index] if (match := _LAST_REVIEWED.fullmatch(line)) is not None]
+    declared = [line for line in lines[1:closing_index] if line.startswith("last-reviewed:")]
     if len(candidates) != 1 or len(declared) != 1:
         raise _InspectionError("dashboard_invalid")
     value = next(value for value in candidates[0].groups() if value is not None)
@@ -231,9 +219,7 @@ def _relevant_verified_dates(documents_root: Path) -> tuple[date, ...]:
         if not isinstance(fact, dict):
             raise _InspectionError("facts_invalid")
         entity_ids = fact.get("entity_ids")
-        if not isinstance(entity_ids, list) or any(
-            not isinstance(entity_id, str) for entity_id in entity_ids
-        ):
+        if not isinstance(entity_ids, list) or any(not isinstance(entity_id, str) for entity_id in entity_ids):
             raise _InspectionError("facts_invalid")
         if not _SCOPE_ENTITY_IDS.intersection(entity_ids):
             continue
@@ -257,9 +243,7 @@ def _unavailable(checked_on: date, error: str) -> SanyiStatusConsistency:
     )
 
 
-def inspect_sanyi_status(
-    documents_root: Path, *, today: date | None = None
-) -> SanyiStatusConsistency:
+def inspect_sanyi_status(documents_root: Path, *, today: date | None = None) -> SanyiStatusConsistency:
     """Compare declared CR08 facts with dashboard frontmatter only."""
     checked_on = today or datetime.now(UTC).date()
     try:

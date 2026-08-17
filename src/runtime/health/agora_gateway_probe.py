@@ -54,9 +54,7 @@ def main() -> int:
     if hb is not None:
         alive, dead, total = hb
         if total > 0 and alive == 0:
-            print(
-                f"[PROBE] agora-gateway: PID {pid} alive but ALL {total} backends dead"
-            )
+            print(f"[PROBE] agora-gateway: PID {pid} alive but ALL {total} backends dead")
             return 1
         if dead > 0:
             print(
@@ -93,10 +91,8 @@ def _find_pid() -> int | None:
     # launchctl (launchd KeepAlive 管理的真实 PID)
     try:
         result = subprocess.run(
-            ["launchctl", "list", "com.agora.gateway"],
-            capture_output=True,
-            text=True,
-            timeout=5, check=False)
+            ["launchctl", "list", "com.agora.gateway"], capture_output=True, text=True, timeout=5, check=False
+        )
         m = re.search(r'"PID"\s*=\s*(\d+)', result.stdout)
         if m:
             return int(m.group(1))
@@ -104,11 +100,7 @@ def _find_pid() -> int | None:
         pass  # defensive fallback
     # pgrep fallback
     try:
-        result = subprocess.run(
-            ["pgrep", "-f", "agora"],
-            capture_output=True,
-            text=True,
-            timeout=5, check=False)
+        result = subprocess.run(["pgrep", "-f", "agora"], capture_output=True, text=True, timeout=5, check=False)
         if result.returncode == 0 and result.stdout.strip():
             return int(result.stdout.strip().split("\n")[0])
     except (subprocess.TimeoutExpired, OSError, ValueError):

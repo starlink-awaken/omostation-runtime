@@ -45,11 +45,7 @@ class WorkingMemory:
 
     def prune(self) -> int:
         now_ms = time.time() * 1000
-        expired = [
-            k
-            for k, e in self._store.items()
-            if e.expires_at is not None and now_ms > e.expires_at
-        ]
+        expired = [k for k, e in self._store.items() if e.expires_at is not None and now_ms > e.expires_at]
         for k in expired:
             del self._store[k]
         return len(expired)
@@ -109,18 +105,14 @@ class ProjectMemory:
         )
         self._conn.commit()
 
-    def retrieve(
-        self, project_id: str, category: str, key: str
-    ) -> ProjectMemoryEntry | None:
+    def retrieve(self, project_id: str, category: str, key: str) -> ProjectMemoryEntry | None:
         row = self._conn.execute(
             "SELECT * FROM project_memory WHERE project_id=? AND category=? AND key=?",
             (project_id, category, key),
         ).fetchone()
         return ProjectMemory._row_to_entry(row) if row else None
 
-    def list_by_category(
-        self, project_id: str, category: str
-    ) -> list[ProjectMemoryEntry]:
+    def list_by_category(self, project_id: str, category: str) -> list[ProjectMemoryEntry]:
         rows = self._conn.execute(
             "SELECT * FROM project_memory WHERE project_id=? AND category=? ORDER BY updated_at DESC",
             (project_id, category),
@@ -162,9 +154,7 @@ class ProjectMemory:
         return c > 0
 
     def delete_by_project(self, project_id: str) -> int:
-        c = self._conn.execute(
-            "DELETE FROM project_memory WHERE project_id=?", (project_id,)
-        ).rowcount
+        c = self._conn.execute("DELETE FROM project_memory WHERE project_id=?", (project_id,)).rowcount
         self._conn.commit()
         return c
 
@@ -232,9 +222,7 @@ class OrgMemory:
         self._conn.commit()
 
     def retrieve(self, category: str, key: str) -> OrgMemoryEntry | None:
-        row = self._conn.execute(
-            "SELECT * FROM org_memory WHERE category=? AND key=?", (category, key)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM org_memory WHERE category=? AND key=?", (category, key)).fetchone()
         return OrgMemory._row_to_entry(row) if row else None
 
     def list_by_category(self, category: str) -> list[OrgMemoryEntry]:
@@ -254,9 +242,7 @@ class OrgMemory:
         ).fetchall()
         return [OrgMemory._row_to_entry(r) for r in rows]
 
-    def get_high_confidence(
-        self, min_confidence: float = 0.7, limit: int = 50
-    ) -> list[OrgMemoryEntry]:
+    def get_high_confidence(self, min_confidence: float = 0.7, limit: int = 50) -> list[OrgMemoryEntry]:
         rows = self._conn.execute(
             "SELECT * FROM org_memory WHERE confidence >= ? ORDER BY confidence DESC LIMIT ?",
             (min_confidence, limit),
@@ -273,9 +259,7 @@ class OrgMemory:
         return c > 0
 
     def delete(self, category: str, key: str) -> bool:
-        c = self._conn.execute(
-            "DELETE FROM org_memory WHERE category=? AND key=?", (category, key)
-        ).rowcount
+        c = self._conn.execute("DELETE FROM org_memory WHERE category=? AND key=?", (category, key)).rowcount
         self._conn.commit()
         return c > 0
 
@@ -284,9 +268,7 @@ class OrgMemory:
             "SELECT category, count(*), avg(confidence) FROM org_memory GROUP BY category ORDER BY count(*) DESC"
         ).fetchall()
         return {
-            "categories": {
-                r[0]: {"count": r[1], "avg_confidence": round(r[2], 3)} for r in rows
-            },
+            "categories": {r[0]: {"count": r[1], "avg_confidence": round(r[2], 3)} for r in rows},
             "total": sum(r[1] for r in rows),
         }
 

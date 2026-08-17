@@ -72,15 +72,11 @@ def _model_freshness_binding_environ(tmp_path: Path) -> dict[str, str]:
     }
 
 
-def _write_model_freshness_fixture(
-    documents_root: Path, *, facts_reviewed: str, model_reviewed: str
-) -> None:
+def _write_model_freshness_fixture(documents_root: Path, *, facts_reviewed: str, model_reviewed: str) -> None:
     entities = documents_root / "@工作文档" / "卫健委" / "_entities"
     models = entities / "models"
     models.mkdir(parents=True)
-    entities.joinpath("facts.md").write_text(
-        f"last-reviewed: {facts_reviewed}\nfixture facts body\n", encoding="utf-8"
-    )
+    entities.joinpath("facts.md").write_text(f"last-reviewed: {facts_reviewed}\nfixture facts body\n", encoding="utf-8")
     models.joinpath("fixture-private-model.md").write_text(
         f"last-reviewed: {model_reviewed}\nfixture private model body\n",
         encoding="utf-8",
@@ -200,9 +196,9 @@ def test_default_registry_declares_read_only_weijian_facts_audit(
 ) -> None:
     from runtime.documents_plane.cli import _default_registry
 
-    spec, command = _default_registry(
-        {"DOCUMENTS_CONTENT_ROOT": str(tmp_path / "Documents")}
-    ).resolve("documents-weijian-facts-audit")
+    spec, command = _default_registry({"DOCUMENTS_CONTENT_ROOT": str(tmp_path / "Documents")}).resolve(
+        "documents-weijian-facts-audit"
+    )
 
     assert spec.reads == ("@工作文档/卫健委/_entities/facts",)
     assert spec.writes == ()
@@ -237,9 +233,7 @@ def test_default_cli_runs_weijian_facts_audit_read_only(
         "    status: active\n",
         encoding="utf-8",
     )
-    facts_dir.joinpath("_index.yaml").write_text(
-        "facts_total: 1\nby_type: {info: 1}\n", encoding="utf-8"
-    )
+    facts_dir.joinpath("_index.yaml").write_text("facts_total: 1\nby_type: {info: 1}\n", encoding="utf-8")
     source_root = Path(__file__).parents[1] / "src"
     monkeypatch.setenv("PYTHONPATH", str(source_root))
 
@@ -290,9 +284,7 @@ def test_weijian_facts_audit_persists_bounded_semantic_evidence(
         "    status: active\n",
         encoding="utf-8",
     )
-    facts_dir.joinpath("_index.yaml").write_text(
-        "facts_total: 1\nby_type: {info: 1}\n", encoding="utf-8"
-    )
+    facts_dir.joinpath("_index.yaml").write_text("facts_total: 1\nby_type: {info: 1}\n", encoding="utf-8")
     source_root = Path(__file__).parents[1] / "src"
     monkeypatch.setenv("PYTHONPATH", str(source_root))
 
@@ -364,9 +356,7 @@ def test_default_cli_registry_job_preserves_owner_nonzero_exit(
     registry_path.parent.mkdir(parents=True)
     registry_path.write_text("broken: [\n", encoding="utf-8")
     owner = tmp_path / "fake-l4-kernel"
-    owner.write_text(
-        "#!/bin/sh\nprintf 'invalid registry\\n' >&2\nexit 2\n", encoding="utf-8"
-    )
+    owner.write_text("#!/bin/sh\nprintf 'invalid registry\\n' >&2\nexit 2\n", encoding="utf-8")
     owner.chmod(0o755)
 
     exit_code = main(
@@ -477,18 +467,14 @@ def test_run_job_writes_metadata_only_evidence_under_state_root(
 
     assert result.exit_code == 0
     assert result.stdout == "owner output\n"
-    assert result.evidence_path == (
-        state_root / "control/evidence/contract-check/evidence/contract-check.json"
-    )
+    assert result.evidence_path == (state_root / "control/evidence/contract-check/evidence/contract-check.json")
     evidence = json.loads(result.evidence_path.read_text(encoding="utf-8"))
     assert evidence["job_id"] == "contract-check"
     assert "stdout" not in evidence
     assert "stderr" not in evidence
 
 
-def test_evidence_symlink_is_refused_without_writing_documents(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_evidence_symlink_is_refused_without_writing_documents(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "runtime.documents_plane.commands._sandbox_argv",
         lambda command, _state_root: command,
@@ -499,13 +485,7 @@ def test_evidence_symlink_is_refused_without_writing_documents(
     documents_root.mkdir()
     state_root = tmp_path / "state"
     target = documents_root / "stolen-evidence.json"
-    evidence = (
-        state_root
-        / "control"
-        / "evidence"
-        / "contract-check"
-        / "evidence/contract-check.json"
-    )
+    evidence = state_root / "control" / "evidence" / "contract-check" / "evidence/contract-check.json"
     evidence.parent.mkdir(parents=True)
     evidence.symlink_to(target)
 
@@ -521,9 +501,7 @@ def test_evidence_symlink_is_refused_without_writing_documents(
     assert not target.exists()
 
 
-def test_evidence_directory_is_refused_without_replacing_it(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_evidence_directory_is_refused_without_replacing_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "runtime.documents_plane.commands._sandbox_argv",
         lambda command, _state_root: command,
@@ -533,18 +511,10 @@ def test_evidence_directory_is_refused_without_replacing_it(
     documents_root = tmp_path / "Documents"
     documents_root.mkdir()
     state_root = tmp_path / "state"
-    evidence = (
-        state_root
-        / "control"
-        / "evidence"
-        / "contract-check"
-        / "evidence/contract-check.json"
-    )
+    evidence = state_root / "control" / "evidence" / "contract-check" / "evidence/contract-check.json"
     evidence.mkdir(parents=True)
 
-    result = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
+    result = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
 
     assert result.exit_code == 74
     assert result.evidence_error
@@ -612,31 +582,21 @@ record.write_text(json.dumps([*previous, str(work_roots.pop())]))
     registry.register(_spec(), [sys.executable, "-c", script])
     state_root = tmp_path / "state"
 
-    first = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
-    second = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
+    first = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
+    second = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
 
     assert first.exit_code == 0
     assert second.exit_code == 0
     roots = json.loads(
-        (
-            state_root / "owner-output/contract-check/receipts/contract-check.json"
-        ).read_text(encoding="utf-8")
+        (state_root / "owner-output/contract-check/receipts/contract-check.json").read_text(encoding="utf-8")
     )
     assert len(roots) == 2
     assert roots[0] != roots[1]
-    assert all(
-        Path(root).parent == (state_root / "control/runs").resolve() for root in roots
-    )
+    assert all(Path(root).parent == (state_root / "control/runs").resolve() for root in roots)
     assert list(documents_root.iterdir()) == []
 
 
-def test_repeated_runs_atomically_replace_regular_receipt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_repeated_runs_atomically_replace_regular_receipt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "runtime.documents_plane.commands._sandbox_argv",
         lambda command, _roots: command,
@@ -647,12 +607,8 @@ def test_repeated_runs_atomically_replace_regular_receipt(
     documents_root.mkdir()
     state_root = tmp_path / "state"
 
-    first = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
-    second = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
+    first = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
+    second = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
 
     assert first.exit_code == 0
     assert second.exit_code == 0
@@ -680,9 +636,7 @@ def test_evidence_write_failure_removes_random_temporary_receipt(
     documents_root.mkdir()
     state_root = tmp_path / "state"
 
-    result = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
+    result = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
 
     evidence_parent = state_root / "control/evidence/contract-check/evidence"
     assert result.exit_code == 74
@@ -690,9 +644,7 @@ def test_evidence_write_failure_removes_random_temporary_receipt(
     assert list(evidence_parent.iterdir()) == []
 
 
-def test_evidence_fd_close_failure_returns_stable_io_result(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_evidence_fd_close_failure_returns_stable_io_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from runtime.documents_plane import jobs
 
     original_close = jobs._PrivateLayout.close
@@ -790,17 +742,11 @@ except OSError:
 """
     registry.register(_spec(), [sys.executable, "-c", script])
 
-    first = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
-    second = run_job(
-        registry, "contract-check", state_root=state_root, documents_root=documents_root
-    )
+    first = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
+    second = run_job(registry, "contract-check", state_root=state_root, documents_root=documents_root)
 
     roots = json.loads(
-        (
-            state_root / "owner-output/contract-check/receipts/contract-check.json"
-        ).read_text(encoding="utf-8")
+        (state_root / "owner-output/contract-check/receipts/contract-check.json").read_text(encoding="utf-8")
     )
     assert first.exit_code == 0
     assert second.exit_code == 0
@@ -840,14 +786,10 @@ raise SystemExit(0 if len(blocked) == 2 else 1)
     assert result.exit_code == 0
     assert not (state_root / "control" / "forbidden.txt").exists()
     assert not (documents_root / "forbidden.txt").exists()
-    assert (
-        state_root / "owner-output/contract-check/receipts/contract-check.json"
-    ).exists()
+    assert (state_root / "owner-output/contract-check/receipts/contract-check.json").exists()
 
 
-def test_documents_cli_runs_registered_job_as_json_dry_run(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_documents_cli_runs_registered_job_as_json_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from runtime.documents_plane.cli import main
 
     registry = JobRegistry()
@@ -871,16 +813,11 @@ def test_default_registry_loads_exact_model_freshness_binding(tmp_path: Path) ->
     from runtime.documents_plane.cli import _default_registry
 
     environ = _model_freshness_binding_environ(tmp_path)
-    registry_path = (
-        Path(environ["DOCUMENTS_CONTENT_ROOT"])
-        / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
-    )
+    registry_path = Path(environ["DOCUMENTS_CONTENT_ROOT"]) / "@公共/_control/L4-DOMAIN-REGISTRY.yaml"
     registry_path.parent.mkdir(parents=True)
     registry_path.write_text("kind: registry\n", encoding="utf-8")
 
-    spec, command = _default_registry(environ).resolve(
-        "documents-weijian-model-freshness"
-    )
+    spec, command = _default_registry(environ).resolve("documents-weijian-model-freshness")
 
     assert spec == JobSpec(
         job_id="documents-weijian-model-freshness",
@@ -1145,9 +1082,7 @@ def test_model_freshness_projection_rejects_unavailable_error_state_conflicts(
     assert "owner_evidence" not in receipt
 
 
-def _write_sanyi_documents(
-    root: Path, *, dashboard: str = "2026-08-05", latest: str = "2026-08-13"
-) -> Path:
+def _write_sanyi_documents(root: Path, *, dashboard: str = "2026-08-05", latest: str = "2026-08-13") -> Path:
     documents_root = root / "Documents"
     domain = documents_root / "@工作文档" / "卫健委"
     dashboard_path = domain / "_control" / "三医态势仪表盘.md"
@@ -1228,9 +1163,7 @@ def _sanyi_environ(root: Path, *, documents_root: Path | None = None) -> dict[st
 
 
 @pytest.mark.parametrize("mutation", ["missing", "drift"])
-def test_default_registry_fails_closed_when_controller_shadow_binding_is_invalid(
-    tmp_path: Path, mutation: str
-) -> None:
+def test_default_registry_fails_closed_when_controller_shadow_binding_is_invalid(tmp_path: Path, mutation: str) -> None:
     from runtime.documents_plane.cli import _default_registry
     from runtime.documents_plane.paths import DocumentsPlanePathError
 
@@ -1279,26 +1212,13 @@ def test_default_registry_registers_controller_model_and_sanyi_bindings(
 
     registry = _default_registry(environ)
 
-    assert (
-        registry.resolve("documents-weijian-controller-shadow")[0].owner
-        == "runtime-control"
-    )
-    assert (
-        registry.resolve("documents-weijian-model-freshness")[0].owner
-        == "runtime-control"
-    )
-    assert (
-        registry.resolve("documents-weijian-sanyi-status-audit")[0].owner
-        == "runtime-control"
-    )
+    assert registry.resolve("documents-weijian-controller-shadow")[0].owner == "runtime-control"
+    assert registry.resolve("documents-weijian-model-freshness")[0].owner == "runtime-control"
+    assert registry.resolve("documents-weijian-sanyi-status-audit")[0].owner == "runtime-control"
 
 
 def _documents_digest(root: Path) -> tuple[tuple[str, bytes], ...]:
-    return tuple(
-        (str(path.relative_to(root)), path.read_bytes())
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    )
+    return tuple((str(path.relative_to(root)), path.read_bytes()) for path in sorted(root.rglob("*")) if path.is_file())
 
 
 def test_sanyi_status_job_persists_bounded_attention_evidence(
@@ -1334,9 +1254,7 @@ def test_sanyi_status_job_persists_bounded_attention_evidence(
     assert receipt_path.is_file()
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert receipt["owner_evidence"]["status"] == "attention"
-    assert receipt["owner_evidence"]["schema"] == (
-        "runtime.documents-sanyi-status-consistency.evidence.v1"
-    )
+    assert receipt["owner_evidence"]["schema"] == ("runtime.documents-sanyi-status-consistency.evidence.v1")
     assert "statement" not in json.dumps(receipt, ensure_ascii=False)
 
 
@@ -1373,9 +1291,7 @@ def test_sanyi_status_dry_run_and_real_run_never_write_documents(
     assert _documents_digest(documents_root) == before
 
 
-def test_sanyi_text_cli_redacts_runtime_state_io_failure(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_sanyi_text_cli_redacts_runtime_state_io_failure(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from runtime.documents_plane.cli import main
 
     environ = _sanyi_environ(tmp_path)
@@ -1460,9 +1376,7 @@ def test_documents_cli_redacts_cr08_argument_parse_failures(
         assert payload["status"] == "unavailable"
         assert payload["error"] == "arguments_invalid"
     else:
-        assert (
-            captured.out == "documents-weijian-sanyi-status-audit: arguments_invalid\n"
-        )
+        assert captured.out == "documents-weijian-sanyi-status-audit: arguments_invalid\n"
 
 
 def test_sanyi_binding_rejects_unknown_or_reordered_contract_values(
@@ -1474,11 +1388,7 @@ def test_sanyi_binding_rejects_unknown_or_reordered_contract_values(
     environ = _sanyi_environ(tmp_path)
     binding_path = Path(environ["DOCUMENTS_DOMAIN_PROJECTS_REGISTRY"])
     binding = json.loads(binding_path.read_text(encoding="utf-8"))
-    sanyi_job = next(
-        job
-        for job in binding["runtime_jobs"]
-        if job["id"] == "documents-weijian-sanyi-status-audit"
-    )
+    sanyi_job = next(job for job in binding["runtime_jobs"] if job["id"] == "documents-weijian-sanyi-status-audit")
     sanyi_job["scope_entity_ids"].reverse()
     sanyi_job["unexpected"] = True
     binding_path.write_text(json.dumps(binding), encoding="utf-8")
@@ -1486,9 +1396,7 @@ def test_sanyi_binding_rejects_unknown_or_reordered_contract_values(
         _sanyi_status_job_spec(environ)
 
 
-def test_sanyi_receipt_rejects_malformed_owner_evidence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_sanyi_receipt_rejects_malformed_owner_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from runtime.documents_plane.cli import _sanyi_status_job_spec
 
     monkeypatch.setattr(

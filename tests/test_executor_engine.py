@@ -151,9 +151,7 @@ def test_execute_tool_known_function():
 
             rt = AgentRuntime()
             # Tool registry entries use {"fn": callable} format
-            rt._tool_registry = {
-                "echo": {"fn": lambda message: {"result": f"echoed: {message}"}}
-            }
+            rt._tool_registry = {"echo": {"fn": lambda message: {"result": f"echoed: {message}"}}}
 
             tc = {
                 "id": "call-1",
@@ -317,18 +315,12 @@ def test_call_llm_uses_registry_route_for_matching_provider():
     fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="anthropic",
-            model=types.SimpleNamespace(
-                id="anthropic/claude-sonnet-4", name="claude-sonnet-4"
-            ),
-            reasoning="Matched route anthropic/claude-sonnet-4",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="anthropic",
+        model=types.SimpleNamespace(id="anthropic/claude-sonnet-4", name="claude-sonnet-4"),
+        reasoning="Matched route anthropic/claude-sonnet-4",
     )
-    fake_registry_loader.estimate_model_cost = (
-        lambda model_id, input_tokens, output_tokens: 0.0
-    )
+    fake_registry_loader.estimate_model_cost = lambda model_id, input_tokens, output_tokens: 0.0
 
     fake_audit = types.ModuleType("llm_gateway.audit")
     fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")
@@ -346,9 +338,7 @@ def test_call_llm_uses_registry_route_for_matching_provider():
         from runtime.executor.engine import AgentRuntime
 
         rt = AgentRuntime()
-        response = rt._call_llm(
-            [{"role": "user", "content": "hello"}], tools=[{"function": {"name": "x"}}]
-        )
+        response = rt._call_llm([{"role": "user", "content": "hello"}], tools=[{"function": {"name": "x"}}])
 
     assert response["content"] == "provider=anthropic model=claude-sonnet-4"
     assert response["provider"] == "anthropic"
@@ -391,18 +381,12 @@ def test_call_llm_falls_back_when_routed_provider_unavailable():
     fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="anthropic",
-            model=types.SimpleNamespace(
-                id="anthropic/claude-sonnet-4", name="claude-sonnet-4"
-            ),
-            reasoning="Matched route anthropic/claude-sonnet-4",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="anthropic",
+        model=types.SimpleNamespace(id="anthropic/claude-sonnet-4", name="claude-sonnet-4"),
+        reasoning="Matched route anthropic/claude-sonnet-4",
     )
-    fake_registry_loader.estimate_model_cost = (
-        lambda model_id, input_tokens, output_tokens: 0.0
-    )
+    fake_registry_loader.estimate_model_cost = lambda model_id, input_tokens, output_tokens: 0.0
 
     fake_audit = types.ModuleType("llm_gateway.audit")
     fake_audit.record_llm_audit = lambda **kwargs: Path("/tmp/llm_calls.jsonl")
@@ -437,9 +421,7 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
         default_model = "gpt-4.1"
 
         async def generate(self, request):
-            raise AssertionError(
-                "generate should not be called when budget rejects first"
-            )
+            raise AssertionError("generate should not be called when budget rejects first")
 
     class _LLMRequest:
         def __init__(self, **kwargs):
@@ -457,16 +439,12 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
     fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="openai",
-            model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
-            reasoning="Matched route openai/gpt-4.1",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="openai",
+        model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
+        reasoning="Matched route openai/gpt-4.1",
     )
-    fake_registry_loader.estimate_model_cost = (
-        lambda model_id, input_tokens, output_tokens: 0.42
-    )
+    fake_registry_loader.estimate_model_cost = lambda model_id, input_tokens, output_tokens: 0.42
 
     fake_audit = types.ModuleType("llm_gateway.audit")
     fake_audit.record_llm_audit = lambda **kwargs: tmp_path / "unused.jsonl"
@@ -487,9 +465,7 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
             (tmp_path / ".omo" / "debt" / "items").mkdir(parents=True, exist_ok=True)
             omo_src = tmp_path / "projects" / "omo" / "src"
             omo_src.parent.mkdir(parents=True, exist_ok=True)
-            real_omo_src = (
-                Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
-            )
+            real_omo_src = Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
             omo_src.symlink_to(real_omo_src, target_is_directory=True)
             with mock.patch("llm_gateway.budget.estimate_cost", return_value=0.42):
                 rt = AgentRuntime()
@@ -503,18 +479,13 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
                 )
 
     assert "Budget policy blocked task opc-p4-budget-demo" in response["error"]
-    debt_files = list(
-        (tmp_path / ".omo" / "debt" / "items").glob("DEBT-OPC-P4-BUDGET-*.yaml")
-    )
+    debt_files = list((tmp_path / ".omo" / "debt" / "items").glob("DEBT-OPC-P4-BUDGET-*.yaml"))
     assert len(debt_files) == 1
     debt_text = debt_files[0].read_text(encoding="utf-8")
     import yaml
 
     parsed = yaml.safe_load(debt_text)
-    assert (
-        "estimated cost 0.420000 USD exceeded budget 0.010000 USD"
-        in parsed["description"]
-    )
+    assert "estimated cost 0.420000 USD exceeded budget 0.010000 USD" in parsed["description"]
     # 治本 4 守护: debt YAML 必须可被 yaml.safe_load 解析 (无格式破坏)
     import yaml
 
@@ -524,9 +495,7 @@ def test_call_llm_budget_policy_rejects_and_registers_debt(tmp_path):
     assert parsed["status"] == "open"
     assert parsed["severity"] == "medium"
     # 即便 task_id 含 YAML 特殊字符 (含 `:`, `#`, 换行) 也不会破格式
-    assert "\n- " not in debt_text or "  " in debt_text, (
-        "debt YAML 含未缩进的列表项, 表明字符串拼接导致格式破坏"
-    )
+    assert "\n- " not in debt_text or "  " in debt_text, "debt YAML 含未缩进的列表项, 表明字符串拼接导致格式破坏"
 
 
 def test_budget_debt_lock_prevents_concurrent_occurrence_loss(tmp_path):
@@ -540,9 +509,7 @@ def test_budget_debt_lock_prevents_concurrent_occurrence_loss(tmp_path):
     debt_dir.mkdir(parents=True, exist_ok=True)
     omo_src = tmp_path / "projects" / "omo" / "src"
     omo_src.parent.mkdir(parents=True, exist_ok=True)
-    real_omo_src = (
-        Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
-    )
+    real_omo_src = Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
     omo_src.symlink_to(real_omo_src, target_is_directory=True)
     with mock.patch.dict(os.environ, {"WORKSPACE": str(tmp_path)}):
         # 跑 5 次 (单进程顺序执行, 但验证 file 锁路径 + yaml.dump 都 OK)
@@ -558,8 +525,7 @@ def test_budget_debt_lock_prevents_concurrent_occurrence_loss(tmp_path):
     parsed = yaml.safe_load(debt_files[0].read_text(encoding="utf-8"))
     # 5 次顺序调用: occurrence_count 应从 1 累加到 5
     assert parsed["occurrence_count"] == 5, (
-        f"5 次顺序调用 occurrence_count 应=5, 实际 {parsed['occurrence_count']} "
-        f"(说明 read-modify-write 竞态)"
+        f"5 次顺序调用 occurrence_count 应=5, 实际 {parsed['occurrence_count']} (说明 read-modify-write 竞态)"
     )
 
 
@@ -572,9 +538,7 @@ def test_budget_debt_yaml_safe_for_special_chars_in_task_id(tmp_path):
     debt_dir.mkdir(parents=True, exist_ok=True)
     omo_src = tmp_path / "projects" / "omo" / "src"
     omo_src.parent.mkdir(parents=True, exist_ok=True)
-    real_omo_src = (
-        Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
-    )
+    real_omo_src = Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
     omo_src.symlink_to(real_omo_src, target_is_directory=True)
     # 含冒号/井号/换行/前导横线
     weird_task_id = "task:foo #bar\n-baz end"
@@ -633,18 +597,12 @@ def test_call_llm_records_audit_log(tmp_path):
     fake_provider.ToolSchema = _ToolSchema
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="anthropic",
-            model=types.SimpleNamespace(
-                id="anthropic/claude-sonnet-4", name="claude-sonnet-4"
-            ),
-            reasoning="Matched route anthropic/claude-sonnet-4",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="anthropic",
+        model=types.SimpleNamespace(id="anthropic/claude-sonnet-4", name="claude-sonnet-4"),
+        reasoning="Matched route anthropic/claude-sonnet-4",
     )
-    fake_registry_loader.estimate_model_cost = (
-        lambda model_id, input_tokens, output_tokens: 0.123
-    )
+    fake_registry_loader.estimate_model_cost = lambda model_id, input_tokens, output_tokens: 0.123
 
     fake_audit = types.ModuleType("llm_gateway.audit")
     fake_audit.record_llm_audit = _record_llm_audit
@@ -728,14 +686,10 @@ def test_budget_policy_includes_task_id_and_model_in_route_info(tmp_path):
     fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="anthropic",
-            model=types.SimpleNamespace(
-                id="anthropic/claude-sonnet-4", name="claude-sonnet-4"
-            ),
-            reasoning="Matched",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="anthropic",
+        model=types.SimpleNamespace(id="anthropic/claude-sonnet-4", name="claude-sonnet-4"),
+        reasoning="Matched",
     )
     fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.02
 
@@ -758,9 +712,7 @@ def test_budget_policy_includes_task_id_and_model_in_route_info(tmp_path):
             (tmp_path / ".omo" / "debt" / "items").mkdir(parents=True, exist_ok=True)
             omo_src = tmp_path / "projects" / "omo" / "src"
             omo_src.parent.mkdir(parents=True, exist_ok=True)
-            real_omo_src = (
-                Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
-            )
+            real_omo_src = Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
             omo_src.symlink_to(real_omo_src, target_is_directory=True)
             with mock.patch("llm_gateway.budget.estimate_cost", return_value=0.02):
                 rt = AgentRuntime()
@@ -800,12 +752,10 @@ def test_budget_debt_reuse_does_not_create_duplicate_files(tmp_path):
     fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="openai",
-            model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
-            reasoning="Matched",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="openai",
+        model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
+        reasoning="Matched",
     )
     fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 0.5
 
@@ -828,26 +778,16 @@ def test_budget_debt_reuse_does_not_create_duplicate_files(tmp_path):
             (tmp_path / ".omo" / "debt" / "items").mkdir(parents=True, exist_ok=True)
             omo_src = tmp_path / "projects" / "omo" / "src"
             omo_src.parent.mkdir(parents=True, exist_ok=True)
-            real_omo_src = (
-                Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
-            )
+            real_omo_src = Path(__file__).parent.parent.parent.parent / "projects" / "omo" / "src"
             omo_src.symlink_to(real_omo_src, target_is_directory=True)
             with mock.patch("llm_gateway.budget.estimate_cost", return_value=0.5):
                 rt = AgentRuntime()
                 ctx = {"task_id": "opc-p4-budget-reuse", "llm_budget_usd": 0.01}
-                rt._call_llm(
-                    [{"role": "user", "content": "x"}], tools=None, request_context=ctx
-                )
-                rt._call_llm(
-                    [{"role": "user", "content": "y"}], tools=None, request_context=ctx
-                )
-                rt._call_llm(
-                    [{"role": "user", "content": "z"}], tools=None, request_context=ctx
-                )
+                rt._call_llm([{"role": "user", "content": "x"}], tools=None, request_context=ctx)
+                rt._call_llm([{"role": "user", "content": "y"}], tools=None, request_context=ctx)
+                rt._call_llm([{"role": "user", "content": "z"}], tools=None, request_context=ctx)
 
-    debt_files = sorted(
-        (tmp_path / ".omo" / "debt" / "items").glob("DEBT-OPC-P4-BUDGET-*.yaml")
-    )
+    debt_files = sorted((tmp_path / ".omo" / "debt" / "items").glob("DEBT-OPC-P4-BUDGET-*.yaml"))
     assert len(debt_files) == 1, f"expected single debt file, got {debt_files}"
     body = debt_files[0].read_text(encoding="utf-8")
     assert "occurrence_count: 3" in body
@@ -873,12 +813,10 @@ def test_budget_reject_returns_error_dict_not_traceback(tmp_path):
     fake_provider.ToolSchema = lambda **kwargs: types.SimpleNamespace(**kwargs)
 
     fake_registry_loader = types.ModuleType("llm_gateway.registry_data_loader")
-    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: (
-        types.SimpleNamespace(
-            provider_name="openai",
-            model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
-            reasoning="Matched",
-        )
+    fake_registry_loader.route_role_request = lambda role, required_capabilities=None: types.SimpleNamespace(
+        provider_name="openai",
+        model=types.SimpleNamespace(id="openai/gpt-4.1", name="gpt-4.1"),
+        reasoning="Matched",
     )
     fake_registry_loader.estimate_model_cost = lambda mid, inp, out: 1.0
 
@@ -914,9 +852,7 @@ def test_budget_reject_returns_error_dict_not_traceback(tmp_path):
 
     assert isinstance(response, dict)
     assert response["finish_reason"] == "error"
-    assert (
-        "Budget policy blocked task opc-p4-budget-structured-error" in response["error"]
-    )
+    assert "Budget policy blocked task opc-p4-budget-structured-error" in response["error"]
     assert "openai/gpt-4.1" in response["error"]
     assert "debt_path" in response["route"]["budget_policy"]
     assert response["route"]["role"] in {"planner", "operator"}

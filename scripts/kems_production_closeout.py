@@ -60,9 +60,7 @@ def _manifest_digest(manifest: dict[str, Any]) -> tuple[str, str, int]:
         digest = document.get("sha256")
         filename = document.get("filename")
         size = document.get("bytes")
-        if not isinstance(source_ref, str) or not source_ref.startswith(
-            "vault://redacted/"
-        ):
+        if not isinstance(source_ref, str) or not source_ref.startswith("vault://redacted/"):
             raise CloseoutError("manifest source_ref must be redacted")
         if not isinstance(digest, str) or not SHA256.fullmatch(digest):
             raise CloseoutError("manifest document sha256 is invalid")
@@ -74,9 +72,7 @@ def _manifest_digest(manifest: dict[str, Any]) -> tuple[str, str, int]:
     canonical.pop("manifest_sha256", None)
     canonical.pop("dispatch_id", None)
     digest = hashlib.sha256(
-        json.dumps(
-            canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+        json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     return run_id.strip(), digest, len(documents)
 
@@ -95,17 +91,11 @@ def _preflight_inventory(
     if (
         not isinstance(checks, list)
         or not checks
-        or any(
-            not isinstance(check, dict) or check.get("ok") is not True
-            for check in checks
-        )
+        or any(not isinstance(check, dict) or check.get("ok") is not True for check in checks)
     ):
         raise CloseoutError("production preflight contains failed checks")
     for field in ("evaluation", "model_acceptance", "omo"):
-        if (
-            not isinstance(preflight.get(field), dict)
-            or preflight[field].get("available") is not True
-        ):
+        if not isinstance(preflight.get(field), dict) or preflight[field].get("available") is not True:
             raise CloseoutError(f"preflight {field} evidence is unavailable")
     inventory = preflight.get("sources")
     if not isinstance(inventory, list) or not inventory:
@@ -115,12 +105,7 @@ def _preflight_inventory(
         if not isinstance(item, dict):
             raise CloseoutError("preflight source inventory item is invalid")
         name, size, digest = item.get("name"), item.get("bytes"), item.get("sha256")
-        if (
-            not isinstance(name, str)
-            or not name
-            or not isinstance(size, int)
-            or size < 0
-        ):
+        if not isinstance(name, str) or not name or not isinstance(size, int) or size < 0:
             raise CloseoutError("preflight source inventory metadata is invalid")
         if not isinstance(digest, str) or not SHA256.fullmatch(digest):
             raise CloseoutError("preflight source inventory sha256 is invalid")
@@ -128,9 +113,7 @@ def _preflight_inventory(
     return run_id.strip(), sorted(normalized)
 
 
-def validate_closeout(
-    *, preflight_path: Path, manifest_path: Path, receipt_path: Path
-) -> dict[str, Any]:
+def validate_closeout(*, preflight_path: Path, manifest_path: Path, receipt_path: Path) -> dict[str, Any]:
     preflight = _load_json(preflight_path, "preflight evidence")
     manifest = _load_json(manifest_path, "ReachBridge manifest")
     receipt = _load_json(receipt_path, "dispatch receipt")
@@ -154,17 +137,12 @@ def validate_closeout(
         raise CloseoutError("dispatch receipt status is not accepted")
 
     manifest_inventory = sorted(
-        (document["filename"], document["bytes"], document["sha256"])
-        for document in manifest["documents"]
+        (document["filename"], document["bytes"], document["sha256"]) for document in manifest["documents"]
     )
     if manifest_inventory != inventory:
-        raise CloseoutError(
-            "manifest inventory does not match preflight source inventory"
-        )
+        raise CloseoutError("manifest inventory does not match preflight source inventory")
     if document_count != len(inventory):
-        raise CloseoutError(
-            "manifest document count does not match preflight inventory"
-        )
+        raise CloseoutError("manifest document count does not match preflight inventory")
     return {
         "schema": "kems.production-closeout.v1",
         "status": "ready",

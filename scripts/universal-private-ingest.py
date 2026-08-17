@@ -16,7 +16,7 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 DOCS_ROOT = Path("/Users/xiamingxing/Documents")
@@ -87,12 +87,15 @@ def fetch_real_wechat_messages(limit: int = 15) -> list[dict[str, str]]:
     try:
         conn = sqlite3.connect(str(state_db))
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT session_id, role, content, timestamp
             FROM messages
             ORDER BY timestamp DESC
             LIMIT ?
-        """, (limit,))
+        """,
+            (limit,),
+        )
         rows = cursor.fetchall()
         conn.close()
 
@@ -100,12 +103,9 @@ def fetch_real_wechat_messages(limit: int = 15) -> list[dict[str, str]]:
             sid, role, content, ts = r
             clean_content = str(content).replace("\n", " ").strip()
             if clean_content:
-                items.append({
-                    "role": role,
-                    "content": clean_content[:150],
-                    "timestamp": str(ts),
-                    "session_id": str(sid)[:12]
-                })
+                items.append(
+                    {"role": role, "content": clean_content[:150], "timestamp": str(ts), "session_id": str(sid)[:12]}
+                )
     except Exception as e:  # noqa: BLE001
         print(f"⚠️ 读取微信 state.db 异常: {e}")
 
@@ -123,13 +123,10 @@ def fetch_native_wechat_files(limit: int = 10) -> list[dict[str, str]]:
         docs_dir = wechat_container / "Documents"
         for f in docs_dir.glob("**/*"):
             if f.is_file() and f.suffix.lower() in [".pdf", ".docx", ".doc", ".txt", ".md", ".png", ".jpg"]:
-                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat()
-                items.append({
-                    "file_name": f.name,
-                    "file_path": str(f),
-                    "mtime": mtime,
-                    "size_bytes": str(f.stat().st_size)
-                })
+                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=UTC).isoformat()
+                items.append(
+                    {"file_name": f.name, "file_path": str(f), "mtime": mtime, "size_bytes": str(f.stat().st_size)}
+                )
                 if len(items) >= limit:
                     break
     except Exception as e:  # noqa: BLE001
@@ -140,7 +137,7 @@ def fetch_native_wechat_files(limit: int = 10) -> list[dict[str, str]]:
 
 def fetch_wechat_ui_accessibility_messages() -> list[str]:
     """使用 macOS AppleScript 辅助功能，零解密直接提取当前微信 UI 界面上的聊天正文."""
-    script = '''
+    script = """
     tell application "System Events"
         if exists (process "WeChat") then
             tell process "WeChat"
@@ -154,7 +151,7 @@ def fetch_wechat_ui_accessibility_messages() -> list[str]:
         end if
     end tell
     return {}
-    '''
+    """
     try:
         res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5, check=False)
         if res.stdout:
@@ -168,7 +165,7 @@ def fetch_wechat_ui_accessibility_messages() -> list[str]:
 
 def ingest_chrome_and_sms() -> int:
     INBOX_DIR.mkdir(parents=True, exist_ok=True)
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d")
     count = 0
 
     # 1. 真实 Chrome 浏览历史抓取
@@ -210,7 +207,9 @@ def ingest_chrome_and_sms() -> int:
         target_path = INBOX_DIR / f"{now_str}-auto-wechat-native-files.md"
         lines = [f"# Mac 原生微信接收物理文件与公文附件 — {now_str}\n\n> 来源: com.tencent.xinWeChat 物理文件区\n"]
         for wf in wechat_files:
-            lines.append(f"- **[{wf['file_name']}]** (路径: `{wf['file_path']}`, 大小: {wf['size_bytes']} 字节, 修改时间: {wf['mtime']})")
+            lines.append(
+                f"- **[{wf['file_name']}]** (路径: `{wf['file_path']}`, 大小: {wf['size_bytes']} 字节, 修改时间: {wf['mtime']})"
+            )
         target_path.write_text("\n".join(lines), encoding="utf-8")
         print(f"✅ 原生 Mac 微信物理接收文件抓取成功 ──► {target_path.name}")
         count += 1

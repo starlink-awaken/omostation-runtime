@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -18,18 +18,10 @@ from runtime.adapters.omo import (
 from runtime.matrix import health_check_url, list_services
 from runtime.state_schema import validate_runtime_health_snapshot
 
-STATE_FILE = (
-    Path(os.environ.get("RUNTIME_HOME", Path.home() / "runtime")) / "matrix_state.json"
-)
+STATE_FILE = Path(os.environ.get("RUNTIME_HOME", Path.home() / "runtime")) / "matrix_state.json"
 # Compute OMO state path from RUNTIME_HOME or workspace root
-_workspace_root = (
-    Path(__file__).resolve().parents[4]
-)  # runtime/src/runtime/scheduler.py → workspace root
-OMO_STATE_FILE = Path(
-    os.environ.get(
-        "OMO_STATE_FILE", str(_workspace_root / ".omo" / "state" / "system_health.yaml")
-    )
-)
+_workspace_root = Path(__file__).resolve().parents[4]  # runtime/src/runtime/scheduler.py → workspace root
+OMO_STATE_FILE = Path(os.environ.get("OMO_STATE_FILE", str(_workspace_root / ".omo" / "state" / "system_health.yaml")))
 
 
 class MatrixScheduler:
@@ -53,8 +45,7 @@ class MatrixScheduler:
         if not label:
             return {"status": "unknown"}
         try:
-            r = subprocess.run(
-                ["launchctl", "list", label], capture_output=True, text=True, check=False)
+            r = subprocess.run(["launchctl", "list", label], capture_output=True, text=True, check=False)
             if r.returncode != 0:
                 return {"status": "failed", "exit_code": r.returncode}
 
@@ -90,10 +81,8 @@ class MatrixScheduler:
             return False
         try:
             print(f"🔧 [launchd repair] {label}: unloading/loading {cfg}")
-            subprocess.run(
-                ["launchctl", "unload", str(cfg)], capture_output=True, timeout=10, check=False)
-            subprocess.run(
-                ["launchctl", "load", str(cfg)], capture_output=True, timeout=10, check=False)
+            subprocess.run(["launchctl", "unload", str(cfg)], capture_output=True, timeout=10, check=False)
+            subprocess.run(["launchctl", "load", str(cfg)], capture_output=True, timeout=10, check=False)
             time.sleep(0.5)
             status = self._check_launchd(label)
             return status.get("status") == "running"
@@ -115,7 +104,9 @@ class MatrixScheduler:
                     "{{.Status}}",
                 ],
                 capture_output=True,
-                text=True, check=False)
+                text=True,
+                check=False,
+            )
             status = r.stdout.strip()
             if status:
                 return {"status": "running", "details": status}
@@ -128,8 +119,7 @@ class MatrixScheduler:
         if not port:
             return False
         try:
-            r = subprocess.run(
-                ["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-P"], capture_output=True, check=False)
+            r = subprocess.run(["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-P"], capture_output=True, check=False)
             return r.returncode == 0
         except Exception:  # noqa: BLE001  # defensive fallback
             return False
@@ -167,7 +157,7 @@ class MatrixScheduler:
         state = {}
         if state_file.exists():
             try:
-                with open(state_file, "r") as f:
+                with open(state_file) as f:
                     state = json.load(f)
             except Exception:  # noqa: BLE001, S110  # defensive fallback
                 pass  # defensive fallback
@@ -175,7 +165,7 @@ class MatrixScheduler:
         # Heartbeat & run statistics
         run_count = state.get("run_count", 0) + 1
         state["run_count"] = run_count
-        state["last_run"] = datetime.now(timezone.utc).astimezone().isoformat()
+        state["last_run"] = datetime.now(UTC).astimezone().isoformat()
         state.setdefault("state_transitions", 0)
 
         restart_history = state.get("restart_history", {})
@@ -261,10 +251,7 @@ class MatrixScheduler:
                 rt_status = self._check_launchd(svc.launchd_label)
                 result["runtime"] = rt_status
                 # ISC-2 治本: launchd LWCR 失步时先 unload/load plist 修复
-                if (
-                    rt_status.get("status") in ("failed", "error")
-                    and svc.launchd_config
-                ):
+                if rt_status.get("status") in ("failed", "error") and svc.launchd_config:
                     exit_code = rt_status.get("exit_code")
                     if exit_code in ("78", "19968", 78, 19968) and self._repair_launchd_service(
                         svc.launchd_label, svc.launchd_config
@@ -289,18 +276,12 @@ class MatrixScheduler:
                             print(
                                 f"⚠️ Service {svc.name} is {rt_status.get('status')}. Backoff={backoff}s. Self-healing..."
                             )
-                            subprocess.run(
-                                ["launchctl", "stop", svc.launchd_label],
-                                capture_output=True, check=False)
-                            subprocess.run(
-                                ["launchctl", "start", svc.launchd_label],
-                                capture_output=True, check=False)
+                            subprocess.run(["launchctl", "stop", svc.launchd_label], capture_output=True, check=False)
+                            subprocess.run(["launchctl", "start", svc.launchd_label], capture_output=True, check=False)
                             svc_history.append(current_time)
                             result["runtime"]["self_heal_attempted"] = True
                         else:
-                            print(
-                                f"⏳ Service {svc.name} is in backoff ({backoff}s). Waiting..."
-                            )
+                            print(f"⏳ Service {svc.name} is in backoff ({backoff}s). Waiting...")
                             result["runtime"]["status"] = "BACKOFF"
 
             elif svc.docker_container:
@@ -310,18 +291,12 @@ class MatrixScheduler:
                     backoff = 5 * (2 ** len(svc_history))
                     last_restart = svc_history[-1] if svc_history else 0
                     if current_time - last_restart >= backoff:
-                        print(
-                            f"⚠️ Service {svc.name} is {rt_status.get('status')}. Backoff={backoff}s. Self-healing..."
-                        )
-                        subprocess.run(
-                            ["docker", "restart", svc.docker_container],
-                            capture_output=True, check=False)
+                        print(f"⚠️ Service {svc.name} is {rt_status.get('status')}. Backoff={backoff}s. Self-healing...")
+                        subprocess.run(["docker", "restart", svc.docker_container], capture_output=True, check=False)
                         svc_history.append(current_time)
                         result["runtime"]["self_heal_attempted"] = True
                     else:
-                        print(
-                            f"⏳ Service {svc.name} is in backoff ({backoff}s). Waiting..."
-                        )
+                        print(f"⏳ Service {svc.name} is in backoff ({backoff}s). Waiting...")
                         result["runtime"]["status"] = "BACKOFF"
             else:
                 result["runtime"] = {"status": "unmanaged"}
@@ -349,15 +324,11 @@ class MatrixScheduler:
                     "healthy",
                     None,
                 ):
-                    _degrade_reasons.append(
-                        f"health_check={result.get('health_check')}"
-                    )
+                    _degrade_reasons.append(f"health_check={result.get('health_check')}")
                 # stdio-only daemon (无 port 无 health_url): 日志新鲜度交叉校验真活,
                 # 揭穿 launcher 僵尸 (uv 保活但子服务死, 无 heartbeat). 仅当配了 log_path 才生效.
                 if not svc.port and not svc.health_url and svc.log_path and not self._check_log_freshness(svc.log_path):
-                    _degrade_reasons.append(
-                        f"log {svc.log_path} stale (no heartbeat)"
-                    )
+                    _degrade_reasons.append(f"log {svc.log_path} stale (no heartbeat)")
                 if _degrade_reasons:
                     result["runtime"]["status"] = "degraded"
                     result["runtime"]["degraded_reason"] = "; ".join(_degrade_reasons)
@@ -369,14 +340,9 @@ class MatrixScheduler:
                 self._freshness[svc.name] = time.monotonic()
                 self._consecutive_failures.pop(svc.name, None)
             else:
-                self._consecutive_failures[svc.name] = (
-                    self._consecutive_failures.get(svc.name, 0) + 1
-                )
+                self._consecutive_failures[svc.name] = self._consecutive_failures.get(svc.name, 0) + 1
                 # P1-AUTO_HEAL: trigger autoheal when consecutive failures exceed threshold
-                if (
-                    self._autoheal_enabled
-                    and self._consecutive_failures[svc.name] >= self._stale_threshold
-                ):
+                if self._autoheal_enabled and self._consecutive_failures[svc.name] >= self._stale_threshold:
                     print(
                         f"⚠️ [P1-AUTO_HEAL] {svc.name}: {self._consecutive_failures[svc.name]} consecutive failures, triggering autoheal..."
                     )
@@ -386,32 +352,24 @@ class MatrixScheduler:
             # uptime_seconds: how long the service has been running (stability indicator)
             # last_healthy_seconds: time since last confirmed healthy (staleness indicator)
             running_since = state.setdefault("running_since", {})
-            running_pid = state.setdefault(
-                "running_pid", {}
-            )  # Bug A: 跟踪 pid 治 uptime 虚高
+            running_pid = state.setdefault("running_pid", {})  # Bug A: 跟踪 pid 治 uptime 虚高
             last_healthy = state.setdefault("last_healthy", {})
             if rt == "running":
                 current_pid = result.get("runtime", {}).get("pid")
                 # Bug A 治本: PID 变化(进程重启) → 重置 running_since. 否则 uptime/freshness
                 # 沿用旧进程启动时间永久虚高 (agora-gateway uptime 13天 > 进程实际5天).
-                pid_changed = bool(current_pid) and str(
-                    running_pid.get(svc.name)
-                ) != str(current_pid)
+                pid_changed = bool(current_pid) and str(running_pid.get(svc.name)) != str(current_pid)
                 if svc.name not in running_since or pid_changed:
                     running_since[svc.name] = current_time
                     if current_pid:
                         running_pid[svc.name] = current_pid
-                result["runtime"]["uptime_seconds"] = int(
-                    current_time - running_since[svc.name]
-                )
+                result["runtime"]["uptime_seconds"] = int(current_time - running_since[svc.name])
                 # freshness_seconds: time since last confirmed healthy
                 last_healthy_ts = last_healthy.get(svc.name, 0)
                 if last_healthy_ts:
                     freshness = int(current_time - last_healthy_ts)
                 else:
-                    freshness = int(
-                        current_time - running_since.get(svc.name, current_time)
-                    )
+                    freshness = int(current_time - running_since.get(svc.name, current_time))
                 result["runtime"]["freshness_seconds"] = freshness
             # Track last healthy time — runs for both running and idle services
             if rt in ("running", "idle") or hc == "healthy":
@@ -421,16 +379,12 @@ class MatrixScheduler:
                 running_since.pop(svc.name, None)
                 running_pid.pop(svc.name, None)  # Bug A: 连带清 pid tracking
                 # Report staleness: time since last seen healthy
-                result["runtime"]["last_healthy_seconds"] = int(
-                    current_time - last_healthy.get(svc.name, current_time)
-                )
+                result["runtime"]["last_healthy_seconds"] = int(current_time - last_healthy.get(svc.name, current_time))
 
             scan_results[svc.name] = result
 
         # Calculate state hash (excluding last_scan to prevent constant updates)
-        state_hash = hashlib.md5(
-            json.dumps(scan_results, sort_keys=True).encode()
-        ).hexdigest()
+        state_hash = hashlib.md5(json.dumps(scan_results, sort_keys=True).encode()).hexdigest()
 
         # Detect state transition and increment counter
         state_transitioned = state_hash != self.last_state_hash
@@ -441,9 +395,7 @@ class MatrixScheduler:
         # Save state back
         state["restart_history"] = restart_history
         state["running_since"] = state.get("running_since", {})
-        state["running_pid"] = state.get(
-            "running_pid", {}
-        )  # Bug A: 持久化 pid tracking
+        state["running_pid"] = state.get("running_pid", {})  # Bug A: 持久化 pid tracking
         state["last_healthy"] = state.get("last_healthy", {})
         try:
             with open(state_file, "w") as f:
@@ -476,17 +428,13 @@ class MatrixScheduler:
 
         # Alert on health transitions: healthy → unreachable
         notify_script = (
-            Path(os.environ.get("RUNTIME_HOME", Path.home() / "runtime"))
-            / "scripts"
-            / "event_driven_notify.py"
+            Path(os.environ.get("RUNTIME_HOME", Path.home() / "runtime")) / "scripts" / "event_driven_notify.py"
         )
         for svc_name, result in scan_results.items():
             current_hc = result.get("health_check")
             prev_hc = self._prev_health.get(svc_name)
             if prev_hc == "healthy" and current_hc == "unreachable":
-                print(
-                    f"🚨 Health alert: {svc_name} went healthy→unreachable. Notifying..."
-                )
+                print(f"🚨 Health alert: {svc_name} went healthy→unreachable. Notifying...")
                 try:
                     subprocess.run(
                         [
@@ -499,7 +447,9 @@ class MatrixScheduler:
                         ],
                         capture_output=True,
                         text=True,
-                        timeout=10, check=False)
+                        timeout=10,
+                        check=False,
+                    )
                 except Exception as e:  # noqa: BLE001  # defensive fallback
                     print(f"Failed to run notify script for {svc_name}: {e}")
             self._prev_health[svc_name] = current_hc
@@ -513,9 +463,7 @@ class MatrixScheduler:
             older_than_seconds=604800,
         )
         if compacted > 0:
-            print(
-                f"📦 [X2 Anti-Entropy] Compacted {compacted} resolved debt items to archive."
-            )
+            print(f"📦 [X2 Anti-Entropy] Compacted {compacted} resolved debt items to archive.")
 
     def _check_stale_services(self):
         """X2-NO_FRESHNESS: Check for services that have gone stale (not seen healthy)."""
@@ -534,10 +482,7 @@ class MatrixScheduler:
                     )
                     stale_found = True
                     # Trigger autoheal if enabled and not already triggered by consecutive failures
-                    if (
-                        self._autoheal_enabled
-                        and svc_name not in self._consecutive_failures
-                    ):
+                    if self._autoheal_enabled and svc_name not in self._consecutive_failures:
                         self._autoheal_service(svc_name)
             else:
                 self._stale_count.pop(svc_name, None)
@@ -546,24 +491,18 @@ class MatrixScheduler:
 
     def _autoheal_service(self, svc_name: str):
         """P1-AUTO_HEAL: Call autoheal.sh to restart a failing service."""
-        autoheal_script = (
-            Path(__file__).parent.parent.parent / "scripts" / "autoheal.sh"
-        )
+        autoheal_script = Path(__file__).parent.parent.parent / "scripts" / "autoheal.sh"
         if not autoheal_script.exists():
             print(f"⚠️ [P1-AUTO_HEAL] autoheal.sh not found at {autoheal_script}")
             return
         try:
             r = subprocess.run(
-                ["bash", str(autoheal_script), svc_name],
-                capture_output=True,
-                text=True,
-                timeout=30, check=False)
+                ["bash", str(autoheal_script), svc_name], capture_output=True, text=True, timeout=30, check=False
+            )
             if r.returncode == 0:
                 print(f"✅ [P1-AUTO_HEAL] {svc_name}: autoheal succeeded")
             else:
-                print(
-                    f"❌ [P1-AUTO_HEAL] {svc_name}: autoheal FAILED (exit={r.returncode}): {r.stdout.strip()[-200:]}"
-                )
+                print(f"❌ [P1-AUTO_HEAL] {svc_name}: autoheal FAILED (exit={r.returncode}): {r.stdout.strip()[-200:]}")
         except subprocess.TimeoutExpired:
             print(f"⚠️ [P1-AUTO_HEAL] {svc_name}: autoheal timed out after 30s")
         except Exception as e:  # noqa: BLE001  # defensive fallback
@@ -587,16 +526,14 @@ class MatrixScheduler:
             # single-source: top-level ratio follows the same daemon de-false-positive summary
             if summary.get("ratio") is not None:
                 data["service_online_ratio"] = summary["ratio"]
-            data["updated_at"] = datetime.now(timezone.utc).astimezone().isoformat()
+            data["updated_at"] = datetime.now(UTC).astimezone().isoformat()
 
             # GCSI 维度 2 (ADR-0121): record feedback loop timestamp + evidence score
             data["governance_feedback_last_run"] = data["updated_at"]
 
             tmp = system_yaml.with_suffix(".yaml.tmp")
             tmp.write_text(
-                yaml.dump(
-                    data, allow_unicode=True, sort_keys=False, default_flow_style=False
-                ),
+                yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False),
                 encoding="utf-8",
             )
             tmp.replace(system_yaml)

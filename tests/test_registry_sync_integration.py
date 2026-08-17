@@ -12,6 +12,7 @@ import time
 
 import pytest
 import uvicorn
+
 from runtime.registry.server import create_app
 
 
@@ -38,6 +39,7 @@ class _Server:
 
     def _wait_ready(self, timeout=5):
         import httpx
+
         url = f"http://127.0.0.1:{self.port}/health"
         for _ in range(int(timeout * 20)):
             try:
@@ -88,13 +90,16 @@ class TestGossipSyncTwoNodeE2E:
             assert len(c.get(f"{base_b}/agents").json()) == 0
 
             # Register agent on node-a
-            resp = c.post(f"{base_a}/agents", json={
-                "name": "shared-worker",
-                "node_id": "node-a",
-                "endpoint": f"{base_a}/agents/shared-worker",
-                "capabilities": [{"name": "python", "tags": [], "cost_eu": 0.0}],
-                "max_concurrency": 2,
-            })
+            resp = c.post(
+                f"{base_a}/agents",
+                json={
+                    "name": "shared-worker",
+                    "node_id": "node-a",
+                    "endpoint": f"{base_a}/agents/shared-worker",
+                    "capabilities": [{"name": "python", "tags": [], "cost_eu": 0.0}],
+                    "max_concurrency": 2,
+                },
+            )
             assert resp.status_code == 201
 
             # Add peers BEFORE any background sync can interfere
@@ -123,16 +128,22 @@ class TestGossipSyncTwoNodeE2E:
 
         with httpx.Client(timeout=5) as c:
             # Register different agents on each node
-            c.post(f"{base_a}/agents", json={
-                "name": "worker-a",
-                "node_id": "node-a",
-                "capabilities": [{"name": "coding", "tags": [], "cost_eu": 0.0}],
-            })
-            c.post(f"{base_b}/agents", json={
-                "name": "worker-b",
-                "node_id": "node-b",
-                "capabilities": [{"name": "review", "tags": [], "cost_eu": 0.0}],
-            })
+            c.post(
+                f"{base_a}/agents",
+                json={
+                    "name": "worker-a",
+                    "node_id": "node-a",
+                    "capabilities": [{"name": "coding", "tags": [], "cost_eu": 0.0}],
+                },
+            )
+            c.post(
+                f"{base_b}/agents",
+                json={
+                    "name": "worker-b",
+                    "node_id": "node-b",
+                    "capabilities": [{"name": "review", "tags": [], "cost_eu": 0.0}],
+                },
+            )
 
             # Add peers
             c.post(f"{base_a}/peers", json={"host": "127.0.0.1", "port": node_b.port})
@@ -166,22 +177,31 @@ class TestGossipSyncTwoNodeE2E:
 
         with httpx.Client(timeout=5) as c:
             # Register agents on both nodes with same capability
-            c.post(f"{base_a}/agents", json={
-                "name": "node-a-worker",
-                "node_id": "node-a",
-                "capabilities": [{"name": "compute", "tags": [], "cost_eu": 0.0}],
-            })
-            c.post(f"{base_b}/agents", json={
-                "name": "node-b-worker",
-                "node_id": "node-b",
-                "capabilities": [{"name": "compute", "tags": [], "cost_eu": 0.0}],
-            })
+            c.post(
+                f"{base_a}/agents",
+                json={
+                    "name": "node-a-worker",
+                    "node_id": "node-a",
+                    "capabilities": [{"name": "compute", "tags": [], "cost_eu": 0.0}],
+                },
+            )
+            c.post(
+                f"{base_b}/agents",
+                json={
+                    "name": "node-b-worker",
+                    "node_id": "node-b",
+                    "capabilities": [{"name": "compute", "tags": [], "cost_eu": 0.0}],
+                },
+            )
 
             # Submit task to node-a
-            task_resp = c.post(f"{base_a}/tasks", json={
-                "name": "critical-job",
-                "required_capabilities": ["compute"],
-            })
+            task_resp = c.post(
+                f"{base_a}/tasks",
+                json={
+                    "name": "critical-job",
+                    "required_capabilities": ["compute"],
+                },
+            )
             assert task_resp.status_code == 201
             assert task_resp.json()["status"] == "dispatched"
             assert "task_id" in task_resp.json()

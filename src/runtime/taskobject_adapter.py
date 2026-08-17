@@ -10,19 +10,14 @@ import json
 import subprocess
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 RUNTIME_SRC = Path(__file__).resolve().parent
 
 
 def _utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _validate_taskobject(payload: dict) -> str | None:
@@ -37,9 +32,7 @@ def _validate_taskobject(payload: dict) -> str | None:
         return "Missing target.tool"
     valid_intents = ["run", "query", "control", "custom"]
     if payload.get("intent") not in valid_intents:
-        return (
-            f"Invalid intent: {payload.get('intent')}. Must be one of {valid_intents}"
-        )
+        return f"Invalid intent: {payload.get('intent')}. Must be one of {valid_intents}"
     return None
 
 
@@ -60,7 +53,9 @@ def _mcp_call(tool_name: str, arguments: dict) -> dict:
         input=json.dumps(request),
         capture_output=True,
         text=True,
-        timeout=30, check=False)
+        timeout=30,
+        check=False,
+    )
     if result.returncode != 0 or not result.stdout.strip():
         return {
             "status": "error",
@@ -97,9 +92,7 @@ def dispatch_taskobject(payload: dict) -> dict:
     return result
 
 
-def call_via_taskobject(
-    tool_name: str, params: dict, source: str = "runtime-bridge"
-) -> dict:
+def call_via_taskobject(tool_name: str, params: dict, source: str = "runtime-bridge") -> dict:
     """Wrap a native MCP call in a TaskObject envelope and dispatch."""
     envelope = {
         "id": str(uuid.uuid4()),

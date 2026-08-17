@@ -71,9 +71,7 @@ def load_protocols(path: Path | None = None) -> list[ProtocolEntry]:
 
     protocols = payload.get("protocols")
     if not isinstance(protocols, list):
-        raise TypeError(
-            f"Invalid L0 protocol registry: missing protocol list in {path}"
-        )
+        raise TypeError(f"Invalid L0 protocol registry: missing protocol list in {path}")
 
     return [_normalize_protocol(raw) for raw in protocols]
 
@@ -116,10 +114,7 @@ def register_protocol_handler(protocol_name: str, handler: callable) -> None:
 
 def list_protocol_handlers() -> dict[str, str]:
     """Return a mapping of registered protocol names to handler docstrings."""
-    return {
-        name: (handler.__doc__ or "No description")
-        for name, handler in _PROTOCOL_HANDLERS.items()
-    }
+    return {name: (handler.__doc__ or "No description") for name, handler in _PROTOCOL_HANDLERS.items()}
 
 
 def dispatch_protocol_message(protocol_name: str, message: dict) -> tuple[bool, dict]:

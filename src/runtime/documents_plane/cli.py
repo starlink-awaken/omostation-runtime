@@ -30,22 +30,16 @@ _CONTROLLER_SHADOW_READS = (
     "@工作文档/卫健委/_knowledge",
 )
 _CONTROLLER_SHADOW_EVIDENCE = (
-    "control/evidence/documents-weijian-controller-shadow/"
-    "documents-weijian-controller-shadow.json"
+    "control/evidence/documents-weijian-controller-shadow/documents-weijian-controller-shadow.json"
 )
-_CONTROLLER_SHADOW_EVIDENCE_PREFIX = (
-    "control/evidence/documents-weijian-controller-shadow/"
-)
+_CONTROLLER_SHADOW_EVIDENCE_PREFIX = "control/evidence/documents-weijian-controller-shadow/"
 _MODEL_FRESHNESS_ACTION = "audit_model_freshness"
 _MODEL_FRESHNESS_SCHEMA = "runtime.documents-model-freshness.evidence.v1"
 _MODEL_FRESHNESS_READS = (
     "@工作文档/卫健委/_entities/facts.md",
     "@工作文档/卫健委/_entities/models",
 )
-_MODEL_FRESHNESS_EVIDENCE = (
-    "control/evidence/documents-weijian-model-freshness/"
-    "documents-weijian-model-freshness.json"
-)
+_MODEL_FRESHNESS_EVIDENCE = "control/evidence/documents-weijian-model-freshness/documents-weijian-model-freshness.json"
 _MODEL_FRESHNESS_EVIDENCE_PREFIX = "control/evidence/documents-weijian-model-freshness/"
 _SANYI_ACTION = "audit_sanyi_status_consistency"
 _SANYI_JOB_ID = "documents-weijian-sanyi-status-audit"
@@ -55,10 +49,7 @@ _SANYI_READS = (
     "@工作文档/卫健委/_entities/facts/01-progress.yaml",
 )
 _SANYI_SCOPE = ("proj-syld", "proj-jingbao", "proj-emr-quality")
-_SANYI_EVIDENCE = (
-    "control/evidence/documents-weijian-sanyi-status-audit/"
-    "documents-weijian-sanyi-status-audit.json"
-)
+_SANYI_EVIDENCE = "control/evidence/documents-weijian-sanyi-status-audit/documents-weijian-sanyi-status-audit.json"
 _SANYI_EVIDENCE_PREFIX = "control/evidence/documents-weijian-sanyi-status-audit/"
 _SANYI_COMMAND = (
     sys.executable,
@@ -86,13 +77,7 @@ def _workspace_binding_registry_path(environ: Mapping[str, str]) -> Path:
         return Path(configured).expanduser()
     workspace_root = environ.get("WORKSPACE_ROOT")
     if workspace_root:
-        return (
-            Path(workspace_root).expanduser()
-            / ".omo"
-            / "_truth"
-            / "registry"
-            / "documents-domain-projects.yaml"
-        )
+        return Path(workspace_root).expanduser() / ".omo" / "_truth" / "registry" / "documents-domain-projects.yaml"
     raise DocumentsPlanePathError(
         "DOCUMENTS_DOMAIN_PROJECTS_REGISTRY or WORKSPACE_ROOT is required for Workspace-owned Documents jobs"
     )
@@ -105,13 +90,9 @@ def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry is unavailable"
-        ) from exc
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry has invalid runtime_jobs"
-        )
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
     matches = [
         item
         for item in raw["runtime_jobs"]
@@ -120,9 +101,7 @@ def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
         and item.get("action") == _CONTROLLER_SHADOW_ACTION
     ]
     if len(matches) != 1:
-        raise DocumentsPlanePathError(
-            "Workspace controller shadow job must be declared exactly once"
-        )
+        raise DocumentsPlanePathError("Workspace controller shadow job must be declared exactly once")
     job = matches[0]
     reads = job.get("reads")
     timeout = job.get("timeout_seconds")
@@ -139,9 +118,7 @@ def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
         or not isinstance(timeout, int)
         or timeout <= 0
     ):
-        raise DocumentsPlanePathError(
-            "Workspace controller shadow job has an invalid contract"
-        )
+        raise DocumentsPlanePathError("Workspace controller shadow job has an invalid contract")
     return JobSpec(
         job_id="documents-weijian-controller-shadow",
         reads=tuple(reads),
@@ -149,9 +126,7 @@ def _controller_shadow_job_spec(environ: Mapping[str, str]) -> JobSpec:
         owner="runtime-control",
         schedule="manual",
         timeout=timeout,
-        evidence_path=_CONTROLLER_SHADOW_EVIDENCE.removeprefix(
-            _CONTROLLER_SHADOW_EVIDENCE_PREFIX
-        ),
+        evidence_path=_CONTROLLER_SHADOW_EVIDENCE.removeprefix(_CONTROLLER_SHADOW_EVIDENCE_PREFIX),
         fail_closed=True,
         evidence_projection="controller-shadow-v2",
     )
@@ -164,13 +139,9 @@ def _model_freshness_job_spec(environ: Mapping[str, str]) -> JobSpec:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry is unavailable"
-        ) from exc
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry has invalid runtime_jobs"
-        )
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
     matches = [
         item
         for item in raw["runtime_jobs"]
@@ -179,9 +150,7 @@ def _model_freshness_job_spec(environ: Mapping[str, str]) -> JobSpec:
         and item.get("action") == _MODEL_FRESHNESS_ACTION
     ]
     if len(matches) != 1:
-        raise DocumentsPlanePathError(
-            "Workspace model freshness job must be declared exactly once"
-        )
+        raise DocumentsPlanePathError("Workspace model freshness job must be declared exactly once")
     job = matches[0]
     if (
         job.get("domain_id") != "work-weijian"
@@ -195,9 +164,7 @@ def _model_freshness_job_spec(environ: Mapping[str, str]) -> JobSpec:
         or job.get("evidence_schema") != _MODEL_FRESHNESS_SCHEMA
         or job.get("fail_closed") is not True
     ):
-        raise DocumentsPlanePathError(
-            "Workspace model freshness job has an invalid contract"
-        )
+        raise DocumentsPlanePathError("Workspace model freshness job has an invalid contract")
     return JobSpec(
         job_id="documents-weijian-model-freshness",
         reads=_MODEL_FRESHNESS_READS,
@@ -205,9 +172,7 @@ def _model_freshness_job_spec(environ: Mapping[str, str]) -> JobSpec:
         owner="runtime-control",
         schedule="manual",
         timeout=30,
-        evidence_path=_MODEL_FRESHNESS_EVIDENCE.removeprefix(
-            _MODEL_FRESHNESS_EVIDENCE_PREFIX
-        ),
+        evidence_path=_MODEL_FRESHNESS_EVIDENCE.removeprefix(_MODEL_FRESHNESS_EVIDENCE_PREFIX),
         fail_closed=True,
         evidence_projection="model-freshness-v1",
     )
@@ -219,16 +184,11 @@ def _binding_declares_model_freshness(environ: Mapping[str, str]) -> bool:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry is unavailable"
-        ) from exc
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry has invalid runtime_jobs"
-        )
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
     return any(
-        isinstance(item, dict) and item.get("id") == "documents-weijian-model-freshness"
-        for item in raw["runtime_jobs"]
+        isinstance(item, dict) and item.get("id") == "documents-weijian-model-freshness" for item in raw["runtime_jobs"]
     )
 
 
@@ -238,17 +198,10 @@ def _binding_declares_job(environ: Mapping[str, str], job_id: str) -> bool:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry is unavailable"
-        ) from exc
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry has invalid runtime_jobs"
-        )
-    return any(
-        isinstance(item, dict) and item.get("id") == job_id
-        for item in raw["runtime_jobs"]
-    )
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
+    return any(isinstance(item, dict) and item.get("id") == job_id for item in raw["runtime_jobs"])
 
 
 def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
@@ -257,22 +210,12 @@ def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry is unavailable"
-        ) from exc
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
-        raise DocumentsPlanePathError(
-            "Workspace Documents binding registry has invalid runtime_jobs"
-        )
-    matches = [
-        item
-        for item in raw["runtime_jobs"]
-        if isinstance(item, dict) and item.get("id") == _SANYI_JOB_ID
-    ]
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
+    matches = [item for item in raw["runtime_jobs"] if isinstance(item, dict) and item.get("id") == _SANYI_JOB_ID]
     if len(matches) != 1:
-        raise DocumentsPlanePathError(
-            "Workspace sanyi status job must be declared exactly once"
-        )
+        raise DocumentsPlanePathError("Workspace sanyi status job must be declared exactly once")
     expected = {
         "id": _SANYI_JOB_ID,
         "domain_id": "work-weijian",
@@ -288,9 +231,7 @@ def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
         "fail_closed": True,
     }
     if matches[0] != expected:
-        raise DocumentsPlanePathError(
-            "Workspace sanyi status job has an invalid contract"
-        )
+        raise DocumentsPlanePathError("Workspace sanyi status job has an invalid contract")
     return JobSpec(
         job_id=expected["id"],
         reads=_SANYI_READS,
@@ -316,16 +257,10 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
         str(documents_root / "@公共" / "_control" / "L4-DOMAIN-REGISTRY.yaml"),
     )
     try:
-        registry_relative_path = (
-            Path(registry_path).expanduser().resolve().relative_to(documents_root)
-        )
-        registry_path = str(
-            resolve_documents_read_path(documents_root, registry_relative_path)
-        )
+        registry_relative_path = Path(registry_path).expanduser().resolve().relative_to(documents_root)
+        registry_path = str(resolve_documents_read_path(documents_root, registry_relative_path))
     except ValueError as exc:
-        raise DocumentsPlanePathError(
-            "L4_DOMAIN_REGISTRY must be inside DOCUMENTS_CONTENT_ROOT"
-        ) from exc
+        raise DocumentsPlanePathError("L4_DOMAIN_REGISTRY must be inside DOCUMENTS_CONTENT_ROOT") from exc
     l4_command = environ.get("L4_KERNEL_COMMAND", "l4-kernel")
     registry = JobRegistry()
     registry.register(
@@ -424,9 +359,7 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             "@工作文档/卫健委",
         ],
     )
-    if environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY") or environ.get(
-        "WORKSPACE_ROOT"
-    ):
+    if environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY") or environ.get("WORKSPACE_ROOT"):
         registry.register(
             _controller_shadow_job_spec(environ),
             [
@@ -505,20 +438,12 @@ def _emit_sanyi_status_parse_failure(argv: Sequence[str]) -> int:
     return 2
 
 
-def _documents_main(
-    argv: Sequence[str], *, registry: JobRegistry, environ: Mapping[str, str]
-) -> int:
+def _documents_main(argv: Sequence[str], *, registry: JobRegistry, environ: Mapping[str, str]) -> int:
     is_sanyi_invocation = _SANYI_JOB_ID in argv
-    parser_class = (
-        _RedactingSanyiArgumentParser
-        if is_sanyi_invocation
-        else argparse.ArgumentParser
-    )
+    parser_class = _RedactingSanyiArgumentParser if is_sanyi_invocation else argparse.ArgumentParser
     parser = parser_class(prog="runtime documents")
     subparsers = parser.add_subparsers(dest="documents_command", required=True)
-    run_parser = subparsers.add_parser(
-        "run", help="Run an explicitly registered owner job"
-    )
+    run_parser = subparsers.add_parser("run", help="Run an explicitly registered owner job")
     run_parser.add_argument("job_id")
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -527,9 +452,7 @@ def _documents_main(
     except _SanyiArgumentParseError:
         return _emit_sanyi_status_parse_failure(argv)
 
-    if (
-        args.documents_command != "run"
-    ):  # pragma: no cover - argparse owns this boundary
+    if args.documents_command != "run":  # pragma: no cover - argparse owns this boundary
         return 2
     try:
         result = run_job(
@@ -541,19 +464,13 @@ def _documents_main(
         )
     except ValueError as exc:
         if args.json_output:
-            print(
-                json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False)
-            )
+            print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         else:
             print(f"runtime documents: {exc}", file=sys.stderr)
         return 2
 
     if args.json_output:
-        payload = (
-            _sanyi_status_cli_payload(result)
-            if result.job_id == _SANYI_JOB_ID
-            else result.as_dict()
-        )
+        payload = _sanyi_status_cli_payload(result) if result.job_id == _SANYI_JOB_ID else result.as_dict()
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
     elif result.job_id == _SANYI_JOB_ID:
         _print_sanyi_status_text_result(result)
@@ -580,12 +497,8 @@ def main(
         return legacy_main(arguments)
     environment = os.environ if environ is None else environ
     try:
-        selected_registry = (
-            _default_registry(environment) if registry is None else registry
-        )
+        selected_registry = _default_registry(environment) if registry is None else registry
     except DocumentsPlanePathError as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         return 2
-    return _documents_main(
-        arguments[1:], registry=selected_registry, environ=environment
-    )
+    return _documents_main(arguments[1:], registry=selected_registry, environ=environment)

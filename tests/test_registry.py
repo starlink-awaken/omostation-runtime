@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+
 from runtime.registry.dispatch import Dispatcher, TaskRequest, TaskStatus
 from runtime.registry.heartbeat import HeartbeatManager
 from runtime.registry.models import (
@@ -152,7 +153,14 @@ class TestRegistryServer:
         assert r.json()["status"] == "ok"
 
     def test_register_and_discover(self, client):
-        r = client.post("/agents", json={"name": "coder", "endpoint": "http://localhost:9000", "capabilities": [{"name": "code-generation", "tags": ["python"]}]})
+        r = client.post(
+            "/agents",
+            json={
+                "name": "coder",
+                "endpoint": "http://localhost:9000",
+                "capabilities": [{"name": "code-generation", "tags": ["python"]}],
+            },
+        )
         assert r.status_code == 201
         assert "agent_id" in r.json()
         r = client.get("/agents/find", params={"capability": "code-generation"})
@@ -175,7 +183,10 @@ class TestRegistryServer:
         assert r.status_code == 404
 
     def test_node_register(self, client):
-        r = client.post("/nodes", json={"host": "192.168.1.100", "port": 8000, "role": "worker", "capabilities": [{"name": "compute"}]})
+        r = client.post(
+            "/nodes",
+            json={"host": "192.168.1.100", "port": 8000, "role": "worker", "capabilities": [{"name": "compute"}]},
+        )
         assert r.status_code == 201
         assert r.json()["host"] == "192.168.1.100"
 
@@ -302,6 +313,7 @@ class TestDispatcher:
 
     def test_task_assignment_serialization(self):
         from runtime.registry.dispatch import TaskAssignment
+
         a = TaskAssignment(task_id="t1", agent_id="a1", agent_name="w1")
         assert a.task_id == "t1"
         assert a.status == TaskStatus.DISPATCHED

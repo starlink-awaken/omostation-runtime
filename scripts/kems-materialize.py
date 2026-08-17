@@ -13,7 +13,7 @@ import importlib.util
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 SOURCE_PATTERNS = (
@@ -63,7 +63,7 @@ def materialize(docs_root: Path, graph_db: Path, run_id: str) -> dict[str, objec
     if not files:
         raise RuntimeError("no source documents available for KEMS materialization")
     store = GraphStore(graph_db)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     entities = 0
     evidence = 0
     for path in files:
@@ -73,22 +73,66 @@ def materialize(docs_root: Path, graph_db: Path, run_id: str) -> dict[str, objec
         text = path.read_text(encoding="utf-8", errors="replace")
         sensitivity = "internal" if "seeyon" in path.name else "personal"
         store.put_document_version(
-            DocumentVersion(document_id, version_id, source_sha, "official_work" if sensitivity == "internal" else "personal", text, sensitivity=sensitivity, run_id=run_id)
+            DocumentVersion(
+                document_id,
+                version_id,
+                source_sha,
+                "official_work" if sensitivity == "internal" else "personal",
+                text,
+                sensitivity=sensitivity,
+                run_id=run_id,
+            )
         )
         evidence_id = f"evidence:{source_sha[:24]}"
         first_line = next((line.strip() for line in text.splitlines() if line.strip()), path.stem)
-        store.add_evidence(EvidenceSpan(evidence_id, document_id, version_id, "line=1", first_line[:500], "kems-materialize-v1", 1.0, run_id))
-        store.add_entity(GraphEntity(document_id, "source_document", path.name, document_id, version_id, evidence_id, 1.0, "pending", created_by_run=run_id))
-        store.record_extraction_run(run_id=f"{run_id}:{source_sha[:16]}", scenario_id="private-source-materialization", source_sha256=source_sha, model_id="kems-materialize-v1", status="completed", evidence_refs=(evidence_id,), created_at=now)
+        store.add_evidence(
+            EvidenceSpan(
+                evidence_id, document_id, version_id, "line=1", first_line[:500], "kems-materialize-v1", 1.0, run_id
+            )
+        )
+        store.add_entity(
+            GraphEntity(
+                document_id,
+                "source_document",
+                path.name,
+                document_id,
+                version_id,
+                evidence_id,
+                1.0,
+                "pending",
+                created_by_run=run_id,
+            )
+        )
+        store.record_extraction_run(
+            run_id=f"{run_id}:{source_sha[:16]}",
+            scenario_id="private-source-materialization",
+            source_sha256=source_sha,
+            model_id="kems-materialize-v1",
+            status="completed",
+            evidence_refs=(evidence_id,),
+            created_at=now,
+        )
         entities += 1
         evidence += 1
-    return {"run_id": run_id, "documents": len(files), "entities": entities, "evidence": evidence, "graph_db": str(graph_db)}
+    return {
+        "run_id": run_id,
+        "documents": len(files),
+        "entities": entities,
+        "evidence": evidence,
+        "graph_db": str(graph_db),
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--docs-root", type=Path, default=Path(os.environ.get("BOS_DOCS_ROOT", "/Users/xiamingxing/Documents")))
-    parser.add_argument("--graph-db", type=Path, default=Path(os.environ.get("KEMS_GRAPH_DB", str(Path.home() / ".kems" / "graph.sqlite"))))
+    parser.add_argument(
+        "--docs-root", type=Path, default=Path(os.environ.get("BOS_DOCS_ROOT", "/Users/xiamingxing/Documents"))
+    )
+    parser.add_argument(
+        "--graph-db",
+        type=Path,
+        default=Path(os.environ.get("KEMS_GRAPH_DB", str(Path.home() / ".kems" / "graph.sqlite"))),
+    )
     parser.add_argument("--run-id", default=os.environ.get("BOS_MESH_RUN_ID", ""))
     args = parser.parse_args()
     if not args.run_id:

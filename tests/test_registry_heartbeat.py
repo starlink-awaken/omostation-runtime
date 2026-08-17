@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
 from runtime.registry.heartbeat import (
     DEFAULT_INTERVAL,
     DEFAULT_TTL,

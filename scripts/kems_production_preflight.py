@@ -65,14 +65,7 @@ def _write_json_atomically(payload: dict[str, object], output: Path) -> None:
 
 def _source_files(docs_root: Path) -> list[Path]:
     inbox = docs_root / "_inbox"
-    return sorted(
-        {
-            path
-            for pattern in SOURCE_PATTERNS
-            for path in inbox.glob(pattern)
-            if path.is_file()
-        }
-    )
+    return sorted({path for pattern in SOURCE_PATTERNS for path in inbox.glob(pattern) if path.is_file()})
 
 
 def _source_scope_metadata(docs_root: Path, sources: list[Path]) -> dict[str, object]:
@@ -89,20 +82,13 @@ def _source_scope_metadata(docs_root: Path, sources: list[Path]) -> dict[str, ob
     return {
         "scope_id": SOURCE_SCOPE_ID,
         "controlled_patterns": list(SOURCE_PATTERNS),
-        "excluded_auto_sources": [
-            {"name": name, "reason": "outside_controlled_scope"} for name in excluded
-        ],
+        "excluded_auto_sources": [{"name": name, "reason": "outside_controlled_scope"} for name in excluded],
     }
 
 
 def _source_inventory(sources: list[Path]) -> tuple[list[dict[str, object]], str]:
-    inventory = [
-        {"name": path.name, "bytes": path.stat().st_size, "sha256": _sha256(path)}
-        for path in sources
-    ]
-    canonical = json.dumps(
-        inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    inventory = [{"name": path.name, "bytes": path.stat().st_size, "sha256": _sha256(path)} for path in sources]
+    canonical = json.dumps(inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return inventory, hashlib.sha256(canonical).hexdigest()
 
 
@@ -129,9 +115,7 @@ def _load_json(path: Path) -> object:
         raise ValueError(f"invalid JSON metadata: {type(exc).__name__}") from exc
 
 
-def _evaluation_check(
-    path: Path | None, sources: list[Path], *, bind_sources: bool
-) -> Check:
+def _evaluation_check(path: Path | None, sources: list[Path], *, bind_sources: bool) -> Check:
     if path is None:
         return Check("evaluation_manifest", False, "missing evaluation manifest path")
     if not path.is_file():
@@ -153,9 +137,7 @@ def _evaluation_check(
     if not isinstance(samples, list) or not samples:
         return Check("evaluation_manifest", False, "manifest has no samples")
     sample_ids: set[str] = set()
-    source_inventory = {
-        f"vault://redacted/{source.name}": _sha256(source) for source in sources
-    }
+    source_inventory = {f"vault://redacted/{source.name}": _sha256(source) for source in sources}
     for sample in samples:
         if not isinstance(sample, dict):
             return Check("evaluation_manifest", False, "sample must be an object")
@@ -166,32 +148,17 @@ def _evaluation_check(
         source_sha256 = sample.get("source_sha256")
         source_ref = sample.get("source_ref")
         if not isinstance(sample_id, str) or not sample_id or sample_id in sample_ids:
-            return Check(
-                "evaluation_manifest", False, "sample IDs must be non-empty and unique"
-            )
+            return Check("evaluation_manifest", False, "sample IDs must be non-empty and unique")
         if not isinstance(source_sha256, str) or not SHA256.fullmatch(source_sha256):
-            return Check(
-                "evaluation_manifest", False, "sample source_sha256 is invalid"
-            )
-        if not isinstance(source_ref, str) or not source_ref.startswith(
-            "vault://redacted/"
-        ):
-            return Check(
-                "evaluation_manifest", False, "sample source_ref is not redacted"
-            )
+            return Check("evaluation_manifest", False, "sample source_sha256 is invalid")
+        if not isinstance(source_ref, str) or not source_ref.startswith("vault://redacted/"):
+            return Check("evaluation_manifest", False, "sample source_ref is not redacted")
         if sample.get("annotation_status") != "adjudicated":
-            return Check(
-                "evaluation_manifest", False, "all samples must be adjudicated"
-            )
+            return Check("evaluation_manifest", False, "all samples must be adjudicated")
         if not isinstance(sample.get("labels"), dict) or not sample["labels"]:
             return Check("evaluation_manifest", False, "all samples require labels")
-        if (
-            not isinstance(sample.get("annotation_version"), str)
-            or not sample["annotation_version"].strip()
-        ):
-            return Check(
-                "evaluation_manifest", False, "all samples require annotation_version"
-            )
+        if not isinstance(sample.get("annotation_version"), str) or not sample["annotation_version"].strip():
+            return Check("evaluation_manifest", False, "all samples require annotation_version")
         if bind_sources:
             expected_sha256 = source_inventory.get(source_ref)
             if expected_sha256 is None:
@@ -213,9 +180,7 @@ def _evaluation_check(
     return Check("evaluation_manifest", True, detail)
 
 
-def _adjudication_check(
-    database_path: Path | None, evaluation_manifest: Path | None
-) -> Check:
+def _adjudication_check(database_path: Path | None, evaluation_manifest: Path | None) -> Check:
     """Bind every manifest row to the persisted, independently adjudicated record."""
     if database_path is None:
         return Check(
@@ -278,9 +243,7 @@ def _adjudication_check(
                         False,
                         "manifest sample is not adjudicated in persistent store",
                     )
-                if row["source_sha256"] != sample.get("source_sha256") or row[
-                    "source_ref"
-                ] != sample.get("source_ref"):
+                if row["source_sha256"] != sample.get("source_sha256") or row["source_ref"] != sample.get("source_ref"):
                     return Check(
                         "adjudication_persistence",
                         False,
@@ -335,16 +298,12 @@ def _adjudication_check(
     )
 
 
-def _model_acceptance_check(
-    path: Path | None, evaluation_manifest: Path | None
-) -> Check:
+def _model_acceptance_check(path: Path | None, evaluation_manifest: Path | None) -> Check:
     """Require a passing, manifest-bound candidate-model shadow report."""
     if path is None:
         return Check("model_acceptance", False, "missing model acceptance report path")
     if not path.is_file():
-        return Check(
-            "model_acceptance", False, "model acceptance report is unavailable"
-        )
+        return Check("model_acceptance", False, "model acceptance report is unavailable")
     if evaluation_manifest is None or not evaluation_manifest.is_file():
         return Check(
             "model_acceptance",
@@ -357,9 +316,7 @@ def _model_acceptance_check(
     except ValueError as exc:
         return Check("model_acceptance", False, str(exc))
     if not isinstance(payload, dict):
-        return Check(
-            "model_acceptance", False, "model acceptance report must be an object"
-        )
+        return Check("model_acceptance", False, "model acceptance report must be an object")
     if not isinstance(manifest, dict):
         return Check("model_acceptance", False, "evaluation manifest must be an object")
     forbidden = _contains_forbidden_key(payload)
@@ -368,13 +325,9 @@ def _model_acceptance_check(
     if payload.get("schema_version") != MODEL_ACCEPTANCE_SCHEMA:
         return Check("model_acceptance", False, "unsupported model acceptance schema")
     if payload.get("status") != "shadow_pass":
-        return Check(
-            "model_acceptance", False, "candidate model did not pass shadow evaluation"
-        )
+        return Check("model_acceptance", False, "candidate model did not pass shadow evaluation")
     if payload.get("promotion") != "blocked_until_omo_approval":
-        return Check(
-            "model_acceptance", False, "model acceptance cannot authorize promotion"
-        )
+        return Check("model_acceptance", False, "model acceptance cannot authorize promotion")
     for field in ("candidate_model_id", "baseline_model_id"):
         if not isinstance(payload.get(field), str) or not payload[field].strip():
             return Check("model_acceptance", False, f"{field} is missing")
@@ -459,15 +412,11 @@ def _omo_check(omo_root: Path, task_id: str | None) -> Check:
     try:
         import yaml
     except ImportError as exc:
-        return Check(
-            "omo_approval", False, f"invalid OMO task metadata: {type(exc).__name__}"
-        )
+        return Check("omo_approval", False, f"invalid OMO task metadata: {type(exc).__name__}")
     try:
         payload = yaml.safe_load(task_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
-        return Check(
-            "omo_approval", False, f"invalid OMO task metadata: {type(exc).__name__}"
-        )
+        return Check("omo_approval", False, f"invalid OMO task metadata: {type(exc).__name__}")
     if not isinstance(payload, dict):
         return Check("omo_approval", False, "OMO task metadata must be an object")
     if payload.get("status") not in APPROVED_STATUSES:
@@ -476,9 +425,7 @@ def _omo_check(omo_root: Path, task_id: str | None) -> Check:
     if payload.get("id") not in {None, task_id}:
         return Check("omo_approval", False, "OMO task id does not match task path")
     if not isinstance(approval_ref, str) or not approval_ref.endswith(".yaml"):
-        return Check(
-            "omo_approval", False, "OMO task approval_ref is missing or invalid"
-        )
+        return Check("omo_approval", False, "OMO task approval_ref is missing or invalid")
 
     root = omo_root.resolve().parent
     approval_path = _resolve_omo_ref(omo_root, approval_ref)
@@ -634,9 +581,7 @@ def run_preflight(
         Check(
             "reachbridge_endpoint",
             endpoint_ok,
-            "configured HTTP endpoint"
-            if endpoint_ok
-            else "HTTP endpoint is missing or invalid",
+            "configured HTTP endpoint" if endpoint_ok else "HTTP endpoint is missing or invalid",
         )
     )
     checks.append(
@@ -649,12 +594,8 @@ def run_preflight(
     checks.append(
         Check(
             "transport_mode",
-            os.environ.get("BOS_REACHBRIDGE_MODE") != "local_hermes"
-            if production
-            else True,
-            "enterprise transport required"
-            if production
-            else "non-production transport accepted",
+            os.environ.get("BOS_REACHBRIDGE_MODE") != "local_hermes" if production else True,
+            "enterprise transport required" if production else "non-production transport accepted",
         )
     )
 
@@ -664,18 +605,14 @@ def run_preflight(
         Check(
             "source_inventory",
             source_ok,
-            f"source files available={len(sources)}"
-            if source_ok
-            else "no controlled source files found",
+            f"source files available={len(sources)}" if source_ok else "no controlled source files found",
         )
     )
     # Hashing proves inventory stability without placing private content in the report.
     inventory, inventory_sha256 = _source_inventory(sources)
     source_scope = _source_scope_metadata(docs_root, sources)
 
-    checks.append(
-        _evaluation_check(evaluation_manifest, sources, bind_sources=production)
-    )
+    checks.append(_evaluation_check(evaluation_manifest, sources, bind_sources=production))
     checks.append(
         _adjudication_check(adjudication_database, evaluation_manifest)
         if production
@@ -727,9 +664,7 @@ def main() -> int:
     parser.add_argument(
         "--evaluation-manifest",
         type=Path,
-        default=Path(os.environ["KEMS_EVALUATION_MANIFEST"])
-        if os.environ.get("KEMS_EVALUATION_MANIFEST")
-        else None,
+        default=Path(os.environ["KEMS_EVALUATION_MANIFEST"]) if os.environ.get("KEMS_EVALUATION_MANIFEST") else None,
     )
     parser.add_argument(
         "--model-acceptance",
@@ -742,17 +677,13 @@ def main() -> int:
     parser.add_argument(
         "--adjudication-database",
         type=Path,
-        default=Path(os.environ["KEMS_ADJUDICATION_DB"])
-        if os.environ.get("KEMS_ADJUDICATION_DB")
-        else None,
+        default=Path(os.environ["KEMS_ADJUDICATION_DB"]) if os.environ.get("KEMS_ADJUDICATION_DB") else None,
         help="read-only persistent adjudication SQLite database",
     )
     parser.add_argument(
         "--omo-root",
         type=Path,
-        default=Path(
-            os.environ.get("KEMS_OMO_ROOT", "/Users/xiamingxing/Workspace/.omo")
-        ),
+        default=Path(os.environ.get("KEMS_OMO_ROOT", "/Users/xiamingxing/Workspace/.omo")),
     )
     parser.add_argument("--task-id", default=os.environ.get("KEMS_OMO_TASK_ID"))
     parser.add_argument(
@@ -763,21 +694,13 @@ def main() -> int:
         else None,
         help="atomically write redacted preflight evidence JSON",
     )
-    parser.add_argument(
-        "--production", action="store_true", help="require enterprise HTTP transport"
-    )
+    parser.add_argument("--production", action="store_true", help="require enterprise HTTP transport")
     args = parser.parse_args()
     result = run_preflight(
         docs_root=args.docs_root.expanduser().resolve(),
-        evaluation_manifest=args.evaluation_manifest.expanduser().resolve()
-        if args.evaluation_manifest
-        else None,
-        model_acceptance=args.model_acceptance.expanduser().resolve()
-        if args.model_acceptance
-        else None,
-        adjudication_database=args.adjudication_database.expanduser().resolve()
-        if args.adjudication_database
-        else None,
+        evaluation_manifest=args.evaluation_manifest.expanduser().resolve() if args.evaluation_manifest else None,
+        model_acceptance=args.model_acceptance.expanduser().resolve() if args.model_acceptance else None,
+        adjudication_database=args.adjudication_database.expanduser().resolve() if args.adjudication_database else None,
         omo_root=args.omo_root.expanduser().resolve(),
         task_id=args.task_id,
         production=args.production,
