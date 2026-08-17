@@ -87,7 +87,7 @@ class GovernanceInterceptor:
                 or ""
             )
 
-            # 1a. Check path boundary
+            # 1a. Check path boundary & Documents dual-plane rules
             path_res = self.path_inspector.inspect_write(
                 target_file, caller_domain=caller_domain
             )
@@ -197,6 +197,24 @@ class GovernanceInterceptor:
                 "</mof_architecture_guardrails>"
             )
 
+    def get_documents_guardrail_prompt(self, domain_id: str = "work-weijian") -> str:
+        """Synthesize Documents Dual-Plane guardrail block (ADR-0191) for Agent System Prompts."""
+        try:
+            from ecos.ssot.compiler.context_synthesizer import MOFContextSynthesizer
+
+            return MOFContextSynthesizer().synthesize_documents_guardrails(
+                domain_id=domain_id
+            )
+        except ImportError:
+            return (
+                f'<documents_dual_plane_guardrails domain="{domain_id}">\n'
+                "# Workspace × Documents 双平面治理契约 (ADR-0191):\n"
+                "1. [E-DOC-001: REQUIRED] 禁止在 Documents 业务域写入可执行脚本 (.py/.sh/.js/.ts)。\n"
+                "2. [E-DOC-002: REQUIRED] 禁止在 Documents 引入依赖或缓存目录 (node_modules/.venv/__pycache__)。\n"
+                "3. [E-DOC-003: REQUIRED] Documents 仅作为事实资产平面，物理事实以 _entities/facts/ 为 SSOT。\n"
+                "</documents_dual_plane_guardrails>"
+            )
+
     def explain_rule(self, rule_id: str) -> dict[str, Any]:
         """Provide detailed rule explanation, motivation, and code recipe."""
         try:
@@ -293,6 +311,44 @@ class _FallbackAstInspector:
 class _FallbackPathInspector:
     def inspect_write(self, target_path: str, caller_domain: str = "default") -> Any:
         norm = Path(target_path).as_posix().lstrip("./")
+        norm_lower = norm.lower()
+
+        # Documents Content Plane Dual-Plane check
+        is_doc = any(
+            kw in norm_lower
+            for kw in (
+                "documents",
+                "@公共",
+                "@驾驶舱",
+                "@工作文档",
+                "@学习进化",
+                "@家庭生活",
+                "@创意创作",
+                "@个人",
+                "@opc",
+            )
+        )
+        if is_doc:
+            if any(
+                norm.endswith(ext)
+                for ext in (".py", ".sh", ".bash", ".js", ".ts", ".rb", ".go")
+            ):
+                return _SimpleEvalResult(
+                    False,
+                    [
+                        _SimpleViolation(
+                            "X4-C15",
+                            "E-DOC-001",
+                            "禁止在 Documents 内容域写入可执行代码脚本",
+                            f"路径 '{target_path}' 位于 Documents 内容平面 (ADR-0191)",
+                            "请将脚本移至 Workspace/scripts/，Documents 保持纯净",
+                            None,
+                            target_path,
+                            suggested_patch=f"# Move to Workspace/scripts/{Path(target_path).name}",
+                        )
+                    ],
+                )
+
         if norm.startswith("@工作文档") and caller_domain != "work-weijian":
             return _SimpleEvalResult(
                 False,
@@ -358,6 +414,7 @@ class _SimpleViolation:
     line_number: int | None
     offending_symbol: str | None
     severity: str = "required"
+    suggested_patch: str | None = None
 
 
 @dataclass
