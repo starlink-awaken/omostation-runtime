@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 
@@ -30,7 +30,7 @@ class ActionEntry:
     args: dict[str, Any]
     policy_passed: bool
     policy_verifier: str = "shadow-challenger"
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def compute_leaf_hash(self) -> str:
@@ -154,14 +154,16 @@ class MerkleActionLedger:
         curr_idx = index
 
         while len(current_layer) > 1:
-            is_odd = (curr_idx % 2 == 1)
+            is_odd = curr_idx % 2 == 1
             sibling_idx = curr_idx - 1 if is_odd else (curr_idx + 1 if curr_idx + 1 < len(current_layer) else curr_idx)
             sibling_hash = current_layer[sibling_idx]
 
-            audit_path.append({
-                "direction": "left" if is_odd else "right",
-                "hash": sibling_hash,
-            })
+            audit_path.append(
+                {
+                    "direction": "left" if is_odd else "right",
+                    "hash": sibling_hash,
+                }
+            )
 
             # 向上推进一层
             next_layer = []

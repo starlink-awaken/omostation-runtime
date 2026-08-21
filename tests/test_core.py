@@ -1,3 +1,4 @@
+import contextlib
 import os
 import subprocess
 import sys
@@ -149,6 +150,7 @@ class TestResolveScript:
         hermes_scripts = Path.home() / ".hermes" / "scripts"
         test_file = hermes_scripts / "_test_resolve_script_temp.sh"
         try:
+            hermes_scripts.mkdir(parents=True, exist_ok=True)
             test_file.write_text("#!/bin/bash\necho test\n")
             result = _resolve_script("_test_resolve_script_temp.sh")
             assert result is not None
@@ -156,6 +158,9 @@ class TestResolveScript:
         finally:
             if test_file.exists():
                 test_file.unlink()
+            if hermes_scripts.exists():
+                with contextlib.suppress(OSError):
+                    hermes_scripts.rmdir()
 
     def test_relative_path_not_found(self):
         """Relative path to non-existent file returns None"""

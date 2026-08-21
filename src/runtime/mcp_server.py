@@ -436,6 +436,8 @@ def handle_documents_audit(path: str = "~/Documents", domain: str = "default") -
         }
     except Exception as e:  # noqa: BLE001
         return {"error": f"{type(e).__name__}: {e}"}
+
+
 def _ensure_ecos_path() -> None:
     import sys
 
