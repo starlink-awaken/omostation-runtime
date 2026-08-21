@@ -1,6 +1,7 @@
 """Tests for MerkleActionLedger and Cryptographic Proofs (ADR-0201)."""
 
 import pytest
+
 from runtime.merkle_ledger import MerkleActionLedger, sha256
 
 
@@ -36,7 +37,7 @@ def test_multi_actions_merkle_tree_integrity():
     for i in range(7):
         ledger.record_action(
             action_id=f"act-{i:03d}",
-            agent_id=f"agent-{i%3}",
+            agent_id=f"agent-{i % 3}",
             target_uri=f"bos://capability/tool/{i}",
             args={"step": i, "payload": f"data_{i}"},
             policy_passed=True,
