@@ -359,6 +359,79 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             "@工作文档/卫健委",
         ],
     )
+    # KEMS production pipeline (preflight -> materialize -> dispatch -> receipt -> closeout)
+    _runtime_root = Path(__file__).resolve().parents[2]
+    _scripts_root = _runtime_root / "scripts"
+    registry.register(
+        JobSpec(
+            job_id="kems-production-preflight",
+            reads=("@工作文档",),
+            writes=("kems",),
+            owner="runtime-kems",
+            schedule="manual",
+            timeout=120,
+            evidence_path="kems/production-preflight.json",
+            fail_closed=True,
+            evidence_projection="metadata",
+        ),
+        [sys.executable, str(_scripts_root / "kems_production_preflight.py"), "--production"],
+    )
+    registry.register(
+        JobSpec(
+            job_id="kems-materialize",
+            reads=("@工作文档",),
+            writes=("kems",),
+            owner="runtime-kems",
+            schedule="manual",
+            timeout=120,
+            evidence_path="kems/materialize.json",
+            fail_closed=True,
+            evidence_projection="metadata",
+        ),
+        [sys.executable, str(_scripts_root / "kems-materialize.py")],
+    )
+    registry.register(
+        JobSpec(
+            job_id="kems-dispatch-receipt",
+            reads=("@工作文档",),
+            writes=("kems",),
+            owner="runtime-kems",
+            schedule="manual",
+            timeout=60,
+            evidence_path="kems/dispatch-receipt.json",
+            fail_closed=True,
+            evidence_projection="metadata",
+        ),
+        [sys.executable, str(_scripts_root / "kems_dispatch_receipt.py")],
+    )
+    registry.register(
+        JobSpec(
+            job_id="kems-production-closeout",
+            reads=("@工作文档",),
+            writes=("kems",),
+            owner="runtime-kems",
+            schedule="manual",
+            timeout=120,
+            evidence_path="kems/production-closeout.json",
+            fail_closed=True,
+            evidence_projection="metadata",
+        ),
+        [sys.executable, str(_scripts_root / "kems_production_closeout.py")],
+    )
+    registry.register(
+        JobSpec(
+            job_id="reachbridge-kems-gateway",
+            reads=("@工作文档",),
+            writes=("kems",),
+            owner="runtime-kems",
+            schedule="manual",
+            timeout=30,
+            evidence_path="kems/reachbridge-gateway.json",
+            fail_closed=True,
+            evidence_projection="metadata",
+        ),
+        [sys.executable, str(_scripts_root / "reachbridge-kems-gateway.py")],
+    )
     if environ.get("DOCUMENTS_DOMAIN_PROJECTS_REGISTRY") or environ.get("WORKSPACE_ROOT"):
         registry.register(
             _controller_shadow_job_spec(environ),
