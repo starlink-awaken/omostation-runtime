@@ -346,6 +346,13 @@ def cmd_board(proposal: str, mode: str, session_id: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "documents":
+        # Keep the Documents-plane parser and binding contract in one place;
+        # this is only the installed Runtime CLI entrypoint adapter.
+        from .documents_plane.cli import main as documents_main
+
+        return documents_main(arguments)
     print("⚠️ Runtime 独立 CLI 已弃用，请使用 cockpit 替代", file=sys.stderr)
     parser = argparse.ArgumentParser(
         prog="runtime",
