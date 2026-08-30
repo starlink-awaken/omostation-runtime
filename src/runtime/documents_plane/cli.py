@@ -67,6 +67,19 @@ _LEARNING_DECAY_JOBS = (
     ("documents-learning-orphans", "list_orphan_concepts", "ls-orphan"),
 )
 
+_LEARNING_V2_READS = {
+    "documents-learning-validate": ("@学习进化/_knowledge/50-concepts",),
+    "documents-vault-search": ("@学习进化",),
+    "documents-rename-check": ("@学习进化/_knowledge",),
+}
+_LEARNING_V2_JOBS = (
+    # job_id, action, module, mode-arg（binding SSOT 里须恰好声明一次）
+    ("documents-learning-validate", "validate_concept_cards", "runtime.documents_plane.learning_executors", "validate"),
+    ("documents-vault-search", "search_vault", "runtime.documents_plane.learning_executors", "search"),
+    ("documents-rename-check", "check_rename_references", "runtime.documents_plane.learning_executors", "rename-check"),
+)
+_LEARNING_V2_SCHEMAS = {job_id: f"runtime.{job_id}.evidence.v1" for job_id, _, _, _ in _LEARNING_V2_JOBS}
+
 
 class _SanyiArgumentParseError(ValueError):
     """A deliberately detail-free public CR08 invocation parse failure."""
@@ -288,6 +301,45 @@ def _learning_decay_job_spec(environ: Mapping[str, str], *, job_id: str, action:
         evidence_path=f"{job_id}.json",
         fail_closed=True,
         evidence_projection="learning-decay-v1",
+    )
+
+
+def _learning_v2_job_spec(environ: Mapping[str, str], *, job_id: str, action: str) -> JobSpec:
+    """Load one exact read-only learning-owner declaration from the binding SSOT."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
+    matches = [item for item in raw["runtime_jobs"] if isinstance(item, dict) and item.get("id") == job_id]
+    if len(matches) != 1:
+        raise DocumentsPlanePathError(f"Workspace learning job must be declared exactly once: {job_id}")
+    expected = {
+        "id": job_id,
+        "domain_id": "vault",
+        "owner": "runtime-learning",
+        "action": action,
+        "schedule": "manual",
+        "timeout_seconds": 60,
+        "reads": list(_LEARNING_V2_READS[job_id]),
+        "writes": [],
+        "evidence_relative_path": f"control/evidence/{job_id}/{job_id}.json",
+        "evidence_schema": _LEARNING_V2_SCHEMAS[job_id],
+        "fail_closed": True,
+    }
+    if matches[0] != expected:
+        raise DocumentsPlanePathError(f"Workspace learning job has an invalid contract: {job_id}")
+    return JobSpec(
+        job_id=job_id,
+        reads=_LEARNING_V2_READS[job_id],
+        writes=(),
+        owner="runtime-learning",
+        schedule="manual",
+        timeout=60,
+        evidence_path=f"{job_id}.json",
+        fail_closed=True,
     )
 
 
@@ -517,6 +569,19 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
                         mode,
                         "--domain-relative",
                         _LEARNING_DECAY_READS[0],
+                    ],
+                )
+        for job_id, action, module, mode in _LEARNING_V2_JOBS:
+            if _binding_declares_job(environ, job_id):
+                registry.register(
+                    _learning_v2_job_spec(environ, job_id=job_id, action=action),
+                    [
+                        sys.executable,
+                        "-m",
+                        module,
+                        mode,
+                        "--domain-relative",
+                        _LEARNING_V2_READS[job_id][0],
                     ],
                 )
     return registry
