@@ -33,6 +33,7 @@ _EVIDENCE_PROJECTIONS = frozenset(
         "controller-shadow-v2",
         "model-freshness-v1",
         "sanyi-status-consistency-v1",
+        "learning-decay-v1",
     }
 )
 _KEMS_CHECK_SCOPES = frozenset({"inbox", "knowledge", "entities", "control", "buffer_inbox"})
@@ -76,6 +77,9 @@ _SANYI_STATUS_ERRORS = frozenset(
         "facts_scope_empty",
     }
 )
+_LEARNING_DECAY_STATUSES = frozenset({"ok", "attention", "unavailable"})
+_LEARNING_DECAY_ERRORS = frozenset({"documents_root_invalid", "concept_root_invalid", "today_invalid"})
+_LEARNING_DECAY_BUCKETS = frozenset({"fresh", "normal", "aging", "stale", "decayed", "uncommitted"})
 _MODEL_FRESHNESS_PRE_FACTS_ERRORS = frozenset(
     {
         "domain_root_missing",
@@ -673,6 +677,88 @@ def _sanyi_status_evidence(stdout: str) -> dict[str, object]:
     }
 
 
+def _learning_decay_evidence(stdout: str) -> dict[str, object]:
+    """Validate aggregate-only learning decay evidence from the owner."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("learning-decay evidence must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("learning-decay evidence must be a JSON object")
+    fields = {
+        "schema",
+        "status",
+        "mode",
+        "checked_on",
+        "concept_file_count",
+        "referenced_concept_count",
+        "orphan_concept_count",
+        "decay_candidate_count",
+        "staleness_counts",
+        "error",
+    }
+    count_fields = {
+        "concept_file_count",
+        "referenced_concept_count",
+        "orphan_concept_count",
+        "decay_candidate_count",
+    }
+    counts = payload.get("staleness_counts")
+    error = payload.get("error")
+    if (
+        set(payload) != fields
+        or payload.get("schema") != "runtime.documents-learning-decay.v1"
+        or payload.get("status") not in _LEARNING_DECAY_STATUSES
+        or payload.get("mode") not in {"scan", "ls-orphan"}
+        or not _valid_iso_date(payload.get("checked_on"))
+        or not isinstance(counts, dict)
+        or set(counts) != _LEARNING_DECAY_BUCKETS
+        or not all(
+            isinstance(payload.get(field), int) and not isinstance(payload[field], bool) and payload[field] >= 0
+            for field in count_fields
+        )
+        or not all(
+            isinstance(counts[field], int) and not isinstance(counts[field], bool) and counts[field] >= 0
+            for field in counts
+        )
+        or (payload.get("status") == "unavailable") != (error in _LEARNING_DECAY_ERRORS)
+        or (payload.get("status") != "unavailable" and error is not None)
+    ):
+        raise ValueError("learning-decay evidence has an invalid schema")
+    concept_count = payload["concept_file_count"]
+    referenced_count = payload["referenced_concept_count"]
+    orphan_count = payload["orphan_concept_count"]
+    decay_count = payload["decay_candidate_count"]
+    bucket_total = sum(counts.values())
+    status = payload["status"]
+    if status == "unavailable":
+        if any(payload[field] != 0 for field in count_fields) or bucket_total != 0:
+            raise ValueError("learning-decay evidence has an invalid schema")
+    elif (
+        referenced_count + orphan_count != concept_count
+        or bucket_total != concept_count
+        or decay_count != counts["stale"] + counts["decayed"]
+        or status == "ok"
+        and (orphan_count != 0 or decay_count != 0)
+        or status == "attention"
+        and orphan_count == 0
+        and decay_count == 0
+    ):
+        raise ValueError("learning-decay evidence has an invalid schema")
+    return {
+        "schema": payload["schema"],
+        "status": status,
+        "mode": payload["mode"],
+        "checked_on": payload["checked_on"],
+        "concept_file_count": concept_count,
+        "referenced_concept_count": referenced_count,
+        "orphan_concept_count": orphan_count,
+        "decay_candidate_count": decay_count,
+        "staleness_counts": dict(counts),
+        "error": error,
+    }
+
+
 def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | None:
     if spec.evidence_projection == "metadata":
         return None
@@ -688,6 +774,8 @@ def _project_owner_evidence(spec: JobSpec, stdout: str) -> dict[str, object] | N
         return _model_freshness_evidence(stdout)
     if spec.evidence_projection == "sanyi-status-consistency-v1":
         return _sanyi_status_evidence(stdout)
+    if spec.evidence_projection == "learning-decay-v1":
+        return _learning_decay_evidence(stdout)
     raise ValueError("job evidence projection is not supported")  # pragma: no cover - validated at registration
 
 

@@ -60,6 +60,12 @@ _SANYI_COMMAND = (
     "@工作文档/卫健委",
 )
 _SANYI_PROJECTION = "sanyi-status-consistency-v1"
+_LEARNING_DECAY_SCHEMA = "runtime.documents-learning-decay.evidence.v1"
+_LEARNING_DECAY_READS = ("@学习进化/_knowledge/50-concepts",)
+_LEARNING_DECAY_JOBS = (
+    ("documents-learning-decay", "audit_concept_decay", "scan"),
+    ("documents-learning-orphans", "list_orphan_concepts", "ls-orphan"),
+)
 
 
 class _SanyiArgumentParseError(ValueError):
@@ -242,6 +248,46 @@ def _sanyi_status_job_spec(environ: Mapping[str, str]) -> JobSpec:
         evidence_path=_SANYI_EVIDENCE.removeprefix(_SANYI_EVIDENCE_PREFIX),
         fail_closed=True,
         evidence_projection=_SANYI_PROJECTION,
+    )
+
+
+def _learning_decay_job_spec(environ: Mapping[str, str], *, job_id: str, action: str) -> JobSpec:
+    """Load one exact learning inspection declaration from the binding SSOT."""
+    path = _workspace_binding_registry_path(environ)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise DocumentsPlanePathError("Workspace Documents binding registry is unavailable") from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("runtime_jobs"), list):
+        raise DocumentsPlanePathError("Workspace Documents binding registry has invalid runtime_jobs")
+    matches = [item for item in raw["runtime_jobs"] if isinstance(item, dict) and item.get("id") == job_id]
+    if len(matches) != 1:
+        raise DocumentsPlanePathError(f"Workspace learning job must be declared exactly once: {job_id}")
+    expected = {
+        "id": job_id,
+        "domain_id": "vault",
+        "owner": "runtime-learning",
+        "action": action,
+        "schedule": "manual",
+        "timeout_seconds": 60,
+        "reads": list(_LEARNING_DECAY_READS),
+        "writes": [],
+        "evidence_relative_path": f"control/evidence/{job_id}/{job_id}.json",
+        "evidence_schema": _LEARNING_DECAY_SCHEMA,
+        "fail_closed": True,
+    }
+    if matches[0] != expected:
+        raise DocumentsPlanePathError(f"Workspace learning job has an invalid contract: {job_id}")
+    return JobSpec(
+        job_id=job_id,
+        reads=_LEARNING_DECAY_READS,
+        writes=(),
+        owner="runtime-learning",
+        schedule="manual",
+        timeout=60,
+        evidence_path=f"{job_id}.json",
+        fail_closed=True,
+        evidence_projection="learning-decay-v1",
     )
 
 
@@ -458,6 +504,21 @@ def _default_registry(environ: Mapping[str, str]) -> JobRegistry:
             )
         if _binding_declares_job(environ, _SANYI_JOB_ID):
             registry.register(_sanyi_status_job_spec(environ), _SANYI_COMMAND)
+        for job_id, action, mode in _LEARNING_DECAY_JOBS:
+            if _binding_declares_job(environ, job_id):
+                registry.register(
+                    _learning_decay_job_spec(environ, job_id=job_id, action=action),
+                    [
+                        sys.executable,
+                        "-m",
+                        "runtime.documents_plane.learning_decay",
+                        "inspect",
+                        "--mode",
+                        mode,
+                        "--domain-relative",
+                        _LEARNING_DECAY_READS[0],
+                    ],
+                )
     return registry
 
 
