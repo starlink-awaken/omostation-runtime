@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """执行日落检查：标记已到期的任务/规则。"""
-import os, re, sys
+import os
+import re
+import sys
 from datetime import date
 
 TRIGGERS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '_triggers')
@@ -12,11 +14,11 @@ def run_sunsets():
         return 1
     with open(sunset_file) as f:
         content = f.read()
-    
+
     # Find sunset conditions with dates
     date_sunsets = re.findall(r'sunset:\s*(\+?\d+d|\d{4}-\d{2}-\d{2})', content)
     today = date.today()
-    
+
     print(f"=== KEMS Sunset Check ({today}) ===")
     print(f"Found {len(date_sunsets)} sunset conditions in config")
     # Note: actual sunset execution depends on task definition format

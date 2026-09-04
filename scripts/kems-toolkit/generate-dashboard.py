@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """从 KEMS 实际数据生成 Dashboard HTML。读取 _control/ + _gates/ + _strategy/ 的最新数据。"""
-import os, re, sys, json
+import json
+import os
+import re
+import sys
 from datetime import date
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,7 +54,7 @@ def generate():
     tasks = read_tasks()
     total, stale, rate = read_freshness()
     health = 100 - rate
-    
+
     # Build metrics
     metrics = [
         {"name":"文件过期率", "val":f"{rate}%", "pct":rate, "cls":"warn" if rate > 10 else "ok"},
@@ -59,7 +62,7 @@ def generate():
         {"name":"信号数", "val":str(len(signals)), "pct":min(len(signals)*20, 100), "cls":"ok"},
         {"name":"任务数", "val":str(len(tasks)), "pct":min(len(tasks)*25, 100), "cls":"ok"},
     ]
-    
+
     # Generate HTML
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -98,7 +101,7 @@ th{{color:#888;font-weight:500}}
 """
     for m in metrics:
         html += f'<div class="metric"><div class="name">{m["name"]}</div><div class="val {m["cls"]}">{m["val"]}</div><div class="bar"><div class="bar-fill" style="width:{m["pct"]}%;background:{"#c62828" if m["cls"]=="crit" else "#ef6c00" if m["cls"]=="warn" else "#2e7d32"}"></div></div></div>\n'
-    
+
     html += """</div>
 <h2>信号日志（最近）</h2>
 <table><thead><tr><th>类型</th><th>信号</th></tr></thead><tbody>
@@ -107,7 +110,7 @@ th{{color:#888;font-weight:500}}
         html += f'<tr><td>{s["type"]}</td><td>{s["text"]}</td></tr>\n'
     if not signals:
         html += '<tr><td colspan="2" style="color:#aaa">暂无信号</td></tr>\n'
-    
+
     html += """</tbody></table>
 <h2>任务看板</h2>
 <table><thead><tr><th>ID</th><th>任务</th><th>状态</th><th>优先级</th></tr></thead><tbody>
@@ -116,11 +119,11 @@ th{{color:#888;font-weight:500}}
         html += f'<tr><td>{t["id"]}</td><td>{t["name"]}</td><td>{t["status"]}</td><td>{t["pri"]}</td></tr>\n'
     if not tasks:
         html += '<tr><td colspan="4" style="color:#aaa">暂无任务</td></tr>\n'
-    
+
     html += f"""</tbody></table>
 <p class="footer">KEMS v3.3 · generated {today} · <code>python3 _scripts/generate-dashboard.py</code></p>
 </body></html>"""
-    
+
     with open(OUTPUT, 'w') as f:
         f.write(html)
     print(f"Dashboard generated: {OUTPUT} ({len(html)} bytes)")

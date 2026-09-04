@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """汇报一屏看生成器（模型驱动）— gen-report-view.py
 从模型 SSOT 动态生成领导一屏看报告，四域通用（不再硬编码卫健委项目）：
 - 项目态势：从 instances.yaml C3 活跃实例读取（name/note 中解析预算）
@@ -10,8 +9,12 @@
   python3 _runtime/gen-report-view.py                # 输出 _control/汇报一屏看-YYYYMMDD.md
   python3 _runtime/gen-report-view.py --stdout       # 直接打印
 """
-import datetime, re, sys, yaml
+import datetime
+import re
+import sys
 from pathlib import Path
+
+import yaml
 
 BASE = Path(__file__).parent.parent
 TODAY = datetime.date.today()

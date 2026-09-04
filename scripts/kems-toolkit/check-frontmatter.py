@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """检查所有 Markdown 文件的 frontmatter 字段完整性。"""
-import os, re, sys
+import os
+import re
+import sys
 
 REQUIRED = ['title', 'status', 'created']
 EXPECTED = ['title', 'status', 'type', 'created', 'last-reviewed', 'tags']
@@ -36,15 +38,15 @@ def check_frontmatter():
                 incomplete.append((rel, partial))
             else:
                 ok.append(rel)
-    
+
     total = len(ok) + len(incomplete) + len(missing)
-    print(f"=== KEMS Frontmatter Check ===")
+    print("=== KEMS Frontmatter Check ===")
     print(f"Total: {total} | OK: {len(ok)} | Partial: {len(incomplete)} | Missing: {len(missing)}")
     if missing:
-        print(f"\n❌ Missing required fields:")
+        print("\n❌ Missing required fields:")
         for p, fields in missing: print(f"  {p}: missing {fields}")
     if incomplete:
-        print(f"\n⚠️  Missing expected fields:")
+        print("\n⚠️  Missing expected fields:")
         for p, fields in incomplete: print(f"  {p}: missing {fields}")
     return 0 if not missing else 1
 

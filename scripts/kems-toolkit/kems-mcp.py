@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """KEMS MCP Server — exposes KEMS project operations as MCP stdio tools."""
-import os, sys, json, re, subprocess
+import json
+import os
+import re
+import subprocess
+import sys
 from datetime import date
 
 KEMS_HOME = os.environ.get("KEMS_HOME", os.path.expanduser("~/Documents/学习进化/体系/KEMS"))

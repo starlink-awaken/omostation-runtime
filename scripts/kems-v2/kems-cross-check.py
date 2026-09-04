@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """KEMS 跨域巡检 — kems-cross-check.py
 检查所有已落地域的工具链完整性、本体结构、版本一致性。
 闭环「@公共 单点维护」：确保四域软链指向同一版本，无漂移。
@@ -7,8 +6,13 @@
   python3 kems-cross-check.py --domains 卫健委,国转中心,规自委,@家庭生活
   python3 kems-cross-check.py --domains ~/Documents/@工作文档/卫健委,...   # 或绝对路径
 """
-import argparse, hashlib, os, sys, yaml
+import argparse
+import hashlib
+import os
+import sys
 from pathlib import Path
+
+import yaml
 
 KEMS_V2 = Path(__file__).resolve().parent  # @公共/kems-v2
 TOOLS = ["check-ssot-sync.py", "check-ontology-consistency.py", "check-model-conformance.py",

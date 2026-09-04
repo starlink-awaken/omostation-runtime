@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """kems — KEMS project bootstrap & management CLI."""
-import os, sys, shutil, json, argparse
+import argparse
+import json
+import os
+import shutil
+import sys
 from datetime import date
 
 KEMS_HOME = os.environ.get("KEMS_HOME", os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))

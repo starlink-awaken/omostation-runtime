@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """检查所有 Markdown 文件的 last-reviewed 字段，报告过期文件。"""
-import os, re, sys
+import os
+import re
+import sys
 from datetime import date, timedelta
 
 WARN_DAYS = 7
@@ -30,20 +32,20 @@ def check_freshness():
                 warn.append((rel, age))
             else:
                 fresh.append(rel)
-    
+
     total = len(fresh) + len(warn) + len(critical) + len(no_date)
     rate = round(len(warn)+len(critical)+len(no_date) / max(total,1) * 100)
-    print(f"=== KEMS Freshness Check ===")
+    print("=== KEMS Freshness Check ===")
     print(f"Total: {total} | Fresh: {len(fresh)} | Warn: {len(warn)} | Critical: {len(critical)} | NoDate: {len(no_date)}")
     print(f"Stale Rate: {rate}% {'⚠️ >10%' if rate > 10 else '✅'}")
     if warn:
-        print(f"\n⚠️  Warning (>7 days):")
+        print("\n⚠️  Warning (>7 days):")
         for p, a in warn: print(f"  {p} ({a}d)")
     if critical:
-        print(f"\n🔴 Critical (>14 days):")
+        print("\n🔴 Critical (>14 days):")
         for p, a in critical: print(f"  {p} ({a}d)")
     if no_date:
-        print(f"\n❓ Missing last-reviewed:")
+        print("\n❓ Missing last-reviewed:")
         for p in no_date: print(f"  {p}")
     return 0 if not critical else 1
 

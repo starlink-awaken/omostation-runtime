@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """KEMS Bootstrap —  generate a new KEMS project directory."""
-import os, sys, shutil
+import os
+import shutil
+import sys
 from datetime import date
 
 KEMS_ROOT = os.environ.get('KEMS_ROOT', os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
