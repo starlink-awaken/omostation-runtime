@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/runtime
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # Agent Registry
 
 Unified multi-machine agent coordination for eCOS. Merges patterns from Agora (Ed25519 identity, heartbeat), eCOS (AgentStatus enum, node_id), and Runtime (endpoint tracking).

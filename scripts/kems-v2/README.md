@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/runtime
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # kems-v2（Workspace 原生重建）
 
 > 重建债 D-8 的落地面。v2.1.1 已随 #2596 事故字节级丢失（9/12 脚本），

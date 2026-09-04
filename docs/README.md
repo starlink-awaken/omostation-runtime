@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/runtime
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # runtime Documentation
 
 > L1 · 运行时/调度/KEI 沙箱
