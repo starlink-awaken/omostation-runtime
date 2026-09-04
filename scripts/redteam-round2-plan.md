@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # Red Team Round 2 — Integration Layer Security Audit
 
 **Debt Item:** DEBT-OMO-030

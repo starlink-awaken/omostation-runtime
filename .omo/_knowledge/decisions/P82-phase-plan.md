@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # P82 阶段计划 — 监控稳定性 + 技术债清理
 
 > 日期: 2026-08-01
