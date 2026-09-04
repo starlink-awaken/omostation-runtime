@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # KEMS Production Handoff
 
 This runbook is the handoff contract for moving KEMS from integration

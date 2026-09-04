@@ -1,4 +1,5 @@
 ---
+type: ssot
 id: STRAT-P81-MASTER-DECISION-INBOX
 title: STRAT-P81 兑现期入场决策单（7 卡 · 人类拍板）
 owner: 夏明星

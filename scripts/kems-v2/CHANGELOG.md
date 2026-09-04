@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # kems-v2 CHANGELOG
 
 ## v2.2.0 (2026-08-30, D-8 重建)
