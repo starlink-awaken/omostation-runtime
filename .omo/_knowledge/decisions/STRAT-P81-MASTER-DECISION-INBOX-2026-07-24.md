@@ -5,6 +5,7 @@ title: STRAT-P81 兑现期入场决策单（7 卡 · 人类拍板）
 owner: 夏明星
 created_at: 2026-07-24T08:50:00Z
 status: ready_for_human
+last-reviewed: 2026-09-04
 ssot_refs:
   - .omo/_knowledge/decisions/STRAT-P81-strategic-roadmap.md
   - .omo/_knowledge/audits/2026-07-24-p81-stage0-closeout.md
