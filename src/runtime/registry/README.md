@@ -157,5 +157,5 @@ Capability:
 ```bash
 cd projects/runtime
 pytest tests/test_registry.py -v
-# 31 tests: models(6) + store(7) + heartbeat(2) + server(8) + dispatch(8)
+# 测试计数以实际输出为准: pytest tests/test_registry.py --collect-only -q
 ```
