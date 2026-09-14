@@ -29,9 +29,7 @@ class ExecutorLogRecord(ZTimestampModel):
     engine.py _log_execution() 写入的每条记录.
     """
 
-    ts: str = Field(
-        ..., description="UTC ISO8601 with Z suffix, e.g. 2026-06-11T05:30:00Z"
-    )
+    ts: str = Field(..., description="UTC ISO8601 with Z suffix, e.g. 2026-06-11T05:30:00Z")
     task_id: str = Field(..., min_length=1)
     status: str = Field(..., min_length=1)
     summary: str

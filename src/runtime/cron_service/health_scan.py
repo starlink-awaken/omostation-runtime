@@ -68,30 +68,22 @@ def _probe_daemons(state: dict) -> None:
     probe_script = Path(__file__).parent.parent / "health" / "agora_gateway_probe.py"
     if not probe_script.exists():
         return
-    for name, svc in services.items():
+    for name, svc in services.items():  # noqa: PERF102  # need both key and value
         if svc.get("type") != "daemon" or svc.get("health_check"):
             continue
         try:
             result = subprocess.run(
-                ["python3", str(probe_script)],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
+                ["python3", str(probe_script)], capture_output=True, text=True, timeout=10, check=False
             )
             if result.returncode == 0:
                 svc["health_check"] = "healthy (probe)"
             elif result.returncode == 2:
                 # degraded: PID 活但部分后端无心跳 (agora_gateway_probe 三态)
                 svc["health_check"] = "degraded (probe)"
-                svc.setdefault("runtime", {})["degraded_reason"] = (
-                    result.stdout.strip() or "probe degraded"
-                )
+                svc.setdefault("runtime", {})["degraded_reason"] = result.stdout.strip() or "probe degraded"
             else:
                 svc["health_check"] = "unhealthy (probe)"
-                svc.setdefault("runtime", {})["degraded_reason"] = (
-                    result.stdout.strip() or "probe failed"
-                )
+                svc.setdefault("runtime", {})["degraded_reason"] = result.stdout.strip() or "probe failed"
         except subprocess.TimeoutExpired:
             svc["health_check"] = "stale (probe timeout)"
 
@@ -124,7 +116,6 @@ def should_scan(now: float | None = None) -> bool:
     Args:
         now: Current timestamp (time.time()). Defaults to time.time().
     """
-    global _last_scan_ts
     now = now or time.time()
     return (now - _last_scan_ts) >= HEALTH_SCAN_INTERVAL
 

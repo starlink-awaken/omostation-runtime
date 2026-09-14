@@ -55,6 +55,7 @@ def test_cron_emit_failed_status() -> None:
     """A failed run should emit runtime:cron:failed."""
     # Patch bus_event directly
     from bus_foundation.facade import event as bus_event
+
     from runtime.cron_service.scheduler import _bus_emit_cron_fired
 
     captured: list = []
@@ -76,7 +77,7 @@ def test_cron_emit_failed_status() -> None:
         bus_event.publish = original_publish  # type: ignore[assignment]
 
     assert len(captured) == 1
-    args, kwargs = captured[0]
+    _args, kwargs = captured[0]
     assert kwargs["topic"] == "runtime:cron:failed"
     assert kwargs["payload"]["status"] == "error"
 

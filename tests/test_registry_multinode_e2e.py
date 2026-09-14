@@ -182,11 +182,7 @@ class TestMultiNodeGossipSync:
         # Configure node-B as a gossip peer on node-A
         httpx.post(
             f"{base_a}/peers",
-            json={
-                "host": "127.0.0.1",
-                "port": int(base_b.split(":")[-1]),
-                "role": "worker",
-            },
+            json={"host": "127.0.0.1", "port": int(base_b.split(":")[-1]), "role": "worker"},
             timeout=5.0,
         )
 
@@ -238,11 +234,7 @@ class TestMultiNodeGossipSync:
         for name in ["h1", "h2"]:
             httpx.post(
                 f"{base_a}/agents",
-                json={
-                    "name": name,
-                    "node_id": "node-a",
-                    "endpoint": f"http://x/{name}",
-                },
+                json={"name": name, "node_id": "node-a", "endpoint": f"http://x/{name}"},
                 timeout=5.0,
             )
 

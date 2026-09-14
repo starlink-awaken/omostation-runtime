@@ -7,23 +7,11 @@ def _runtime_stats() -> str:
     import yaml
 
     reg_file = PROJECT_HOME / "protocols" / "kei-extensions.yaml"
-    ext_count = (
-        len(yaml.safe_load(reg_file.read_text()).get("extensions", []))
-        if reg_file.exists()
-        else 0
-    )
+    ext_count = len(yaml.safe_load(reg_file.read_text()).get("extensions", [])) if reg_file.exists() else 0
     plane_file = PROJECT_HOME / "protocols" / "tri-plane-registry.yaml"
-    plane_count = (
-        len(yaml.safe_load(plane_file.read_text()).get("planes", []))
-        if plane_file.exists()
-        else 0
-    )
+    plane_count = len(yaml.safe_load(plane_file.read_text()).get("planes", [])) if plane_file.exists() else 0
     proto_file = PROJECT_HOME / "protocols" / "L0-registry.yaml"
-    proto_count = (
-        len(yaml.safe_load(proto_file.read_text()).get("protocols", []))
-        if proto_file.exists()
-        else 0
-    )
+    proto_count = len(yaml.safe_load(proto_file.read_text()).get("protocols", [])) if proto_file.exists() else 0
 
     from runtime.tools import TOOLS
 
@@ -49,15 +37,9 @@ def _runtime_stats() -> str:
     lines.append("║        LLM Cost Summary (Executor)     ║")
     lines.append("╠════════════════════════════════════════╣")
     cost_summary = _summarize_executor_costs()
-    lines.append(
-        f"║  Total Calls:           {cost_summary['total_calls']:4d}           ║"
-    )
-    lines.append(
-        f"║  Total Tokens:          {cost_summary['total_tokens']:7d}        ║"
-    )
-    lines.append(
-        f"║  Est. Cost:        ${cost_summary['estimated_cost_usd']:>10.6f}   ║"
-    )
+    lines.append(f"║  Total Calls:           {cost_summary['total_calls']:4d}           ║")
+    lines.append(f"║  Total Tokens:          {cost_summary['total_tokens']:7d}        ║")
+    lines.append(f"║  Est. Cost:        ${cost_summary['estimated_cost_usd']:>10.6f}   ║")
     lines.append(f"║  Model:        {cost_summary['model']:28s} ║")
     lines.append("╚════════════════════════════════════════╝")
     return "\n".join(lines)
@@ -69,9 +51,7 @@ def _taskobject_submit(payload: dict) -> str:
 
     error = _validate_taskobject(payload)
     if error:
-        return json.dumps(
-            {"status": "error", "error": error, "task_id": payload.get("id", "")}
-        )
+        return json.dumps({"status": "error", "error": error, "task_id": payload.get("id", "")})
 
     tool_name = payload["target"]["tool"]
     params = payload["target"].get("params", {})
@@ -98,9 +78,7 @@ def _taskobject_submit(payload: dict) -> str:
         }
         return json.dumps(out)
     except Exception as e:  # noqa: BLE001  # defensive fallback
-        return json.dumps(
-            {"status": "error", "error": str(e), "task_id": payload.get("id", "")}
-        )
+        return json.dumps({"status": "error", "error": str(e), "task_id": payload.get("id", "")})
 
 
 TOOLS = [
@@ -115,9 +93,7 @@ TOOLS = [
         "description": "Submit a TaskObject v1 envelope for execution.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "payload": {"type": "object", "description": "The TaskObject payload"}
-            },
+            "properties": {"payload": {"type": "object", "description": "The TaskObject payload"}},
             "required": ["payload"],
         },
         "handler": lambda args: _taskobject_submit(args["payload"]),

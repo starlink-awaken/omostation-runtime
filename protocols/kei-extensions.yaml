@@ -59,7 +59,7 @@ extensions:
       constraint: "data privacy"
     permissions:
       network: ["localhost", "api.gbrain.ai"]
-      filesystem: ["/Users/xiamingxing/Workspace/projects/gbrain"]
+      filesystem: ["/Users/xiamingxing/Workspace/projects/knowledge/gbrain"]
       shell_exec: false
 
   # ── L0/L1 核心服务注册为扩展 ──────────────────────────────────────

@@ -73,9 +73,7 @@ def _read_shebang(path: Path) -> str | None:
 class ExecutionResult:
     """Result of a script execution."""
 
-    def __init__(
-        self, success: bool, output: str, error: str = "", timed_out: bool = False
-    ):
+    def __init__(self, success: bool, output: str, error: str = "", timed_out: bool = False):
         self.success = success
         self.output = output
         self.error = error

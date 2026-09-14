@@ -11,17 +11,17 @@ v2.0 (Real zlib Email Body Extractor) | 2026-07-31
 
 from __future__ import annotations
 
-import os
 import re
 import sqlite3
-import sys
 import zlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 DOCS_ROOT = Path("/Users/xiamingxing/Documents")
 INBOX_DIR = DOCS_ROOT / "_inbox"
-MAILMASTER_BASE = Path.home() / "Library" / "Containers" / "com.netease.macmail" / "Data" / "Library" / "Application Support" / "data"
+MAILMASTER_BASE = (
+    Path.home() / "Library" / "Containers" / "com.netease.macmail" / "Data" / "Library" / "Application Support" / "data"
+)
 
 
 def clean_html_text(raw_html: str) -> str:
@@ -54,12 +54,14 @@ def fetch_netease_mailmaster_real_bodies(limit: int = 15) -> list[dict[str, str]
             cursor = conn.cursor()
 
             # 查询 MailContent
-            cursor.execute("SELECT LocalId, MailId, OrigBody FROM MailContent WHERE OrigBody IS NOT NULL LIMIT ?", (limit,))
+            cursor.execute(
+                "SELECT LocalId, MailId, OrigBody FROM MailContent WHERE OrigBody IS NOT NULL LIMIT ?", (limit,)
+            )
             rows = cursor.fetchall()
 
             account_name = db_path.parent.name
             for r in rows:
-                lid, mid, raw_blob = r
+                _lid, mid, raw_blob = r
                 if raw_blob:
                     try:
                         decompressed = zlib.decompress(raw_blob)
@@ -67,15 +69,17 @@ def fetch_netease_mailmaster_real_bodies(limit: int = 15) -> list[dict[str, str]
                         plain_text = clean_html_text(html_str)
 
                         if len(plain_text) > 10:
-                            items.append({
-                                "account": account_name,
-                                "mail_id": str(mid.decode() if isinstance(mid, bytes) else mid),
-                                "content": plain_text[:350]
-                            })
-                    except Exception:
+                            items.append(
+                                {
+                                    "account": account_name,
+                                    "mail_id": str(mid.decode() if isinstance(mid, bytes) else mid),
+                                    "content": plain_text[:350],
+                                }
+                            )
+                    except Exception:  # noqa: BLE001, S110
                         pass
             conn.close()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"⚠️ 物理解压网易邮箱大师 {db_path.name} 异常: {e}")
         finally:
             if temp_db.exists():
@@ -88,13 +92,13 @@ def run_netease_mailmaster_ingest_pipeline() -> bool:
     print("📧 [Netease MailMaster Real Body Engine] 启动网易邮箱大师真实邮件 zlib 解压提取流水线...")
 
     records = fetch_netease_mailmaster_real_bodies(limit=25)
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
     if records:
         target_file = INBOX_DIR / f"{now_str}-auto-netease-mailmaster.md"
         lines = [
             f"# 网易邮箱大师 (卫健委/个人 3大账号) 真实解压邮件正文 — {now_str}\n\n",
-            "> 数据源: com.netease.macmail 物理数据库 (zlib 原生解压提炼)\n\n"
+            "> 数据源: com.netease.macmail 物理数据库 (zlib 原生解压提炼)\n\n",
         ]
         for r in records:
             lines.append(f"### 账号: `{r['account']}` | MailID: `{r['mail_id']}`\n")

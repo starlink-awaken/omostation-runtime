@@ -326,9 +326,7 @@ class Lexer:
                 Token(
                     type=tok_type,
                     value=tok_val,
-                    loc=SourceLocation(
-                        file=self.filename, line=start_line, column=start_col
-                    ),
+                    loc=SourceLocation(file=self.filename, line=start_line, column=start_col),
                 )
             )
 
@@ -336,9 +334,7 @@ class Lexer:
             Token(
                 type="EOF",
                 value="",
-                loc=SourceLocation(
-                    file=self.filename, line=self._line, column=self._col
-                ),
+                loc=SourceLocation(file=self.filename, line=self._line, column=self._col),
             )
         )
         return tokens

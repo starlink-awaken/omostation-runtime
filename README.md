@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/runtime
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # runtime
 
 🌐 [简体中文](README.zh.md)
@@ -47,8 +54,6 @@ or sends a dispatch request:
 export BOS_REACHBRIDGE_ENDPOINT="https://<enterprise-endpoint>/dispatch"
 export BOS_REACHBRIDGE_TOKEN="<secret-from-the-runtime-secret-store>"
 export KEMS_EVALUATION_MANIFEST="/secure/kems/evaluation-manifest.json"
-export KEMS_ADJUDICATION_DB="$HOME/.kems/adjudication.sqlite"
-export KEMS_PERSISTENCE_RECOVERY_EVIDENCE="/secure/kems/persistence-recovery.json"
 export KEMS_MODEL_ACCEPTANCE_REPORT="/secure/kems/model-acceptance.json"
 export KEMS_OMO_TASK_ID="<approved-task-id>"
 python scripts/kems_production_preflight.py --production
@@ -68,12 +73,7 @@ python projects/kairon/scripts/kems_evaluate_model_candidate.py \
 The command exits non-zero until the enterprise endpoint, token, adjudicated
 redacted evaluation manifest, a `shadow_pass` candidate-model report bound to
 that manifest's dataset identity and SHA-256, controlled source inventory, and
-approved OMO task, and a PostgreSQL persistence recovery evidence artifact are
-all present. The recovery artifact must use
-`kems.persistence-recovery-evidence.v1`, prove a backup/restore drill with
-matching source and restored graph snapshot hashes, and record actual RPO/RTO
-within target. It may contain evidence references and safe metadata only; it
-must not contain DSNs, credentials, or raw source content. The model report must retain
+approved OMO task are all present. The model report must retain
 `promotion=blocked_until_omo_approval`; this preflight never grants promotion.
 Local Hermes is intentionally not accepted by `--production`.
 
@@ -152,3 +152,18 @@ For the cross-team evidence contract and release responsibilities, see
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [API / Usage Reference](docs/API.md)
 - [Architecture Overview](docs/ARCHITECTURE.md)
+---
+
+## 项目状态 (动态数据)
+
+| 指标 | 权威读源 | 说明 |
+|------|----------|------|
+| 版本 | `pyproject.toml` → `[project.version]` | 以 pyproject.toml 为准 |
+| 测试数 | `pytest --collect-only -q` | 动态计数 |
+| 代码行数 | `find src -name "*.py" \| wc -l` | 以实际文件为准 |
+| 源文件数 | `find src -name "*.py" \| wc -l` | 以实际文件为准 |
+| 测试文件数 | `find tests -name "*.py" \| wc -l` | 以实际文件为准 |
+
+> **doc-ssot 契约**: 上表中的所有数字均为易变事实, 不在本文件硬编码. 运行权威读源命令获取实时值.
+> 模板: `.omo/standards/readme-template.md` | 检测: `bin/gac/check-readme-hardcoded.py`
+

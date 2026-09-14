@@ -6,7 +6,7 @@ description: 运行时基础设施 (Matrix + Scheduler + KEI + Cron)
 cli:
   - name: runtime
     module: runtime.cli:main
-    description: L1 运行时管理 (health/matrix/service/protocol)
+    description: L1 运行时管理 (health/matrix/service/protocol) plus the explicit `runtime documents run` owner-job entry
   - name: ecos-matrix-scheduler
     module: runtime.scheduler:main
     description: 持续健康监控与自动愈合

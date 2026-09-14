@@ -71,9 +71,7 @@ def load_protocols(path: Path | None = None) -> list[ProtocolEntry]:
 
     protocols = payload.get("protocols")
     if not isinstance(protocols, list):
-        raise ValueError(
-            f"Invalid L0 protocol registry: missing protocol list in {path}"
-        )
+        raise TypeError(f"Invalid L0 protocol registry: missing protocol list in {path}")
 
     return [_normalize_protocol(raw) for raw in protocols]
 
@@ -102,10 +100,10 @@ def active_protocols() -> list[ProtocolEntry]:
 # ── Protocol dispatch registry ──────────────────────────────────────────────
 # Per-protocol handlers are registered here. Each handler receives a
 # validated message dict and returns a (success: bool, result: dict) tuple.
-_PROTOCOL_HANDLERS: dict[str, callable] = {}  # type: ignore[reportGeneralTypeIssues]
+_PROTOCOL_HANDLERS: dict[str, callable] = {}
 
 
-def register_protocol_handler(protocol_name: str, handler: callable) -> None:  # type: ignore[reportGeneralTypeIssues]
+def register_protocol_handler(protocol_name: str, handler: callable) -> None:
     """Register a runtime handler for a protocol.
 
     Example:
@@ -116,10 +114,7 @@ def register_protocol_handler(protocol_name: str, handler: callable) -> None:  #
 
 def list_protocol_handlers() -> dict[str, str]:
     """Return a mapping of registered protocol names to handler docstrings."""
-    return {
-        name: (handler.__doc__ or "No description")
-        for name, handler in _PROTOCOL_HANDLERS.items()
-    }
+    return {name: (handler.__doc__ or "No description") for name, handler in _PROTOCOL_HANDLERS.items()}
 
 
 def dispatch_protocol_message(protocol_name: str, message: dict) -> tuple[bool, dict]:

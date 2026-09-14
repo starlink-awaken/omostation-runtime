@@ -12,9 +12,7 @@ v2.0 (Real .emlx Mail Body Extractor) | 2026-07-31
 from __future__ import annotations
 
 import email
-import glob
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 DOCS_ROOT = Path("/Users/xiamingxing/Documents")
@@ -28,8 +26,8 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
     if not MAIL_BASE.exists():
         return emails
 
-    emlx_files = sorted(list(MAIL_BASE.glob("**/*.emlx")), key=lambda x: x.stat().st_mtime, reverse=True)
-    
+    emlx_files = sorted(MAIL_BASE.glob("**/*.emlx"), key=lambda x: x.stat().st_mtime, reverse=True)
+
     for f in emlx_files[:20]:
         try:
             raw_bytes = f.read_bytes()
@@ -37,13 +35,13 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
             first_line_idx = raw_bytes.find(b"\n")
             if first_line_idx == -1:
                 continue
-            eml_bytes = raw_bytes[first_line_idx + 1:]
-            
+            eml_bytes = raw_bytes[first_line_idx + 1 :]
+
             msg = email.message_from_bytes(eml_bytes)
             subject = msg.get("Subject", "(无主题)")
             sender = msg.get("From", "(无发件人)")
             date = msg.get("Date", "(无日期)")
-            
+
             # UTF-8 基础解码
             subject_str = str(subject)
             sender_str = str(sender)
@@ -55,24 +53,19 @@ def fetch_real_apple_mail_bodies() -> list[dict[str, str]]:
                     if part.get_content_type() == "text/plain":
                         payload = part.get_payload(decode=True)
                         if payload:
-                            body_text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")  # type: ignore[reportAttributeAccessIssue]
+                            body_text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")
                             break
             else:
                 payload = msg.get_payload(decode=True)
                 if payload:
-                    body_text = payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")  # type: ignore[reportAttributeAccessIssue]
+                    body_text = payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")
 
             clean_body = " ".join(body_text.split()[:80])
             if not clean_body:
                 clean_body = "官方富媒体或附件邮件通知"
 
-            emails.append({
-                "subject": subject_str,
-                "sender": sender_str,
-                "date": str(date),
-                "body": clean_body
-            })
-        except Exception as e:
+            emails.append({"subject": subject_str, "sender": sender_str, "date": str(date), "body": clean_body})
+        except Exception:  # noqa: BLE001, S110
             pass
 
     return emails
@@ -82,16 +75,16 @@ def run_apple_mail_pipeline() -> bool:
     print("📧 [Apple Mail Native Body Engine] 启动 macOS 4,091 封原生 .emlx 邮件正文解密提取流水线...")
 
     mails = fetch_real_apple_mail_bodies()
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
     if mails:
         target_file = INBOX_DIR / f"{today_str}-auto-apple-mail.md"
         lines = [
             f"# Apple Mail 原生 4,091 封邮件正文提取 — {today_str}\n\n",
-            f"> 数据源: macOS Apple Mail V10 .emlx 本地正文数据库\n",
-            f"> 提取时间: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
+            "> 数据源: macOS Apple Mail V10 .emlx 本地正文数据库\n",
+            f"> 提取时间: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n",
         ]
-        
+
         for idx, m in enumerate(mails, 1):
             lines.append(f"### 邮件 {idx}: {m['subject']}\n")
             lines.append(f"- **发件人**: `{m['sender']}`\n")

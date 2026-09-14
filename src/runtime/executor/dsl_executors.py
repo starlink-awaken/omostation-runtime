@@ -133,9 +133,7 @@ class DSLExecutors:
     def register_tool(self, name: str, fn: Callable):
         self._tool_registry[name] = fn
 
-    async def agent_call(
-        self, ctx: ExecutorContext, target: str, action: str
-    ) -> ExecutorResult:
+    async def agent_call(self, ctx: ExecutorContext, target: str, action: str) -> ExecutorResult:
         """Execute an agent call step."""
         fn = self._agent_registry.get(target)
         if not fn:
@@ -148,9 +146,7 @@ class DSLExecutors:
         except Exception as e:  # noqa: BLE001  # defensive fallback
             return ExecutorResult(success=False, error=str(e))
 
-    async def skill_call(
-        self, ctx: ExecutorContext, target: str, action: str
-    ) -> ExecutorResult:
+    async def skill_call(self, ctx: ExecutorContext, target: str, action: str) -> ExecutorResult:
         """Execute a skill call step."""
         fn = self._skill_registry.get(target)
         if not fn:
@@ -163,9 +159,7 @@ class DSLExecutors:
         except Exception as e:  # noqa: BLE001  # defensive fallback
             return ExecutorResult(success=False, error=str(e))
 
-    async def tool_call(
-        self, ctx: ExecutorContext, target: str, action: str
-    ) -> ExecutorResult:
+    async def tool_call(self, ctx: ExecutorContext, target: str, action: str) -> ExecutorResult:
         """Execute a tool call step."""
         fn = self._tool_registry.get(target)
         if not fn:
@@ -299,9 +293,7 @@ class DSLExecutors:
                 )
                 await self._execute_substep(fin_ctx, finally_step)
 
-    async def _execute_substep(
-        self, ctx: ExecutorContext, step_def: dict
-    ) -> ExecutorResult:
+    async def _execute_substep(self, ctx: ExecutorContext, step_def: dict) -> ExecutorResult:
         step_type = step_def.get("type", "agent_call")
         target = step_def.get("target", "")
         action = step_def.get("action", "")

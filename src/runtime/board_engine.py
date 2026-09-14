@@ -81,9 +81,7 @@ class ConsensusResult:
 class PersonaRouter:
     """Parses @Persona mentions and routes proposals to appropriate Board mode."""
 
-    MENTION_PATTERN: ClassVar[re.Pattern[str]] = re.compile(
-        r"@(?P<role>Builder|Devil|Sage|Keeper)\b", re.IGNORECASE
-    )
+    MENTION_PATTERN: ClassVar[re.Pattern[str]] = re.compile(r"@(?P<role>Builder|Devil|Sage|Keeper)\b", re.IGNORECASE)
 
     # Keywords triggering Mode-A deep debate (immutable frozenset)
     MODE_A_KEYWORDS: ClassVar[frozenset[str]] = frozenset(
@@ -173,10 +171,7 @@ class BoardConsensusEngine:
             persona=PersonaRole.BUILDER,
             title="Agile MVP Execution Step",
             content=f"快速执行方案：直接定位核心瓶颈，实施最小侵入性改动以解决 '{proposal}'。",
-            metadata={
-                "effort": "low",
-                "target_role": target_role.value if target_role else None,
-            },
+            metadata={"effort": "low", "target_role": target_role.value if target_role else None},
         )
         transcript.append(builder_msg)
 
@@ -291,9 +286,7 @@ def dispatch_board_command(payload: dict[str, Any]) -> dict[str, Any]:
         mode = BoardMode.AUTO
 
     engine = BoardConsensusEngine(session_id=session_id)
-    result = engine.execute(
-        proposal=proposal, mode=mode, context=payload.get("context")
-    )
+    result = engine.execute(proposal=proposal, mode=mode, context=payload.get("context"))
 
     return {
         "ok": True,

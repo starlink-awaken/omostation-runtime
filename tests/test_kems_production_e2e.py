@@ -7,7 +7,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from reach_gateway.kems import dispatch_manifest  # type: ignore[reportMissingImports]
+from reach_gateway.kems import dispatch_manifest
+
 from scripts.kems_dispatch_receipt import build_receipt
 from scripts.kems_production_preflight import run_preflight
 
@@ -34,9 +35,7 @@ def _manifest(tmp_path: Path) -> Path:
                 "samples": [
                     {
                         "sample_id": "sample-1",
-                        "source_sha256": hashlib.sha256(
-                            source.read_bytes()
-                        ).hexdigest(),
+                        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
                         "source_ref": "vault://redacted/2026-auto-apple-mail.md",
                         "scenario_id": "oa-notice",
                         "split": "test",
@@ -64,8 +63,7 @@ def _adjudication_database(tmp_path: Path, manifest: Path) -> Path:
             "adjudicator TEXT)"
         )
         connection.execute(
-            "CREATE TABLE adjudication_annotations ("
-            "annotation_id INTEGER PRIMARY KEY, sample_id TEXT, annotator TEXT)"
+            "CREATE TABLE adjudication_annotations (annotation_id INTEGER PRIMARY KEY, sample_id TEXT, annotator TEXT)"
         )
         connection.execute(
             "INSERT INTO adjudication_queue VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -108,42 +106,10 @@ def _model_acceptance(tmp_path: Path, manifest: Path) -> Path:
                 "promotion": "blocked_until_omo_approval",
                 "dataset_id": "kems-real-fixture",
                 "dataset_version": "v1",
-                "evaluation_manifest_sha256": hashlib.sha256(
-                    manifest.read_bytes()
-                ).hexdigest(),
+                "evaluation_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
                 "dataset_sample_count": 1,
             },
             ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    return path
-
-
-def _persistence_recovery_evidence(tmp_path: Path) -> Path:
-    path = tmp_path / "persistence-recovery.json"
-    snapshot_sha256 = "c" * 64
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": "kems.persistence-recovery-evidence.v1",
-                "status": "passed",
-                "backend": "postgresql",
-                "backup_id": "backup-e2e-001",
-                "restore_drill_id": "restore-e2e-001",
-                "backup_ref": "vault://evidence/kems/backup-e2e-001",
-                "restore_ref": "vault://evidence/kems/restore-e2e-001",
-                "backup_sha256": "d" * 64,
-                "graph_snapshot_sha256": snapshot_sha256,
-                "restored_graph_snapshot_sha256": snapshot_sha256,
-                "backup_bytes": 4096,
-                "rpo_minutes": 10,
-                "rto_minutes": 20,
-                "rpo_target_minutes": 30,
-                "rto_target_minutes": 60,
-                "performed_at": "2026-08-02T00:00:00+00:00",
-                "verification_method": "logical_restore_and_hash_compare",
-            }
         ),
         encoding="utf-8",
     )
@@ -155,8 +121,7 @@ def _approved_omo(tmp_path: Path) -> Path:
     (omo_root / "tasks" / "active").mkdir(parents=True)
     (omo_root / "workers" / "runs").mkdir(parents=True)
     (omo_root / "tasks" / "active" / "KEMS-E2E.yaml").write_text(
-        "id: KEMS-E2E\nstatus: approved\n"
-        "approval_ref: .omo/workers/runs/KEMS-E2E-approval.yaml\n",
+        "id: KEMS-E2E\nstatus: approved\napproval_ref: .omo/workers/runs/KEMS-E2E-approval.yaml\n",
         encoding="utf-8",
     )
     (omo_root / "workers" / "runs" / "KEMS-E2E-approval.yaml").write_text(
@@ -169,9 +134,7 @@ def _approved_omo(tmp_path: Path) -> Path:
 
 
 def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "fixture-token")
     manifest_path = _manifest(tmp_path)
     adjudication_database = _adjudication_database(tmp_path, manifest_path)
@@ -180,7 +143,6 @@ def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) ->
         evaluation_manifest=manifest_path,
         model_acceptance=_model_acceptance(tmp_path, manifest_path),
         adjudication_database=adjudication_database,
-        persistence_recovery_evidence=_persistence_recovery_evidence(tmp_path),
         omo_root=_approved_omo(tmp_path),
         task_id="KEMS-E2E",
         production=True,
@@ -194,16 +156,14 @@ def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) ->
             length = int(self.headers["Content-Length"])
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             received["payload"] = payload
-            body = json.dumps(
-                {"dispatch_id": payload["dispatch_id"], "status": "accepted"}
-            ).encode("utf-8")
+            body = json.dumps({"dispatch_id": payload["dispatch_id"], "status": "accepted"}).encode("utf-8")
             self.send_response(202)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, *_args: object) -> None:  # type: ignore[reportIncompatibleMethodOverride]
+        def log_message(self, *_args: object) -> None:
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -220,9 +180,7 @@ def test_redacted_production_lane_reaches_http_receipt(tmp_path, monkeypatch) ->
             "documents": [
                 {
                     "source_ref": "vault://redacted/2026-auto-apple-mail.md",
-                    "sha256": json.loads(manifest_path.read_text(encoding="utf-8"))[
-                        "samples"
-                    ][0]["source_sha256"],
+                    "sha256": json.loads(manifest_path.read_text(encoding="utf-8"))["samples"][0]["source_sha256"],
                     "bytes": 0,
                 }
             ],

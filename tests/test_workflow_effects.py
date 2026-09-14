@@ -33,12 +33,8 @@ def test_effect_store_replays_completed_effect_without_reexecution(tmp_path) -> 
 
 def test_effect_outcome_and_receipt_are_safe_and_stable_on_replay(tmp_path) -> None:
     store = WorkflowEffectStore(tmp_path / "effects.jsonl")
-    first = store.execute_once_with_outcome(
-        "run-1:effect:one", lambda: {"remote_id": "obj-1", "content": "private"}
-    )
-    second = store.execute_once_with_outcome(
-        "run-1:effect:one", lambda: {"remote_id": "should-not-run"}
-    )
+    first = store.execute_once_with_outcome("run-1:effect:one", lambda: {"remote_id": "obj-1", "content": "private"})
+    second = store.execute_once_with_outcome("run-1:effect:one", lambda: {"remote_id": "should-not-run"})
 
     assert first.safe_payload()["receipt_eligible"] is True
     assert "result" not in first.safe_payload()
@@ -88,9 +84,7 @@ def test_compensation_is_explicit_idempotent_and_safe(tmp_path) -> None:
         "run-1:effect:compensate",
         lambda: calls.append("compensated") or {"remote_id": "obj-1"},
     )
-    second = store.compensate(
-        "run-1:effect:compensate", lambda: {"remote_id": "must-not-run"}
-    )
+    second = store.compensate("run-1:effect:compensate", lambda: {"remote_id": "must-not-run"})
 
     assert first.status == "compensated"
     assert second.replayed is True
@@ -119,6 +113,4 @@ def test_cross_process_lock_prevents_duplicate_effect(tmp_path) -> None:
 
     outcomes = [queue.get(timeout=2), queue.get(timeout=2)]
     assert sorted(outcome["replayed"] for outcome in outcomes) == [False, True]
-    assert (tmp_path / "calls.txt").read_text(encoding="utf-8").splitlines() == [
-        "executed"
-    ]
+    assert (tmp_path / "calls.txt").read_text(encoding="utf-8").splitlines() == ["executed"]

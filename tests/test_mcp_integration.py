@@ -37,10 +37,10 @@ def mcp_client():
     )
 
     def _send(req, expect_response=True):
-        proc.stdin.write((json.dumps(req) + "\n").encode())  # type: ignore[reportOptionalMemberAccess]
-        proc.stdin.flush()  # type: ignore[reportOptionalMemberAccess]
+        proc.stdin.write((json.dumps(req) + "\n").encode())
+        proc.stdin.flush()
         if expect_response:
-            line = proc.stdout.readline().decode()  # type: ignore[reportOptionalMemberAccess]
+            line = proc.stdout.readline().decode()
             if not line:
                 pytest.skip("MCP server closed stdout — mcp library may be missing")
             return json.loads(line)

@@ -10,6 +10,7 @@ Verifies:
 from __future__ import annotations
 
 import pytest
+
 from runtime.executor.dsl_executors import (
     DSLExecutors,
     ExecutorContext,
@@ -109,9 +110,7 @@ class TestDSLExecutorsConditional:
     async def test_condition_true_routes_to_true_step(self):
         executors = DSLExecutors()
         ctx = ExecutorContext(globals={"x": 10})
-        result = await executors.conditional(
-            ctx, "x > 5", true_step="next_a", false_step="next_b"
-        )
+        result = await executors.conditional(ctx, "x > 5", true_step="next_a", false_step="next_b")
         assert result.success is True
         assert result.output is True
         assert result.next_step == "next_a"
@@ -120,9 +119,7 @@ class TestDSLExecutorsConditional:
     async def test_condition_false_routes_to_false_step(self):
         executors = DSLExecutors()
         ctx = ExecutorContext(globals={"x": 1})
-        result = await executors.conditional(
-            ctx, "x > 5", true_step="next_a", false_step="next_b"
-        )
+        result = await executors.conditional(ctx, "x > 5", true_step="next_a", false_step="next_b")
         assert result.success is True
         assert result.output is False
         assert result.next_step == "next_b"
@@ -131,9 +128,7 @@ class TestDSLExecutorsConditional:
     async def test_condition_with_results_context(self):
         executors = DSLExecutors()
         ctx = ExecutorContext(results={"count": 3})
-        result = await executors.conditional(
-            ctx, "count > 0", true_step="proceed", false_step="stop"
-        )
+        result = await executors.conditional(ctx, "count > 0", true_step="proceed", false_step="stop")
         assert result.success is True
         assert result.next_step == "proceed"
 
@@ -141,9 +136,7 @@ class TestDSLExecutorsConditional:
     async def test_invalid_condition_returns_error(self):
         executors = DSLExecutors()
         ctx = ExecutorContext(globals={"x": 1})
-        result = await executors.conditional(
-            ctx, "x + 1", true_step="a", false_step="b"
-        )
+        result = await executors.conditional(ctx, "x + 1", true_step="a", false_step="b")
         assert result.success is False
         assert "Unsupported" in result.error
 
@@ -155,9 +148,7 @@ class TestDSLExecutorsLoop:
     async def test_loop_with_counter_condition(self):
         executors = DSLExecutors()
         ctx = ExecutorContext(globals={"counter": 0})
-        sub_steps = [
-            {"id": "inc", "type": "agent_call", "target": "increment", "params": {}}
-        ]
+        sub_steps = [{"id": "inc", "type": "agent_call", "target": "increment", "params": {}}]
 
         # Mock the agent call to increment counter
         async def mock_agent(ctx2):
@@ -167,9 +158,7 @@ class TestDSLExecutorsLoop:
             return ExecutorResult(success=True, output=ctx2.globals["counter"])
 
         executors.register_agent("increment", mock_agent)
-        result = await executors.loop(
-            ctx, sub_steps, max_iterations=5, condition="counter < 3"
-        )
+        result = await executors.loop(ctx, sub_steps, max_iterations=5, condition="counter < 3")
         assert result.success is True
         assert ctx.globals["counter"] == 3
 

@@ -33,13 +33,11 @@ _GOVERNANCE_ONLY_KEYS = {
 
 def validate_runtime_health_snapshot(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
-        raise ValueError("runtime health snapshot must be a mapping")
+        raise ValueError("runtime health snapshot must be a mapping")  # noqa: TRY004
     mixed = sorted(_GOVERNANCE_ONLY_KEYS.intersection(payload))
     if mixed:
-        raise ValueError(
-            "runtime health snapshot contains governance-only keys: " + ", ".join(mixed)
-        )
+        raise ValueError("runtime health snapshot contains governance-only keys: " + ", ".join(mixed))
     services = payload.get("services")
     if not isinstance(services, dict):
-        raise ValueError("runtime health snapshot services must be a mapping")
+        raise ValueError("runtime health snapshot services must be a mapping")  # noqa: TRY004
     return payload

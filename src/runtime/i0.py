@@ -18,7 +18,7 @@ import socket
 import subprocess
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -54,12 +54,7 @@ _SERVICE_LAYER: dict[str, str] = {
 
 
 def _utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _read_yaml(path: Path) -> dict:
@@ -99,13 +94,7 @@ def _get_pid_for_port(port: int) -> int | None:
     if not port:
         return None
     try:
-        r = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
+        r = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True, timeout=5, check=False)
         if r.stdout.strip():
             return int(r.stdout.strip().split("\n")[0])
     except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, OSError):
@@ -193,8 +182,8 @@ def i0_services() -> list[dict]:
             port_listening = True
             pid = None
         elif has_port:
-            port_listening = _probe_port("127.0.0.1", svc.port)  # type: ignore[reportArgumentType]
-            pid = _get_pid_for_port(svc.port) if port_listening else None  # type: ignore[reportArgumentType]
+            port_listening = _probe_port("127.0.0.1", svc.port)
+            pid = _get_pid_for_port(svc.port) if port_listening else None
         else:
             # No port — trust matrix.yaml status (running/active = online)
             port_listening = svc.status in ("running", "active", "idle")

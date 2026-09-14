@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/runtime
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # Agent Registry
 
 Unified multi-machine agent coordination for eCOS. Merges patterns from Agora (Ed25519 identity, heartbeat), eCOS (AgentStatus enum, node_id), and Runtime (endpoint tracking).
@@ -150,5 +157,5 @@ Capability:
 ```bash
 cd projects/runtime
 pytest tests/test_registry.py -v
-# 31 tests: models(6) + store(7) + heartbeat(2) + server(8) + dispatch(8)
+# 测试计数以实际输出为准: pytest tests/test_registry.py --collect-only -q
 ```

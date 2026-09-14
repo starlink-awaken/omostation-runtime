@@ -72,7 +72,7 @@ planes:
 
   memory:
     name: "gbrain 记忆面"
-    code: "~/Workspace/projects/gbrain/"
+    code: "~/Workspace/projects/knowledge/gbrain/"
     runtime: "bun (gbrain)"
     entry: "kos MCP (stdio)"
     status: "active"

@@ -3,20 +3,19 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from runtime.kei_probe import count_last_24h, last_age_hours, main
 from runtime.state_schema import validate_runtime_health_snapshot
 
 
 class TestValidateRuntimeHealthSnapshot:
     def test_valid_payload(self):
-        result = validate_runtime_health_snapshot(
-            {"services": {"agora": {"status": "ok"}}}
-        )
+        result = validate_runtime_health_snapshot({"services": {"agora": {"status": "ok"}}})
         assert result["services"]["agora"]["status"] == "ok"
 
     def test_not_a_dict(self):
@@ -49,7 +48,7 @@ class TestCountLast24h:
         assert count_last_24h(Path("/fake.jsonl")) == 0
 
     def test_recent_events(self, tmp_path: Path):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         lines = [
             json.dumps({"ts": now.isoformat()}),
             json.dumps({"ts": (now - timedelta(hours=2)).isoformat()}),
@@ -59,7 +58,7 @@ class TestCountLast24h:
         assert count_last_24h(path) == 2
 
     def test_old_events(self, tmp_path: Path):
-        old = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+        old = (datetime.now(UTC) - timedelta(hours=48)).isoformat()
         path = tmp_path / "kei_audit.jsonl"
         path.write_text(json.dumps({"ts": old}), encoding="utf-8")
         assert count_last_24h(path) == 0
@@ -75,14 +74,14 @@ class TestLastAgeHours:
         assert last_age_hours(Path("/fake.jsonl")) == float("inf")
 
     def test_recent_event(self, tmp_path: Path):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         path = tmp_path / "kei_audit.jsonl"
         path.write_text(json.dumps({"ts": now.isoformat()}), encoding="utf-8")
         age = last_age_hours(path)
         assert 0 <= age < 1
 
     def test_old_event(self, tmp_path: Path):
-        old = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        old = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
         path = tmp_path / "kei_audit.jsonl"
         path.write_text(json.dumps({"ts": old}), encoding="utf-8")
         age = last_age_hours(path)
@@ -98,35 +97,27 @@ class TestMain:
     @patch("runtime.kei_probe.count_last_24h")
     @patch("runtime.kei_probe.argparse.ArgumentParser.parse_args")
     def test_count_24h(self, mock_args, mock_count):
-        mock_args.return_value = MagicMock(
-            count_24h=True, last_age_hours=False, path="/fake.jsonl"
-        )
+        mock_args.return_value = MagicMock(count_24h=True, last_age_hours=False, path="/fake.jsonl")
         mock_count.return_value = 5
         assert main() == 0
 
     @patch("runtime.kei_probe.count_last_24h")
     @patch("runtime.kei_probe.argparse.ArgumentParser.parse_args")
     def test_count_24h_zero(self, mock_args, mock_count):
-        mock_args.return_value = MagicMock(
-            count_24h=True, last_age_hours=False, path="/fake.jsonl"
-        )
+        mock_args.return_value = MagicMock(count_24h=True, last_age_hours=False, path="/fake.jsonl")
         mock_count.return_value = 0
         assert main() == 1
 
     @patch("runtime.kei_probe.last_age_hours")
     @patch("runtime.kei_probe.argparse.ArgumentParser.parse_args")
     def test_last_age_hours(self, mock_args, mock_age):
-        mock_args.return_value = MagicMock(
-            count_24h=False, last_age_hours=True, path="/fake.jsonl"
-        )
+        mock_args.return_value = MagicMock(count_24h=False, last_age_hours=True, path="/fake.jsonl")
         mock_age.return_value = 2.5
         assert main() == 0
 
     @patch("runtime.kei_probe.last_age_hours")
     @patch("runtime.kei_probe.argparse.ArgumentParser.parse_args")
     def test_last_age_hours_exceeded(self, mock_args, mock_age):
-        mock_args.return_value = MagicMock(
-            count_24h=False, last_age_hours=True, path="/fake.jsonl"
-        )
+        mock_args.return_value = MagicMock(count_24h=False, last_age_hours=True, path="/fake.jsonl")
         mock_age.return_value = 48.0
         assert main() == 1

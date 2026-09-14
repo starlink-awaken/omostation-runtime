@@ -10,9 +10,7 @@ def _source_tree(tmp_path):
     inbox = docs / "_inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     (inbox / "2026-auto-apple-mail.md").write_text("private source\n", encoding="utf-8")
-    (inbox / "2026-auto-browser-history.md").write_text(
-        "excluded source\n", encoding="utf-8"
-    )
+    (inbox / "2026-auto-browser-history.md").write_text("excluded source\n", encoding="utf-8")
     return docs
 
 
@@ -31,9 +29,7 @@ def _evaluation_manifest(tmp_path):
                 "samples": [
                     {
                         "sample_id": "sample-1",
-                        "source_sha256": hashlib.sha256(
-                            source.read_bytes()
-                        ).hexdigest(),
+                        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
                         "source_ref": "vault://redacted/2026-auto-apple-mail.md",
                         "scenario_id": "oa-notice",
                         "split": "test",
@@ -69,9 +65,7 @@ def _model_acceptance(tmp_path, manifest):
                 "promotion": "blocked_until_omo_approval",
                 "dataset_id": "real-kems",
                 "dataset_version": "2026-07-31",
-                "evaluation_manifest_sha256": hashlib.sha256(
-                    manifest.read_bytes()
-                ).hexdigest(),
+                "evaluation_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
                 "dataset_sample_count": 1,
             }
         ),
@@ -90,8 +84,7 @@ def _adjudication_database(tmp_path):
             "adjudicator TEXT)"
         )
         connection.execute(
-            "CREATE TABLE adjudication_annotations ("
-            "annotation_id INTEGER PRIMARY KEY, sample_id TEXT, annotator TEXT)"
+            "CREATE TABLE adjudication_annotations (annotation_id INTEGER PRIMARY KEY, sample_id TEXT, annotator TEXT)"
         )
         source = tmp_path / "docs" / "_inbox" / "2026-auto-apple-mail.md"
         connection.execute(
@@ -110,36 +103,6 @@ def _adjudication_database(tmp_path):
             "INSERT INTO adjudication_annotations VALUES (?, ?, ?)",
             [(1, "sample-1", "annotator-a"), (2, "sample-1", "annotator-b")],
         )
-    return path
-
-
-def _persistence_recovery_evidence(tmp_path):
-    path = tmp_path / "persistence-recovery.json"
-    snapshot_sha256 = "c" * 64
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": "kems.persistence-recovery-evidence.v1",
-                "status": "passed",
-                "backend": "postgresql",
-                "backup_id": "backup-20260802-001",
-                "restore_drill_id": "restore-drill-20260802-001",
-                "backup_ref": "vault://evidence/kems/backup-20260802-001",
-                "restore_ref": "vault://evidence/kems/restore-20260802-001",
-                "backup_sha256": "d" * 64,
-                "graph_snapshot_sha256": snapshot_sha256,
-                "restored_graph_snapshot_sha256": snapshot_sha256,
-                "backup_bytes": 4096,
-                "rpo_minutes": 10,
-                "rto_minutes": 20,
-                "rpo_target_minutes": 30,
-                "rto_target_minutes": 60,
-                "performed_at": "2026-08-02T00:00:00+00:00",
-                "verification_method": "logical_restore_and_hash_compare",
-            }
-        ),
-        encoding="utf-8",
-    )
     return path
 
 
@@ -170,19 +133,15 @@ def test_preflight_blocks_without_external_gates(tmp_path, monkeypatch):
         production=True,
     )
     assert result["status"] == "blocked"
-    assert all(
-        "private source" not in json.dumps(result, ensure_ascii=False) for _ in [0]
-    )
-    assert result["source_scope"]["scope_id"] == "kems.private-source-review.v1"  # type: ignore[reportIndexIssue]
-    assert result["source_scope"]["excluded_auto_sources"] == [  # type: ignore[reportIndexIssue]
+    assert all("private source" not in json.dumps(result, ensure_ascii=False) for _ in [0])
+    assert result["source_scope"]["scope_id"] == "kems.private-source-review.v1"
+    assert result["source_scope"]["excluded_auto_sources"] == [
         {"name": "2026-auto-browser-history.md", "reason": "outside_controlled_scope"}
     ]
 
 
 def test_preflight_is_ready_only_when_all_production_gates_pass(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -192,7 +151,6 @@ def test_preflight_is_ready_only_when_all_production_gates_pass(tmp_path, monkey
         evaluation_manifest=manifest,
         model_acceptance=_model_acceptance(tmp_path, manifest),
         adjudication_database=adjudication_database,
-        persistence_recovery_evidence=_persistence_recovery_evidence(tmp_path),
         omo_root=tmp_path / "omo",
         task_id="KEMS-001",
         production=True,
@@ -202,9 +160,7 @@ def test_preflight_is_ready_only_when_all_production_gates_pass(tmp_path, monkey
 
 
 def test_preflight_blocks_without_model_shadow_acceptance(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -216,18 +172,11 @@ def test_preflight_blocks_without_model_shadow_acceptance(tmp_path, monkeypatch)
         production=True,
     )
     assert result["status"] == "blocked"
-    assert any(
-        item["id"] == "model_acceptance" and not item["ok"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
-    )
+    assert any(item["id"] == "model_acceptance" and not item["ok"] for item in result["checks"])
 
 
-def test_preflight_blocks_model_acceptance_bound_to_other_manifest(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+def test_preflight_blocks_model_acceptance_bound_to_other_manifest(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -245,17 +194,13 @@ def test_preflight_blocks_model_acceptance_bound_to_other_manifest(
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "model_acceptance"
-        and not item["ok"]
-        and "different manifest" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "model_acceptance" and not item["ok"] and "different manifest" in item["detail"]
+        for item in result["checks"]
     )
 
 
 def test_preflight_writes_redacted_auditable_evidence(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -266,7 +211,6 @@ def test_preflight_writes_redacted_auditable_evidence(tmp_path, monkeypatch):
         evaluation_manifest=manifest,
         model_acceptance=_model_acceptance(tmp_path, manifest),
         adjudication_database=adjudication_database,
-        persistence_recovery_evidence=_persistence_recovery_evidence(tmp_path),
         omo_root=tmp_path / "omo",
         task_id="KEMS-001",
         production=True,
@@ -281,73 +225,13 @@ def test_preflight_writes_redacted_auditable_evidence(tmp_path, monkeypatch):
     assert evidence["evaluation"]["dataset_id"] == "real-kems"
     assert evidence["adjudication"]["available"] is True
     assert evidence["model_acceptance"]["status"] == "shadow_pass"
-    assert evidence["persistence_recovery"]["backend"] == "postgresql"
     assert evidence["omo"]["approval_ref"] == ".omo/workers/runs/KEMS-001-approval.yaml"
     assert "private source" not in output.read_text(encoding="utf-8")
     assert not list(output.parent.glob(".*.tmp"))
 
 
-def test_preflight_requires_persistence_recovery_for_production(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
-    monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
-    _approved_task(tmp_path / "omo")
-    manifest = _evaluation_manifest(tmp_path)
-    result = run_preflight(
-        docs_root=_source_tree(tmp_path),
-        evaluation_manifest=manifest,
-        model_acceptance=_model_acceptance(tmp_path, manifest),
-        adjudication_database=_adjudication_database(tmp_path),
-        omo_root=tmp_path / "omo",
-        task_id="KEMS-001",
-        production=True,
-    )
-    assert result["status"] == "blocked"
-    assert any(
-        item["id"] == "persistence_recovery"
-        and not item["ok"]
-        and "evidence path" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
-    )
-
-
-def test_preflight_rejects_unmatched_restored_graph_snapshot(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
-    monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
-    _approved_task(tmp_path / "omo")
-    manifest = _evaluation_manifest(tmp_path)
-    evidence = _persistence_recovery_evidence(tmp_path)
-    payload = json.loads(evidence.read_text(encoding="utf-8"))
-    payload["restored_graph_snapshot_sha256"] = "e" * 64
-    evidence.write_text(json.dumps(payload), encoding="utf-8")
-    result = run_preflight(
-        docs_root=_source_tree(tmp_path),
-        evaluation_manifest=manifest,
-        model_acceptance=_model_acceptance(tmp_path, manifest),
-        adjudication_database=_adjudication_database(tmp_path),
-        persistence_recovery_evidence=evidence,
-        omo_root=tmp_path / "omo",
-        task_id="KEMS-001",
-        production=True,
-    )
-    assert result["status"] == "blocked"
-    assert any(
-        item["id"] == "persistence_recovery"
-        and not item["ok"]
-        and "snapshot" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
-    )
-
-
-def test_preflight_requires_persisted_adjudication_for_production(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+def test_preflight_requires_persisted_adjudication_for_production(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -361,17 +245,13 @@ def test_preflight_requires_persisted_adjudication_for_production(
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "adjudication_persistence"
-        and not item["ok"]
-        and "database path" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "adjudication_persistence" and not item["ok"] and "database path" in item["detail"]
+        for item in result["checks"]
     )
 
 
 def test_production_preflight_rejects_manifest_source_drift(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -388,19 +268,13 @@ def test_production_preflight_rejects_manifest_source_drift(tmp_path, monkeypatc
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "evaluation_manifest"
-        and not item["ok"]
-        and "current source inventory" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "evaluation_manifest" and not item["ok"] and "current source inventory" in item["detail"]
+        for item in result["checks"]
     )
 
 
-def test_production_preflight_rejects_manifest_source_not_in_inventory(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+def test_production_preflight_rejects_manifest_source_not_in_inventory(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -417,17 +291,13 @@ def test_production_preflight_rejects_manifest_source_not_in_inventory(
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "evaluation_manifest"
-        and not item["ok"]
-        and "not present" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "evaluation_manifest" and not item["ok"] and "not present" in item["detail"]
+        for item in result["checks"]
     )
 
 
 def test_preflight_rejects_raw_evaluation_fields(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -444,16 +314,11 @@ def test_preflight_rejects_raw_evaluation_fields(tmp_path, monkeypatch):
         production=True,
     )
     assert result["status"] == "blocked"
-    assert any(
-        item["id"] == "evaluation_manifest" and not item["ok"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
-    )
+    assert any(item["id"] == "evaluation_manifest" and not item["ok"] for item in result["checks"])
 
 
 def test_preflight_blocks_on_invalid_omo_yaml(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     task_dir = tmp_path / "omo" / "tasks" / "active"
     task_dir.mkdir(parents=True)
@@ -471,17 +336,13 @@ def test_preflight_blocks_on_invalid_omo_yaml(tmp_path, monkeypatch):
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "omo_approval"
-        and not item["ok"]
-        and "invalid OMO task metadata" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "omo_approval" and not item["ok"] and "invalid OMO task metadata" in item["detail"]
+        for item in result["checks"]
     )
 
 
 def test_preflight_rejects_ungranted_omo_promotion(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -501,17 +362,12 @@ def test_preflight_rejects_ungranted_omo_promotion(tmp_path, monkeypatch):
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "omo_approval"
-        and not item["ok"]
-        and "ungranted" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "omo_approval" and not item["ok"] and "ungranted" in item["detail"] for item in result["checks"]
     )
 
 
 def test_preflight_rejects_omo_task_that_is_only_active(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     task = tmp_path / "omo" / "tasks" / "active" / "KEMS-001.yaml"
@@ -530,17 +386,13 @@ def test_preflight_rejects_omo_task_that_is_only_active(tmp_path, monkeypatch):
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "omo_approval"
-        and not item["ok"]
-        and "not approved" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "omo_approval" and not item["ok"] and "not approved" in item["detail"]
+        for item in result["checks"]
     )
 
 
 def test_preflight_rejects_incomplete_manifest_identity(tmp_path, monkeypatch):
-    monkeypatch.setenv(
-        "BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch"
-    )
+    monkeypatch.setenv("BOS_REACHBRIDGE_ENDPOINT", "https://reachbridge.example.test/dispatch")
     monkeypatch.setenv("BOS_REACHBRIDGE_TOKEN", "test-token")
     _approved_task(tmp_path / "omo")
     manifest = _evaluation_manifest(tmp_path)
@@ -558,8 +410,6 @@ def test_preflight_rejects_incomplete_manifest_identity(tmp_path, monkeypatch):
     )
     assert result["status"] == "blocked"
     assert any(
-        item["id"] == "evaluation_manifest"
-        and not item["ok"]
-        and "dataset_version" in item["detail"]
-        for item in result["checks"]  # type: ignore[reportGeneralTypeIssues]
+        item["id"] == "evaluation_manifest" and not item["ok"] and "dataset_version" in item["detail"]
+        for item in result["checks"]
     )

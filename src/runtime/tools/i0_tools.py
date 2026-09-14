@@ -70,14 +70,10 @@ def _i0_protocols() -> str:
             lines.append(f"  {u:12s}: {cnt}")
         lines.append("")
         protos = protocols.get("protocols", [])
-        lines.append(
-            f"{'NAME':25s} {'VERSION':10s} {'CATEGORY':22s} {'STATUS':10s} {'USAGE':10s}"
-        )
+        lines.append(f"{'NAME':25s} {'VERSION':10s} {'CATEGORY':22s} {'STATUS':10s} {'USAGE':10s}")
         lines.append("-" * 85)
         for p in protos:
-            lines.append(
-                f"{p['name']:25s} {p['version']:10s} {p['category']:22s} {p['status']:10s} {p['usage']:10s}"
-            )
+            lines.append(f"{p['name']:25s} {p['version']:10s} {p['category']:22s} {p['status']:10s} {p['usage']:10s}")
         return "\n".join(lines)
     except Exception as e:  # noqa: BLE001  # defensive fallback
         return f"❌ i0_protocols failed: {e}"

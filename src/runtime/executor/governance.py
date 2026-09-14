@@ -128,9 +128,7 @@ class GovernanceCoordinator:
     def __init__(self, config: CoordinatorConfig | None = None) -> None:
         self._config = config or CoordinatorConfig()
         self._agents: dict[str, GovernanceAgent] = {}
-        self._votes: dict[
-            str, dict[str, list[GovernanceVote]]
-        ] = {}  # project_id -> decision_id -> votes
+        self._votes: dict[str, dict[str, list[GovernanceVote]]] = {}  # project_id -> decision_id -> votes
         self._decisions: dict[str, dict[str, GovernanceDecision]] = {}
         self._conflicts: dict[str, list[GovernanceConflict]] = {}
         self._conflict_history: list[GovernanceConflict] = []
@@ -163,9 +161,7 @@ class GovernanceCoordinator:
 
     # -- Voting --------------------------------------------------------------
 
-    def submit_vote(
-        self, project_id: str, decision_id: str, vote: GovernanceVote
-    ) -> dict[str, Any]:
+    def submit_vote(self, project_id: str, decision_id: str, vote: GovernanceVote) -> dict[str, Any]:
         agent = self._agents.get(vote.agent_id)
         if agent is None:
             return {"success": False, "error": f"Unknown agent: {vote.agent_id}"}
@@ -177,9 +173,7 @@ class GovernanceCoordinator:
         self._votes.setdefault(project_id, {}).setdefault(decision_id, [])
         votes = self._votes[project_id][decision_id]
 
-        existing = next(
-            (i for i, v in enumerate(votes) if v.agent_id == vote.agent_id), None
-        )
+        existing = next((i for i, v in enumerate(votes) if v.agent_id == vote.agent_id), None)
         vote.timestamp = time.time()
         if existing is not None:
             votes[existing] = vote
@@ -202,9 +196,7 @@ class GovernanceCoordinator:
 
     # -- Conflict detection --------------------------------------------------
 
-    def detect_conflicts(
-        self, project_id: str, decision_id: str
-    ) -> list[GovernanceConflict]:
+    def detect_conflicts(self, project_id: str, decision_id: str) -> list[GovernanceConflict]:
         votes = self.get_votes(project_id, decision_id)
         conflicts: list[GovernanceConflict] = []
 
@@ -226,11 +218,7 @@ class GovernanceCoordinator:
                 else (
                     ConflictSeverity.HIGH
                     if combined > 0.7
-                    else (
-                        ConflictSeverity.MEDIUM
-                        if combined > 0.5
-                        else ConflictSeverity.LOW
-                    )
+                    else (ConflictSeverity.MEDIUM if combined > 0.5 else ConflictSeverity.LOW)
                 )
             )
 
@@ -255,9 +243,7 @@ class GovernanceCoordinator:
                 GovernanceConflict(
                     id=uuid.uuid4().hex[:12],
                     type=ConflictType.CONFIDENCE_GAP,
-                    severity=ConflictSeverity.HIGH
-                    if gap > 0.5
-                    else ConflictSeverity.MEDIUM,
+                    severity=ConflictSeverity.HIGH if gap > 0.5 else ConflictSeverity.MEDIUM,
                     agents=[v.agent_id for v in votes],
                     description=f"Confidence gap: {gap:.1%}",
                     timestamp=time.time(),
@@ -271,9 +257,7 @@ class GovernanceCoordinator:
 
     # -- Decision aggregation ------------------------------------------------
 
-    def aggregate_decision(
-        self, project_id: str, decision_id: str
-    ) -> GovernanceDecision:
+    def aggregate_decision(self, project_id: str, decision_id: str) -> GovernanceDecision:
         cached = self._decisions.get(project_id, {}).get(decision_id)
         if cached is not None:
             return cached
@@ -311,14 +295,9 @@ class GovernanceCoordinator:
         conflicts = self.detect_conflicts(project_id, decision_id)
         if not conflicts:
             decision = self.aggregate_decision(project_id, decision_id)
-            return ConflictResolution(
-                resolved=True, decision=decision, message="No conflicts"
-            )
+            return ConflictResolution(resolved=True, decision=decision, message="No conflicts")
 
-        high_severity = any(
-            c.severity in (ConflictSeverity.HIGH, ConflictSeverity.CRITICAL)
-            for c in conflicts
-        )
+        high_severity = any(c.severity in (ConflictSeverity.HIGH, ConflictSeverity.CRITICAL) for c in conflicts)
         if high_severity:
             return ConflictResolution(
                 resolved=False,
@@ -333,9 +312,7 @@ class GovernanceCoordinator:
             message=f"Auto-resolved {len(conflicts)} conflict(s)",
         )
 
-    def get_conflict_history(
-        self, project_id: str | None = None
-    ) -> list[GovernanceConflict]:
+    def get_conflict_history(self, project_id: str | None = None) -> list[GovernanceConflict]:
         if project_id:
             return list(self._conflicts.get(project_id, []))
         return list(self._conflict_history)
@@ -351,9 +328,7 @@ class GovernanceCoordinator:
                 total_decisions += 1
         total_conflicts = len(self._conflict_history)
         human_count = sum(
-            1
-            for c in self._conflict_history
-            if c.severity in (ConflictSeverity.HIGH, ConflictSeverity.CRITICAL)
+            1 for c in self._conflict_history if c.severity in (ConflictSeverity.HIGH, ConflictSeverity.CRITICAL)
         )
         return CoordinatorStats(
             total_decisions=total_decisions,
@@ -394,17 +369,13 @@ class GovernanceCoordinator:
             if total > 0 and go == total:
                 return {
                     "type": VoteType.GO,
-                    "confidence": self._avg_conf(
-                        [v for v in votes if v.type == VoteType.GO]
-                    ),
+                    "confidence": self._avg_conf([v for v in votes if v.type == VoteType.GO]),
                     "reasoning": "Unanimity: all GO",
                 }
             if total > 0 and no == total:
                 return {
                     "type": VoteType.NO_GO,
-                    "confidence": self._avg_conf(
-                        [v for v in votes if v.type == VoteType.NO_GO]
-                    ),
+                    "confidence": self._avg_conf([v for v in votes if v.type == VoteType.NO_GO]),
                     "reasoning": "Unanimity: all NO_GO",
                 }
             if total > 0:
@@ -419,11 +390,7 @@ class GovernanceCoordinator:
             conf_sums: dict[VoteType, float] = {}
             for v in votes:
                 conf_sums[v.type] = conf_sums.get(v.type, 0) + v.confidence
-            best = (
-                max(conf_sums, key=lambda k: conf_sums[k])
-                if conf_sums
-                else VoteType.NO_GO
-            )
+            best = max(conf_sums, key=lambda k: conf_sums[k]) if conf_sums else VoteType.NO_GO
             count = sum(1 for v in votes if v.type == best)
             return {
                 "type": best,
@@ -437,17 +404,13 @@ class GovernanceCoordinator:
             if total > 0 and go / total >= threshold:
                 return {
                     "type": VoteType.GO,
-                    "confidence": self._avg_conf(
-                        [v for v in votes if v.type == VoteType.GO]
-                    ),
+                    "confidence": self._avg_conf([v for v in votes if v.type == VoteType.GO]),
                     "reasoning": f"Super-majority GO ({go}/{total})",
                 }
             if total > 0 and no / total >= threshold:
                 return {
                     "type": VoteType.NO_GO,
-                    "confidence": self._avg_conf(
-                        [v for v in votes if v.type == VoteType.NO_GO]
-                    ),
+                    "confidence": self._avg_conf([v for v in votes if v.type == VoteType.NO_GO]),
                     "reasoning": f"Super-majority NO_GO ({no}/{total})",
                 }
             # Fall through to simple majority
@@ -457,32 +420,24 @@ class GovernanceCoordinator:
         if go == max_count:
             return {
                 "type": VoteType.GO,
-                "confidence": self._avg_conf(
-                    [v for v in votes if v.type == VoteType.GO]
-                ),
+                "confidence": self._avg_conf([v for v in votes if v.type == VoteType.GO]),
                 "reasoning": f"Simple majority: {go} GO",
             }
         if cond == max_count:
             return {
                 "type": VoteType.CONDITIONAL_GO,
-                "confidence": self._avg_conf(
-                    [v for v in votes if v.type == VoteType.CONDITIONAL_GO]
-                ),
+                "confidence": self._avg_conf([v for v in votes if v.type == VoteType.CONDITIONAL_GO]),
                 "reasoning": f"Simple majority: {cond} conditional",
             }
         return {
             "type": VoteType.NO_GO,
-            "confidence": self._avg_conf(
-                [v for v in votes if v.type == VoteType.NO_GO]
-            ),
+            "confidence": self._avg_conf([v for v in votes if v.type == VoteType.NO_GO]),
             "reasoning": f"Simple majority: {no} NO_GO",
         }
 
     # -- Helper methods ------------------------------------------------------
 
-    def _get_weighted_votes(
-        self, votes: list[GovernanceVote]
-    ) -> list[tuple[GovernanceVote, float]]:
+    def _get_weighted_votes(self, votes: list[GovernanceVote]) -> list[tuple[GovernanceVote, float]]:
         result: list[tuple[GovernanceVote, float]] = []
         for v in votes:
             agent = self._agents.get(v.agent_id)
@@ -496,9 +451,7 @@ class GovernanceCoordinator:
             return 0.0
         return sum(v.confidence for v in votes) / len(votes)
 
-    def _record_conflicts(
-        self, project_id: str, conflicts: list[GovernanceConflict]
-    ) -> None:
+    def _record_conflicts(self, project_id: str, conflicts: list[GovernanceConflict]) -> None:
         self._conflicts.setdefault(project_id, [])
         for c in conflicts:
             if c.id not in {x.id for x in self._conflicts[project_id]}:

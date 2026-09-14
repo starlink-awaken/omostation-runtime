@@ -53,9 +53,7 @@ def cmd_i0_status() -> int:
     print("║  Layer Breakdown:                       ║")
     for layer_key in sorted(layers):
         layer_data = layers[layer_key]
-        print(
-            f"║    {layer_key}: {layer_data['services']:2d} services, {layer_data['online']:2d} online    ║"
-        )
+        print(f"║    {layer_key}: {layer_data['services']:2d} services, {layer_data['online']:2d} online    ║")
     print("╚════════════════════════════════════════╝")
     return 0
 
@@ -67,21 +65,15 @@ def cmd_i0_services() -> int:
         print(f"❌ i0_services failed: {e}", file=sys.stderr)
         return 1
 
-    print(
-        f"{'SERVICE':20s} {'TYPE':12s} {'PORT':6s} {'LIVE':6s} {'HEALTH':12s} {'PID':8s} {'LAYER':6s}"
-    )
+    print(f"{'SERVICE':20s} {'TYPE':12s} {'PORT':6s} {'LIVE':6s} {'HEALTH':12s} {'PID':8s} {'LAYER':6s}")
     print("-" * 80)
     for s in services:
         port = str(s["port"]) if s["port"] else "—"
         live = _bool_icon(s.get("port_listening", False))
         health = s.get("health", "?")
         pid = str(s["pid"]) if s.get("pid") else "—"
-        print(
-            f"{s['name']:20s} {s['type']:12s} {port:6s} {live:6s} {health:12s} {pid:8s} {s.get('layer', '?'):6s}"
-        )
-    print(
-        f"\nTotal: {len(services)} services ({sum(1 for s in services if s.get('port_listening'))} online)"
-    )
+        print(f"{s['name']:20s} {s['type']:12s} {port:6s} {live:6s} {health:12s} {pid:8s} {s.get('layer', '?'):6s}")
+    print(f"\nTotal: {len(services)} services ({sum(1 for s in services if s.get('port_listening'))} online)")
     return 0
 
 
@@ -135,9 +127,7 @@ def cmd_i0_protocols() -> int:
     print(f"{'NAME':25s} {'VERSION':10s} {'CATEGORY':22s} {'STATUS':10s} {'USAGE':10s}")
     print("-" * 85)
     for p in protos:
-        print(
-            f"{p['name']:25s} {p['version']:10s} {p['category']:22s} {p['status']:10s} {p['usage']:10s}"
-        )
+        print(f"{p['name']:25s} {p['version']:10s} {p['category']:22s} {p['status']:10s} {p['usage']:10s}")
     return 0
 
 
@@ -194,9 +184,7 @@ def add_i0_subparser(subparsers) -> None:
 
     # events
     ev_p = i0_sub.add_parser("events", help="Recent events from Agora SSE")
-    ev_p.add_argument(
-        "--limit", type=int, default=20, help="Number of events (default: 20)"
-    )
+    ev_p.add_argument("--limit", type=int, default=20, help="Number of events (default: 20)")
 
     # protocols
     i0_sub.add_parser("protocols", help="Protocol registry summary")

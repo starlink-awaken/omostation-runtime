@@ -41,7 +41,7 @@ WORKSPACE = HOME / "Workspace"
 def list_workspace_scripts():
     """Scan all Workspace project scripts/ dirs. Returns {filename: project}"""
     result = {}
-    for project, _ in SCRIPT_PREFIX_MAP.items():
+    for project in SCRIPT_PREFIX_MAP:
         proj_dir = WORKSPACE / project / "scripts"
         if not proj_dir.is_dir():
             continue
@@ -124,12 +124,8 @@ def sync_bridge():
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Sync Hermes ↔ Workspace script bridge"
-    )
-    parser.add_argument(
-        "--check-only", action="store_true", help="Only check, no modifications"
-    )
+    parser = argparse.ArgumentParser(description="Sync Hermes ↔ Workspace script bridge")
+    parser.add_argument("--check-only", action="store_true", help="Only check, no modifications")
     parser.add_argument("--report", action="store_true", help="Output JSON report")
     args = parser.parse_args()
 

@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # TaskObject — eCOS L3 中立任务格式规范 v1.0
 
 > Standard task format for cross-agent task passing through the L3 Entry Bridge.

@@ -11,9 +11,7 @@ def _protocol_list() -> str:
     ]
     for p in L0_PROTOCOLS:
         icon = icons.get(p.status, "❓")
-        parts.append(
-            f"{icon} {p.name:22s} {p.version:12s} {p.category:22s} {p.status:10s}"
-        )
+        parts.append(f"{icon} {p.name:22s} {p.version:12s} {p.category:22s} {p.status:10s}")
     parts.append(f"\nTotal: {len(L0_PROTOCOLS)} protocols")
     return "\n".join(parts)
 
@@ -47,7 +45,7 @@ def _plane_list() -> str:
     data = yaml.safe_load(registry_file.read_text())
     planes = data.get("planes", {})
     lines = [f"{'PLANE':15s} {'STATUS':10s} {'CAPABILITIES':30s}", "-" * 60]
-    for name, p in planes.items():
+    for p in planes.values():
         caps = len(p.get("capabilities", []))
         lines.append(f"{p['name']:15s} {p.get('status', '?'):10s} {caps} capabilities")
     lines.append(f"\nTotal: {len(planes)} planes registered")

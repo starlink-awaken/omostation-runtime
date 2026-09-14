@@ -36,9 +36,7 @@ def _daemon_is_online(service: dict[str, Any]) -> bool:
         return True
     if hc.startswith("healthy") or hc in {"idle", "ok", "up"}:
         return True
-    if service.get("port_listening") is True:
-        return True
-    return False
+    return service.get("port_listening") is True
 
 
 def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -51,11 +49,7 @@ def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]
     # Direct summary from snapshot data — omo.omo_state_schema was removed in
     # refactor; P82-S4 死 import 清理 (try/except 死块移除, 直接 summary, 非补实现).
     services = snapshot.get("services", {}) or {}
-    daemons = {
-        k: v
-        for k, v in services.items()
-        if isinstance(v, dict) and v.get("type") == "daemon"
-    }
+    daemons = {k: v for k, v in services.items() if isinstance(v, dict) and v.get("type") == "daemon"}
     total = len(daemons)
     if total <= 0:
         return {
@@ -74,14 +68,13 @@ def summarize_system_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]
         "online_services": online,
         "total_services": total,
         "ratio": round(ratio, 4),
-        "health_score": max(0, int(round(ratio * 100))),
+        "health_score": max(0, round(ratio * 100)),
         "last_scan": str(snapshot.get("last_scan", "")),
         "service_count": len(services),
         "degraded": [
             k
             for k, v in daemons.items()
-            if str((v.get("runtime") or {}).get("status") or "").lower() == "degraded"
-            and not _daemon_is_online(v)
+            if str((v.get("runtime") or {}).get("status") or "").lower() == "degraded" and not _daemon_is_online(v)
         ],
         "source": "runtime_daemon_de_false_positive",
     }

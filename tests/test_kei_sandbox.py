@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from runtime.kei_sandbox import (
     _load_kei_rules,
     record_audit,
@@ -141,5 +142,6 @@ finally:
             capture_output=True,
             text=True,
             env={**os.environ, "PYTHONPATH": "src"},
+            check=False,
         )
         assert "SUCCESS" in result.stdout

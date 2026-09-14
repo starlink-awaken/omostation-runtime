@@ -36,14 +36,10 @@ class HeartbeatManager:
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(
-            target=self._loop, daemon=True, name="heartbeat-mgr"
-        )
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="heartbeat-mgr")
         self._thread.start()
         logger.info(
-            "HeartbeatManager started (ttl=%ds, zombie=%ds)",
-            self._ttl.total_seconds(),
-            self._zombie.total_seconds(),
+            "HeartbeatManager started (ttl=%ds, zombie=%ds)", self._ttl.total_seconds(), self._zombie.total_seconds()
         )
 
     def stop(self) -> None:

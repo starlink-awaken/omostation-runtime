@@ -123,9 +123,7 @@ def test_runtime_retries_llm_error_when_policy_allows() -> None:
 
 def test_runtime_returns_omo_safe_effect_receipt(tmp_path) -> None:
     runtime = AgentRuntime()
-    runtime._tool_registry = {
-        "lookup": {"fn": lambda query="": {"remote_id": query, "content": "secret"}}
-    }
+    runtime._tool_registry = {"lookup": {"fn": lambda query="": {"remote_id": query, "content": "secret"}}}
     responses = [
         {
             "content": "",

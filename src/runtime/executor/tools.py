@@ -39,9 +39,7 @@ def _check_path_sandbox(path: Path) -> Path:
             break
     if not allowed:
         allowed_names = [str(d) for d in ALLOWED_PATHS]
-        raise PermissionError(
-            f"Access denied: {p} is outside allowed paths ({', '.join(allowed_names)})"
-        )
+        raise PermissionError(f"Access denied: {p} is outside allowed paths ({', '.join(allowed_names)})")
     return p
 
 
@@ -50,15 +48,12 @@ def _check_path_sandbox(path: Path) -> Path:
 
 def _is_agora_direct_mode() -> bool:
     """Check if we are currently in direct MCP mode (bypassing Agora)."""
-    global _agora_direct_mode_until
-    if time.monotonic() > _agora_direct_mode_until:
-        return False
-    return True
+    return not time.monotonic() > _agora_direct_mode_until
 
 
 def _enter_agora_direct_mode():
     """Switch to direct MCP mode for the configured duration."""
-    global _agora_failure_count, _agora_direct_mode_until
+    global _agora_direct_mode_until
     _agora_direct_mode_until = time.monotonic() + _AGORA_DIRECT_MODE_DURATION
     log.warning(
         f"⚠️  Agora direct mode activated for {_AGORA_DIRECT_MODE_DURATION}s (until t={_agora_direct_mode_until:.0f})"
@@ -186,12 +181,7 @@ class Tools:
 
             args = shlex.split(command)
             r = subprocess.run(
-                args,
-                capture_output=True,
-                text=True,
-                cwd=cwd or str(ECOS_DIR),
-                timeout=timeout,
-                check=False,
+                args, capture_output=True, text=True, cwd=cwd or str(ECOS_DIR), timeout=timeout, check=False
             )
             return {
                 "exit_code": r.returncode,

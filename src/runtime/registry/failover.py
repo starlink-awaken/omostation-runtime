@@ -93,10 +93,9 @@ class FailoverManager:
         events: list[FailoverEvent] = []
 
         for agent in self._store.list_agents():
-            if agent.status.value == "offline" and agent.active_tasks > 0:
-                # Find alternative agent
-                alternative = self._find_alternative(agent)
-                if alternative:
+            if agent.status.value == "offline":
+                # Check if agent has active tasks
+                if agent.active_tasks > 0 and (alternative := self._find_alternative(agent)):
                     # Reassign
                     event = FailoverEvent(
                         agent_id=agent.agent_id,
@@ -113,7 +112,7 @@ class FailoverManager:
                         agent.agent_id,
                         alternative.agent_id,
                     )
-                else:
+                elif agent.active_tasks > 0:
                     # Queue for fallback
                     event = FailoverEvent(
                         agent_id=agent.agent_id,
@@ -133,9 +132,7 @@ class FailoverManager:
     def _find_alternative(self, failed_agent):
         """Find a healthy agent with matching capabilities."""
         healthy = [
-            a
-            for a in self._store.list_agents()
-            if a.status.value != "offline" and a.agent_id != failed_agent.agent_id
+            a for a in self._store.list_agents() if a.status.value != "offline" and a.agent_id != failed_agent.agent_id
         ]
         if not healthy:
             return None

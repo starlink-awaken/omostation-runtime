@@ -190,9 +190,7 @@ class TaskFallbackManager:
 
     def get_status(self) -> dict:
         total = len(self._events)
-        dispatched = sum(
-            1 for e in self._events if e.result == FallbackResult.DISPATCHED
-        )
+        dispatched = sum(1 for e in self._events if e.result == FallbackResult.DISPATCHED)
         escalated = sum(1 for e in self._events if e.result == FallbackResult.ESCALATED)
         return {
             "total_events": total,

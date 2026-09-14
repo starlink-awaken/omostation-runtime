@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # Contributing to runtime
 
 > service lifecycle, scheduling, health monitoring and KEI sandbox

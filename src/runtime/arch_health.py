@@ -110,9 +110,7 @@ def load_arch_health() -> dict:
             check=False,
         )
         ruff["check"] = "passed" if result.returncode == 0 else "failed"
-        ruff["errors"] = (
-            len(result.stdout.splitlines()) if result.returncode != 0 else 0
-        )
+        ruff["errors"] = len(result.stdout.splitlines()) if result.returncode != 0 else 0
     except Exception as e:  # noqa: BLE001  # defensive fallback
         ruff["error"] = str(e)
 
@@ -163,9 +161,11 @@ def load_arch_health() -> dict:
                 str(workspace / "projects" / "agora"),
                 "python",
                 "-c",
-                "from agora.auth.mcp_gateway import KNOWN_BACKENDS; "
-                "import json; "
-                "print(json.dumps([b['name'] for b in KNOWN_BACKENDS]))",
+                (
+                    "from agora.auth.mcp_gateway import KNOWN_BACKENDS; "
+                    "import json; "
+                    "print(json.dumps([b['name'] for b in KNOWN_BACKENDS]))"
+                ),
             ],
             capture_output=True,
             text=True,
@@ -205,7 +205,7 @@ def load_arch_health() -> dict:
 
         # Governance freshness: fresh=100, aging=60, stale=0
         # Weight: 25%
-        gov_score = {"fresh": 100, "aging": 60, "stale": 0}.get(gov.get("health"), 50)  # type: ignore[reportArgumentType]
+        gov_score = {"fresh": 100, "aging": 60, "stale": 0}.get(gov.get("health"), 50)
         convergence["dimensions"]["governance_freshness"] = {
             "score": gov_score,
             "weight": 25,
@@ -222,13 +222,9 @@ def load_arch_health() -> dict:
         }
 
         # Weighted total
-        total = sum(
-            d["score"] * d["weight"] / 100 for d in convergence["dimensions"].values()
-        )
+        total = sum(d["score"] * d["weight"] / 100 for d in convergence["dimensions"].values())
         convergence["score"] = round(total)
-        convergence["grade"] = (
-            "GOOD" if total >= 80 else "WARNING" if total >= 60 else "LOW"
-        )
+        convergence["grade"] = "GOOD" if total >= 80 else "WARNING" if total >= 60 else "LOW"
     except Exception:  # noqa: BLE001, S110  # defensive fallback
         pass  # defensive fallback
 

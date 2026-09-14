@@ -72,9 +72,7 @@ def validate_action(manifest: KEIManifest, action_type: str, target: str) -> boo
     elif action_type == "write":
         return any(target.startswith(p) for p in manifest.permissions.fs_write)
     elif action_type == "network":
-        return any(
-            target in host or host == "*" for host in manifest.permissions.network_hosts
-        )
+        return any(target in host or host == "*" for host in manifest.permissions.network_hosts)
     elif action_type == "exec":
         return manifest.permissions.shell_exec
 

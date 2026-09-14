@@ -24,9 +24,7 @@ def test_source_files_deduplicate_patterns(tmp_path):
 
 def test_materialize_requires_kairon_graph_store(tmp_path, monkeypatch):
     (tmp_path / "_inbox").mkdir()
-    (tmp_path / "_inbox" / "2026-auto-apple-mail.md").write_text(
-        "# mail", encoding="utf-8"
-    )
+    (tmp_path / "_inbox" / "2026-auto-apple-mail.md").write_text("# mail", encoding="utf-8")
     monkeypatch.setenv("BOS_KAIRon_ROOT", str(tmp_path / "missing"))
     with pytest.raises(RuntimeError, match="Kairon KOS source"):
         kems_materialize.materialize(tmp_path, tmp_path / "graph.sqlite", "run-1")

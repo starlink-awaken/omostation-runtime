@@ -20,14 +20,10 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
-DEFAULT_PATH = (
-    Path(os.environ.get("RUNTIME_HOME", str(Path.home() / "runtime")))
-    / "data"
-    / "kei_audit.jsonl"
-)
+DEFAULT_PATH = Path(os.environ.get("RUNTIME_HOME", str(Path.home() / "runtime"))) / "data" / "kei_audit.jsonl"
 
 
 def count_last_24h(path: Path) -> int:
@@ -35,7 +31,7 @@ def count_last_24h(path: Path) -> int:
     if not path.exists():
         print(f"0 (文件不存在: {path})")
         return 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     count = 0
     try:
         with open(path, "rb") as f:
@@ -56,7 +52,7 @@ def count_last_24h(path: Path) -> int:
                 continue
             dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             if (now - dt).total_seconds() < 86400:
                 count += 1
         except (json.JSONDecodeError, ValueError):
@@ -88,12 +84,12 @@ def last_age_hours(path: Path) -> float:
                 continue
             last_ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             if last_ts.tzinfo is None:
-                last_ts = last_ts.replace(tzinfo=timezone.utc)
+                last_ts = last_ts.replace(tzinfo=UTC)
         except (json.JSONDecodeError, ValueError):
             continue
     if last_ts is None:
         return float("inf")
-    age = (datetime.now(timezone.utc) - last_ts).total_seconds() / 3600
+    age = (datetime.now(UTC) - last_ts).total_seconds() / 3600
     print(f"{age:.2f}")
     return age
 
@@ -102,9 +98,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="runtime.kei_probe")
     parser.add_argument("--count-24h", action="store_true", help="数 24h 内事件数")
     parser.add_argument("--last-age-hours", action="store_true", help="最新事件龄(h)")
-    parser.add_argument(
-        "--path", type=Path, default=DEFAULT_PATH, help="kei_audit.jsonl 路径"
-    )
+    parser.add_argument("--path", type=Path, default=DEFAULT_PATH, help="kei_audit.jsonl 路径")
     args = parser.parse_args()
 
     if args.count_24h:

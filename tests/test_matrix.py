@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+
 from runtime.matrix import _expand_env, load_matrix
 
 
@@ -17,10 +18,7 @@ def test_expand_env_missing():
     """$NONEXISTENT_VAR should remain as-is if not in env."""
     result = _expand_env("/path/$NONEXISTENT_VAR_XYZ123")
     # If var not set, the literal string stays
-    assert (
-        "NONEXISTENT_VAR_XYZ123" not in result
-        or result == "/path/$NONEXISTENT_VAR_XYZ123"
-    )
+    assert "NONEXISTENT_VAR_XYZ123" not in result or result == "/path/$NONEXISTENT_VAR_XYZ123"
 
 
 def test_expand_env_null():
@@ -49,5 +47,5 @@ runtime_matrix:
     assert svc.name == "test-svc"
     assert svc.type == "daemon"
     assert svc.port == 9999
-    assert svc.deploy_path.endswith("/test")  # type: ignore[reportOptionalMemberAccess]
-    assert "$HOME" not in svc.deploy_path  # type: ignore[reportOperatorIssue]
+    assert svc.deploy_path.endswith("/test")
+    assert "$HOME" not in svc.deploy_path

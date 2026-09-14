@@ -55,10 +55,7 @@ def _is_exempt(path: Path) -> bool:
 
 def _has_forbidden_prefix(value: str) -> bool:
     """Check whether a string literal starts with a forbidden path prefix."""
-    return any(
-        value.startswith(p) or ("/" + p) in value or ("\\" + p) in value
-        for p in FORBIDDEN_PREFIXES
-    )
+    return any(value.startswith(p) or ("/" + p) in value or ("\\" + p) in value for p in FORBIDDEN_PREFIXES)
 
 
 class _GatekeeperVisitor(ast.NodeVisitor):
@@ -76,15 +73,11 @@ class _GatekeeperVisitor(ast.NodeVisitor):
         """If the call's positional arg[arg_index] is a forbidden string literal, record."""
         if isinstance(node, ast.Call) and node.args:
             arg = node.args[arg_index]
-            if (
-                isinstance(arg, ast.Constant)
-                and isinstance(arg.value, str)
-                and _has_forbidden_prefix(arg.value)
-            ):
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and _has_forbidden_prefix(arg.value):
                 self._add(arg, f"forbidden path in call arg: {arg.value!r}")
 
     # ── open(...) ──────────────────────────────────────────────
-    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+    def visit_Call(self, node: ast.Call) -> None:
         func = node.func
 
         # open(".omo/...", ...)
@@ -111,15 +104,14 @@ class _GatekeeperVisitor(ast.NodeVisitor):
             self._check_call_arg(node, 0)
 
         # .read_text(), .write_text(), .read_bytes(), .write_bytes()
-        if isinstance(func, ast.Attribute) and func.attr in IO_FUNCTION_NAMES:
+        if isinstance(func, ast.Attribute) and func.attr in IO_FUNCTION_NAMES and isinstance(func.value, ast.Call):
             # If called on a forbidden Path literal: Path(".omo/...").read_text()
-            if isinstance(func.value, ast.Call):
-                self.visit_Call(func.value)
+            self.visit_Call(func.value)
 
         self.generic_visit(node)
 
     # ── with open(".omo/...") as f: ─────────────────────────────
-    def visit_With(self, node: ast.With) -> None:  # noqa: N802
+    def visit_With(self, node: ast.With) -> None:
         for item in node.items:
             ctx_expr = item.context_expr
             if isinstance(ctx_expr, ast.Call):
@@ -127,17 +119,19 @@ class _GatekeeperVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     # ── Assign to a path-like name using forbidden literal ──────
-    def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
+    def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
-            if isinstance(target, ast.Name) and "path" in target.id.lower():
-                if isinstance(node.value, ast.Constant) and isinstance(
-                    node.value.value, str
-                ):
-                    if _has_forbidden_prefix(node.value.value):
-                        self._add(
-                            node.value,
-                            f"forbidden path assigned to {target.id}: {node.value.value!r}",
-                        )
+            if (
+                isinstance(target, ast.Name)
+                and "path" in target.id.lower()
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and _has_forbidden_prefix(node.value.value)
+            ):
+                self._add(
+                    node.value,
+                    f"forbidden path assigned to {target.id}: {node.value.value!r}",
+                )
         self.generic_visit(node)
 
 
@@ -164,6 +158,7 @@ def _git_diff_files() -> list[Path]:
         ["git", "diff", "--name-only", "--diff-filter=ACM", "HEAD"],
         capture_output=True,
         text=True,
+        check=False,
     )
     paths = []
     for line in result.stdout.strip().splitlines():
@@ -176,9 +171,7 @@ def _git_diff_files() -> list[Path]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="OMO Contract Gatekeeper")
     parser.add_argument("paths", nargs="*", help="Files or directories to check")
-    parser.add_argument(
-        "--diff", action="store_true", help="Only check Python files in git diff"
-    )
+    parser.add_argument("--diff", action="store_true", help="Only check Python files in git diff")
     args = parser.parse_args(argv)
 
     if args.diff:

@@ -114,9 +114,7 @@ class TestIsDue:
 
     def test_none_last_run_is_due(self):
         """schedule 非空 + last_run None → True."""
-        assert (
-            _is_due("job-1", "every 5 min", None, created_at=datetime.now(UTC)) is True
-        )
+        assert _is_due("job-1", "every 5 min", None, created_at=datetime.now(UTC)) is True
 
     def test_every_overdue(self):
         """every 5m, last_run 10m 前 → 到期."""

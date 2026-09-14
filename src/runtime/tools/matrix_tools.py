@@ -81,8 +81,6 @@ TOOLS = [
             },
             "required": ["name", "action"],
         },
-        "handler": lambda args: _run_script(
-            "service-ctl.sh", args["name"], args["action"]
-        ),
+        "handler": lambda args: _run_script("service-ctl.sh", args["name"], args["action"]),
     },
 ]

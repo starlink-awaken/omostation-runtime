@@ -23,8 +23,8 @@ from runtime.cron_service.classify import (  # type: ignore[import-not-found]
 
 __version__ = "1.0.0"
 
-_builtins.classify_tasks = classify_tasks  # type: ignore[reportAttributeAccessIssue]
-_builtins.sort_by_priority = sort_by_priority  # type: ignore[reportAttributeAccessIssue]
+_builtins.classify_tasks = classify_tasks
+_builtins.sort_by_priority = sort_by_priority
 
 __all__ = (
     "__version__",

@@ -136,9 +136,7 @@ class AgentRunner:
         best: AgentDefinition | None = None
         best_score = -1
         for definition in self._definitions.values():
-            score = sum(
-                1 for c in required_capabilities if c in definition.capabilities
-            )
+            score = sum(1 for c in required_capabilities if c in definition.capabilities)
             if score > best_score:
                 best_score = score
                 best = definition
@@ -259,9 +257,7 @@ class AgentRunner:
     ) -> dict[str, Any]:
         """Execute agent via LLM API (requires external LLM client)."""
         self._build_prompt(definition, task, context)
-        msg = (
-            f"LLM client set but real integration not implemented for {definition.name}"
-        )
+        msg = f"LLM client set but real integration not implemented for {definition.name}"
         raise NotImplementedError(msg)
 
     @staticmethod
@@ -336,11 +332,7 @@ class AgentPool:
         if complexity == ComplexityLevel.SIMPLE:
             return [a for a in all_agents if a.layer in (AgentLayer.L3, AgentLayer.L4)]
         if complexity == ComplexityLevel.STANDARD:
-            return [
-                a
-                for a in all_agents
-                if a.layer in (AgentLayer.L2, AgentLayer.L3, AgentLayer.L4)
-            ]
+            return [a for a in all_agents if a.layer in (AgentLayer.L2, AgentLayer.L3, AgentLayer.L4)]
         return all_agents
 
     # -- Capability matching -------------------------------------------------

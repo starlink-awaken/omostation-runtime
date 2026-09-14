@@ -17,6 +17,7 @@ import os
 import random
 import string
 from dataclasses import dataclass
+from datetime import timezone
 from pathlib import Path
 
 import httpx
@@ -60,7 +61,7 @@ def _output_path(job_name: str) -> Path:
 
 
 def _timestamp() -> str:
-    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%d_%H%M%S")
 
 
 def _random_wechat_uin() -> str:
@@ -136,9 +137,7 @@ def _send_weixin(text: str, target: str) -> str | None:
 # ── Delivery ───────────────────────────────────────────────────────
 
 
-def deliver(
-    job_name: str, content: str, target: str, job_id: str | None = None
-) -> str | None:
+def deliver(job_name: str, content: str, target: str, job_id: str | None = None) -> str | None:
     """Deliver job output. Returns error string or None on success.
 
     Args:

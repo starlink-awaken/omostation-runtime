@@ -85,9 +85,7 @@ BUILTIN_SKILLS: list[SkillConfig] = [
         ),
         inputs=[
             SkillInputSchema(name="code", description="Source code to review"),
-            SkillInputSchema(
-                name="language", description="Programming language", required=False
-            ),
+            SkillInputSchema(name="language", description="Programming language", required=False),
         ],
         agent_template="Review the following {{language}} code:\n```{{language}}\n{{code}}\n```",
     ),
@@ -103,9 +101,7 @@ BUILTIN_SKILLS: list[SkillConfig] = [
         ),
         inputs=[
             SkillInputSchema(name="code", description="Source code"),
-            SkillInputSchema(
-                name="language", description="Programming language", required=False
-            ),
+            SkillInputSchema(name="language", description="Programming language", required=False),
         ],
         token_budget=8000,
         agent_template="Generate unit tests for:\n```{{language}}\n{{code}}\n```",
@@ -122,9 +118,7 @@ BUILTIN_SKILLS: list[SkillConfig] = [
         ),
         inputs=[
             SkillInputSchema(name="content", description="Content to document"),
-            SkillInputSchema(
-                name="format", description="Output format", required=False
-            ),
+            SkillInputSchema(name="format", description="Output format", required=False),
         ],
         agent_template="Generate documentation in {{format}} format for:\n{{content}}",
     ),
@@ -157,9 +151,7 @@ class SkillRegistry:
     """Manages skill registration, querying, and versioning."""
 
     def __init__(self) -> None:
-        self._skills: dict[
-            str, dict[str, SkillConfig]
-        ] = {}  # skill_id -> version_str -> config
+        self._skills: dict[str, dict[str, SkillConfig]] = {}  # skill_id -> version_str -> config
         for s in BUILTIN_SKILLS:
             self.register(s)
 
@@ -195,11 +187,7 @@ class SkillRegistry:
         return skill_id in self._skills
 
     def list(self) -> list[SkillConfig]:
-        return [
-            self._latest(v)
-            for v in self._skills.values()
-            if self._latest(v) is not None
-        ]  # type: ignore[misc]
+        return [self._latest(v) for v in self._skills.values() if self._latest(v) is not None]  # type: ignore[misc]
 
     def search(self, query: str) -> list[SkillConfig]:  # type: ignore[valid-type]
         q = query.lower()
@@ -285,9 +273,7 @@ class SkillExecutor:
         self._executions[exec_id] = result
         return result
 
-    async def execute_batch(
-        self, requests: list[SkillExecutionRequest]
-    ) -> list[SkillExecutionResult]:
+    async def execute_batch(self, requests: list[SkillExecutionRequest]) -> list[SkillExecutionResult]:
         results: list[SkillExecutionResult] = []
         for req in requests:
             results.append(await self.execute(req))
@@ -304,9 +290,7 @@ class SkillExecutor:
 
     # -- Internal ------------------------------------------------------------
 
-    def _validate_inputs(
-        self, config: SkillConfig, inputs: dict[str, Any]
-    ) -> tuple[bool, str]:
+    def _validate_inputs(self, config: SkillConfig, inputs: dict[str, Any]) -> tuple[bool, str]:
         for inp in config.inputs:
             if inp.required and inp.name not in inputs:
                 return False, f"Required input '{inp.name}' missing"
