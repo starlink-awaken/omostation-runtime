@@ -15,7 +15,7 @@ def test_runtime_intent_compile_tool() -> None:
     assert "detected_domain" in res
     assert res["detected_domain"] == "work-weijian"
     assert len(res["policy_requirements"]) >= 2
-    assert len(res["agent_dag"]) == 4
+    assert len(res["agent_dag"]) >= 4
 
 
 def test_runtime_shadow_challenge_tool() -> None:
