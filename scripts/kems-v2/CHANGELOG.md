@@ -1,12 +1,12 @@
 ---
 type: ssot
 owner: governance-team
-last_updated: 2026-09-03
+last_updated: 2026-09-18
 ---
 
 # kems-v2 CHANGELOG
 
-## v2.2.0 (2026-08-30, D-8 重建)
+## v2.2.0 (2026-08-30, D-8 重建; 2026-09-18 完成)
 
 - **重建语义**：v2.1.1 随 #2596 搬迁后包丢失，9/12 脚本字节级永久丢失（principal 决定放弃 iCloud 追查）。
   v2.2.0 是新版本语义的重建，非字节恢复。
@@ -17,5 +17,11 @@ last_updated: 2026-09-03
 - **重写清单（9 个，按 CHANGELOG v2.1.1 蓝本，随真实需求逐个推进）**：
   check-critical-path / check-model-conformance / check-ontology-consistency /
   check-ssot-sync / graph-query / kems-init / kems-snapshot / model-ask / refresh-indexes
+- **完成状态（2026-09-18）**：上述 9 个脚本完成 Workspace 语义重建；
+  `kems-init` 生成的 facts 索引显式声明 `per_file`，避免空域自检误报；
+  `graph-query` 移除某一具体域的 223/36 硬编码规模；
+  `kems-cross-check` 改为显式 `--domains`，移除 Documents 默认域与 symlink 要求。
+- **验收**：`tests/test_kems_v2_rebuild.py` 用四个临时 Workspace 域执行
+  init、check、snapshot、query 和 cross-check 语义测试，全程零 Documents 依赖。
 - **设计变更**：不再使用 Documents 四域 symlink 单点（事故根因）；以 --root 参数化
   （kems-toolkit 模式），SSOT git 托管，消费者走 Workspace owner 命令。

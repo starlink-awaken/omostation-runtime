@@ -1,120 +1,113 @@
 #!/usr/bin/env python3
-"""KEMS 跨域巡检 — kems-cross-check.py
-检查所有已落地域的工具链完整性、本体结构、版本一致性。
-闭环「@公共 单点维护」：确保四域软链指向同一版本，无漂移。
-用法：
-  python3 kems-cross-check.py --domains 卫健委,国转中心,规自委,@家庭生活
-  python3 kems-cross-check.py --domains ~/Documents/@工作文档/卫健委,...   # 或绝对路径
+"""Cross-domain KEMS integrity checker.
+
+The v2.1.1 tool assumed four hard-coded external roots and required symlinked
+tool copies.  v2.2.0 removes that accident-prone coupling: callers pass one or
+more workspace-owned domain roots, and this checker validates each domain's
+ontology and declared counts directly.
+
+Usage:
+  python3 kems-cross-check.py --domains /path/a,/path/b
 """
+from __future__ import annotations
+
 import argparse
-import hashlib
-import os
 import sys
 from pathlib import Path
 
 import yaml
 
-KEMS_V2 = Path(__file__).resolve().parent  # @公共/kems-v2
-TOOLS = ["check-ssot-sync.py", "check-ontology-consistency.py", "check-model-conformance.py",
-         "refresh-indexes.py", "kems-snapshot.py", "model-ask.py", "gen-report-view.py",
-         "graph-query.py", "kems-toolkit.py", "kems-init.py", "check-critical-path.py"]
+ONTOLOGY_FILES = (
+    "metamodel.yaml",
+    "classes.yaml",
+    "relations.yaml",
+    "layers.yaml",
+    "instances.yaml",
+    "gaps.yaml",
+    "aliases.yaml",
+    "associations.yaml",
+    "constraints.yaml",
+)
 
-DEFAULT_DOMAINS = {
-    "卫健委": "/Users/xiamingxing/Documents/@工作文档/卫健委",
-    "国转中心": "/Users/xiamingxing/Documents/@工作文档/国转中心",
-    "规自委": "/Users/xiamingxing/Documents/@工作文档/规自委",
-    "@家庭生活": "/Users/xiamingxing/Documents/@家庭生活",
-}
 
-
-def check_domain(name: str, root: Path) -> tuple[int, list[str]]:
-    issues = []
-    n_ok = 0
-    if not root.exists():
-        return 0, [f"❌ {name}: 目录不存在 {root}"]
-    rt = root / "_runtime"
-    if not rt.exists():
-        return 0, [f"❌ {name}: 无 _runtime"]
-
-    # 1. 工具链软链完整性
-    for t in TOOLS:
-        p = rt / t
-        if p.is_symlink():
-            target = Path(os.readlink(p))
-            if str(target).startswith("/Users") and "kems-v2" in str(target):
-                n_ok += 1
-            else:
-                issues.append(f"⚠️ {name}: {t} 软链目标异常 → {target}")
-        elif p.exists():
-            issues.append(f"❌ {name}: {t} 是本地副本（应软链 @公共）")
-        else:
-            issues.append(f"❌ {name}: {t} 缺失")
-
-    # 2. 本体结构
-    ont = root / "_entities/ontology"
-    for f in ["metamodel.yaml", "classes.yaml", "relations.yaml", "layers.yaml",
-              "instances.yaml", "gaps.yaml", "aliases.yaml", "associations.yaml", "constraints.yaml"]:
-        if (ont / f).exists():
-            n_ok += 1
-        else:
-            issues.append(f"❌ {name}: ontology/{f} 缺失")
-
-    # 3. 实例/边/缺口计数一致性
+def _load_yaml(path: Path) -> tuple[dict, str | None]:
     try:
-        inst = yaml.safe_load(open(ont / "instances.yaml", encoding="utf-8"))
-        if len(inst.get("instances", [])) != inst.get("total_instances", -1):
-            issues.append(f"⚠️ {name}: instances total({inst.get('total_instances')}) ≠ 实际({len(inst.get('instances', []))})")
-        edges = yaml.safe_load(open(ont / "associations.yaml", encoding="utf-8"))
-        if len(edges.get("edges", [])) != edges.get("total_edges", -1):
-            issues.append(f"⚠️ {name}: edges total({edges.get('total_edges')}) ≠ 实际({len(edges.get('edges', []))})")
-        n_ok += 2
-    except Exception as ex:
-        issues.append(f"❌ {name}: 本体解析异常 {ex}")
-
-    # 4. 模型层
-    models_dir = root / "_entities/models"
-    n_models = len(list(models_dir.glob("*.md"))) if models_dir.exists() else 0
-    if n_models == 0:
-        issues.append(f"⚠️ {name}: 无 M1 模型")
-    n_ok += 1
-
-    return n_ok, issues
+        with path.open(encoding="utf-8") as handle:
+            value = yaml.safe_load(handle) or {}
+    except FileNotFoundError:
+        return {}, f"missing file: {path}"
+    except yaml.YAMLError as exc:
+        return {}, f"invalid YAML in {path}: {exc}"
+    if not isinstance(value, dict):
+        return {}, f"YAML mapping expected in {path}"
+    return value, None
 
 
-def main():
-    ap = argparse.ArgumentParser(description="KEMS 跨域巡检")
-    ap.add_argument("--domains", help="逗号分隔的域名或路径")
-    a = ap.parse_args()
-    domains = {}
-    if a.domains:
-        for d in a.domains.split(","):
-            d = d.strip()
-            if "/" in d:
-                domains[Path(d).name] = Path(d)
-            else:
-                domains[d] = Path(DEFAULT_DOMAINS[d])
-    else:
-        domains = {n: Path(p) for n, p in DEFAULT_DOMAINS.items()}
+def check_domain(name: str, root: Path) -> tuple[bool, list[str]]:
+    """Return (passing, issues); warnings are reported separately from failures."""
+    failures: list[str] = []
+    warnings: list[str] = []
+    if not root.is_dir():
+        return False, [f"{name}: domain root does not exist ({root})"]
 
-    print("=" * 66)
-    print("KEMS 跨域巡检 — 工具链/本体/版本一致性")
-    print(f"@公共/kems-v2: {KEMS_V2}")
-    ver = (KEMS_V2 / "VERSION").read_text(encoding="utf-8") if (KEMS_V2 / "VERSION").exists() else "?"
-    print(f"工具链版本: {ver.strip()}")
-    print("=" * 66)
+    ontology = root / "_entities" / "ontology"
+    values: dict[str, dict] = {}
+    for filename in ONTOLOGY_FILES:
+        value, error = _load_yaml(ontology / filename)
+        if error:
+            failures.append(f"{name}: {error}")
+        values[filename] = value
+
+    instances = values["instances.yaml"].get("instances", []) or []
+    edges = values["associations.yaml"].get("edges", []) or []
+    if values["instances.yaml"].get("total_instances", len(instances)) != len(instances):
+        failures.append(f"{name}: instances total does not match instances length")
+    if values["associations.yaml"].get("total_edges", len(edges)) != len(edges):
+        failures.append(f"{name}: edges total does not match edges length")
+
+    known_classes = {item.get("id") for item in values["classes.yaml"].get("classes", []) or []}
+    known_relations = {item.get("id") for item in values["relations.yaml"].get("relations", []) or []}
+    known_instances = {item.get("id") for item in instances if item.get("id")}
+    for item in instances:
+        if item.get("class") not in known_classes:
+            failures.append(f"{name}: instance {item.get('id', '?')} references unknown class {item.get('class', '?')}")
+    for edge in edges:
+        if edge.get("source") not in known_instances:
+            failures.append(f"{name}: edge {edge.get('id', '?')} references unknown source {edge.get('source', '?')}")
+        if edge.get("target") not in known_instances:
+            failures.append(f"{name}: edge {edge.get('id', '?')} references unknown target {edge.get('target', '?')}")
+        if edge.get("relation") not in known_relations:
+            failures.append(f"{name}: edge {edge.get('id', '?')} references unknown relation {edge.get('relation', '?')}")
+
+    if not list((root / "_entities" / "models").glob("*.md")):
+        warnings.append(f"{name}: no M1 models yet")
+    if failures:
+        return False, failures + [f"{name}: warning {issue}" for issue in warnings]
+    return True, warnings
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Cross-domain KEMS workspace integrity check")
+    parser.add_argument(
+        "--domains",
+        required=True,
+        help="comma-separated workspace-owned domain roots; external defaults are intentionally not provided",
+    )
+    args = parser.parse_args()
 
     all_ok = True
-    for name, path in domains.items():
-        n_ok, issues = check_domain(name, path)
-        status = "✅" if not issues else ("⚠️" if all("⚠️" in i for i in issues) else "❌")
-        print(f"\n{status} {name}（{path}）· 检查通过 {n_ok}/{len(TOOLS)+10}")
-        for i in issues:
-            print(f"  {i}")
-        if issues:
-            all_ok = False
-
-    print("\n" + "=" * 66)
-    print("✅ 跨域巡检完成：四域工具链/本体一致" if all_ok else "❌ 存在需修复项")
+    for raw in args.domains.split(","):
+        root = Path(raw.strip()).expanduser().resolve()
+        ok, issues = check_domain(root.name or str(root), root)
+        failures = [issue for issue in issues if not issue.startswith("warning ")]
+        warnings = [issue for issue in issues if issue.startswith("warning ")]
+        state = "PASS" if not failures else "FAIL"
+        print(f"{state} {root.name or root}")
+        for issue in failures:
+            print(f"  ERROR {issue}")
+        for issue in warnings:
+            print(f"  WARN  {issue}")
+        all_ok = all_ok and ok
     return 0 if all_ok else 1
 
 
