@@ -6,9 +6,10 @@
 - 风险：gaps.yaml open/in_progress
 - 建议：节点 + 缺口派生
 用法：
-  python3 _runtime/gen-report-view.py                # 输出 _control/汇报一屏看-YYYYMMDD.md
-  python3 _runtime/gen-report-view.py --stdout       # 直接打印
+  python3 gen-report-view.py --root <域根>                # 输出 _control/汇报一屏看-YYYYMMDD.md
+  python3 gen-report-view.py --root <域根> --stdout       # 直接打印
 """
+import argparse
 import datetime
 import re
 import sys
@@ -16,12 +17,11 @@ from pathlib import Path
 
 import yaml
 
-BASE = Path(__file__).parent.parent
 TODAY = datetime.date.today()
 
 
-def load_yaml(rel: str):
-    with open(BASE / rel, encoding="utf-8") as f:
+def load_yaml(domain: Path, rel: str):
+    with open(domain / rel, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -33,10 +33,10 @@ def days_left(date_str: str) -> int:
         return -1
 
 
-def load_projects() -> list[dict]:
+def load_projects(domain: Path) -> list[dict]:
     """从 instances.yaml 读取 C3 活跃项目；note 中解析预算（如 300.06万）。"""
     try:
-        inst = load_yaml("_entities/ontology/instances.yaml")["instances"]
+        inst = load_yaml(domain, "_entities/ontology/instances.yaml")["instances"]
     except Exception:
         return []
     projects = []
@@ -54,13 +54,13 @@ def load_projects() -> list[dict]:
     return projects
 
 
-def build_report() -> str:
+def build_report(domain: Path) -> str:
     now = TODAY.strftime("%Y-%m-%d")
     L = [f"# 🎯 一屏看（{now}）", "",
          "> 生成：模型驱动（instances + key-milestones + gaps）· 跨域通用"]
 
     # 一、项目态势（读实例）
-    projects = load_projects()
+    projects = load_projects(domain)
     L.append("\n## 一、项目态势（C3 活跃实例）\n")
     if projects:
         L.append("| 项目 | 预算(万) | 备注 |")
@@ -78,7 +78,7 @@ def build_report() -> str:
     # 二、关键节点
     L.append("## 二、关键节点（倒计时）\n")
     try:
-        ms = load_yaml("_control/key-milestones.yaml")["milestones"]
+        ms = load_yaml(domain, "_control/key-milestones.yaml")["milestones"]
     except Exception:
         ms = []
     if ms:
@@ -93,7 +93,7 @@ def build_report() -> str:
     # 三、风险
     L.append("\n## 三、风险与阻塞\n")
     try:
-        gaps = load_yaml("_entities/ontology/gaps.yaml")["gaps"]
+        gaps = load_yaml(domain, "_entities/ontology/gaps.yaml")["gaps"]
     except Exception:
         gaps = []
     open_gaps = [g for g in gaps if g["status"] == "open"]
@@ -121,14 +121,25 @@ def build_report() -> str:
 
 
 def main() -> int:
-    report = build_report()
-    if "--stdout" in sys.argv:
+    ap = argparse.ArgumentParser(description="Model-driven KEMS report view")
+    ap.add_argument("--root", required=True, help="域根绝对路径")
+    ap.add_argument("--stdout", action="store_true", help="打印报告而不写文件")
+    args = ap.parse_args()
+    domain = Path(args.root).expanduser().resolve()
+    if not domain.is_dir():
+        print(f"❌ 域根不存在: {domain}")
+        return 1
+
+    report = build_report(domain)
+    if args.stdout:
         print(report)
         return 0
-    out = BASE / "_control" / f"汇报一屏看-{TODAY.strftime('%Y%m%d')}.md"
+    out = domain / "_control" / f"汇报一屏看-{TODAY.strftime('%Y%m%d')}.md"
     out.write_text(report, encoding="utf-8")
     print(f"[OK] 已生成: {out}")
-    print(f"      项目 {len(load_projects())} 个 · 节点 {len(load_yaml('_control/key-milestones.yaml')['milestones'])} 个")
+    projects = load_projects(domain)
+    milestones = load_yaml(domain, "_control/key-milestones.yaml")["milestones"]
+    print(f"      项目 {len(projects)} 个 · 节点 {len(milestones)} 个")
     return 0
 
 

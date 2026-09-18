@@ -7,8 +7,8 @@ kems-toolkit.py — KEMS 域工具集（统一版）
   --mode health  健康度巡检（老化知识 / inbox 滞留 / 待分类 / 信号统计）
 
 用法：
-  python3 kems-toolkit.py --root ~/Documents/@工作文档/卫健委
-  python3 kems-toolkit.py --root ~/Documents/@工作文档/卫健委 --mode health
+  python3 kems-toolkit.py --root /path/to/domain
+  python3 kems-toolkit.py --root /path/to/domain --mode health
   python3 kems-toolkit.py --root <域根> --mode check --dry-run   # 只读不写状态
 """
 
@@ -57,7 +57,7 @@ def run_check(domain, state_file, extra_inbox=None):
         "entities": domain / "_entities" / "entities",
         "control": domain / "_control",
     }
-    # 前店后厂缓冲区（~/Documents/_inbox）——经 --inbox-extra 传入，不硬编码
+    # 额外缓冲区目录必须经 --inbox-extra 显式传入，不使用任何默认跨域路径。
     if extra_inbox:
         ep = Path(extra_inbox).expanduser()
         if ep.is_dir():
@@ -199,9 +199,9 @@ def run_health(domain):
 def main():
     global DRY_RUN
     ap = argparse.ArgumentParser(description="KEMS 域工具集（统一版）")
-    ap.add_argument("--root", required=True, help="域根绝对路径（如 ~/Documents/@工作文档/卫健委）")
+    ap.add_argument("--root", required=True, help="域根绝对路径")
     ap.add_argument("--mode", choices=["check", "health"], default="check")
-    ap.add_argument("--inbox-extra", default=None, help="额外检查的缓冲区目录（如 ~/Documents/_inbox）")
+    ap.add_argument("--inbox-extra", default=None, help="额外检查的缓冲区目录")
     ap.add_argument("--dry-run", action="store_true", help="只读模式，不写状态文件")
     args = ap.parse_args()
 
