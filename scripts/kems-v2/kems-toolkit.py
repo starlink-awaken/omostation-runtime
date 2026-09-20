@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -48,14 +49,73 @@ def _banner(title, domain):
     print("=" * 60)
 
 
-# ── mode: check — 强制更新检查 ──
+# ── W2 覆盖面修复（2026-09-20）：递归 + 不丢点文件 + 纳入盲区目录 + 哈希口径可选 ──
+# 契约：检测面必须覆盖全部声明面与事实面；凡排除项必须显式列出且可解释。
+# 修掉的四个缺陷（域内登记见 _control/.kems_check_list.md 缺陷 3/4/5）：
+#   ① os.listdir 非递归            → 原仅覆盖 4 目录顶层（实测 43/6256 = 0.7%）
+#   ② f.startswith(".") 丢弃点文件  → 连"该怎么闭环"的规程件自身都不受检
+#   ③ 盲区目录未纳入               → .kems/ 与 _entities/{ontology,models,facts}
+#   ④ 只比名+mtime、不比内容        → 改内容而不动 mtime 的编辑不可见（由 content 口径覆盖）
+EXCLUDE_NAMES = {".DS_Store", ".vm-test"}
+BASELINE_NAME = ".kems_check_state.json"
+CONTENT_HASH_MAX_BYTES = 2 * 1024 * 1024  # content 口径下超此体积退化为 大小+mtime
+
+# 哈希口径（由 --hash-mode 设置）：
+#   meta    递归 (相对路径, 大小, mtime_ns)   —— 6260 文件约 0.20s，pre-commit 用
+#   content 递归 (相对路径, 内容 sha256)      —— 6260 文件约 15.7s，定期/CI 深检用
+# 注意：切换口径后首次运行，所有目录都会报"发生变化"（算法变了），属预期。
+HASH_MODE = "meta"
+
+
+def _scan(root):
+    """返回 (待哈希文件列表, 被排除文件数)。排除项见 EXCLUDE_NAMES / BASELINE_NAME。
+    注：**不要**用 fp.resolve() 逐文件比对——那是每文件一次 syscall，
+    实测把 6260 文件的耗时从 ~0.2s 抬到 ~1.6s（8 倍）；基线按名排除已足够。"""
+    kept, excluded = [], 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d != ".git")
+        for fn in sorted(filenames):
+            if fn in EXCLUDE_NAMES or fn == BASELINE_NAME:
+                excluded += 1
+                continue
+            kept.append(Path(dirpath) / fn)
+    return kept, excluded
+
+
+def _hash_tree(root):
+    """递归哈希；返回 (8 位摘要, 进面文件数, 被排除文件数)。进面数即该目录的检测面。"""
+    h = hashlib.sha256()
+    n = 0
+    files, excluded = _scan(root)
+    for fp in files:
+        try:
+            st = fp.stat()
+        except OSError:
+            continue
+        h.update(str(fp.relative_to(root)).encode())
+        if HASH_MODE == "content" and st.st_size <= CONTENT_HASH_MAX_BYTES:
+            try:
+                h.update(hashlib.sha256(fp.read_bytes()).digest())
+            except OSError:
+                h.update(f"{st.st_size}:{st.st_mtime_ns}".encode())
+        else:
+            h.update(f"{st.st_size}:{st.st_mtime_ns}".encode())
+        n += 1
+    return h.hexdigest()[:8], n, excluded
+
+
 def run_check(domain, state_file, extra_inbox=None):
     inbox = find_inbox(domain)
     paths = {
         "inbox": inbox,
         "knowledge": domain / "_knowledge",
         "entities": domain / "_entities" / "entities",
+        # W2：以下为原盲区目录，现纳入检测面
+        "ontology": domain / "_entities" / "ontology",
+        "models": domain / "_entities" / "models",
+        "facts": domain / "_entities" / "facts",
         "control": domain / "_control",
+        "kems": domain / ".kems",
     }
     # 额外缓冲区目录必须经 --inbox-extra 显式传入，不使用任何默认跨域路径。
     if extra_inbox:
@@ -64,21 +124,20 @@ def run_check(domain, state_file, extra_inbox=None):
             paths["buff_inbox"] = ep
 
     hashes = {}
+    coverage = {}
+    excluded = {}
     for name, path in paths.items():
         if path.is_dir():
             try:
-                files = sorted(f for f in os.listdir(path) if not f.startswith("."))
-                h = hashlib.md5()
-                for f in files:
-                    fp = path / f
-                    if fp.is_file():
-                        h.update(f.encode())
-                        h.update(str(fp.stat().st_mtime).encode())
-                hashes[name] = h.hexdigest()[:8]
+                hashes[name], coverage[name], excluded[name] = _hash_tree(path)
             except OSError:
                 hashes[name] = "error"
+                coverage[name] = 0
+                excluded[name] = 0
         else:
             hashes[name] = "not_found"
+            coverage[name] = 0
+            excluded[name] = 0
 
     saved = {}
     if state_file.is_file():
@@ -99,6 +158,11 @@ def run_check(domain, state_file, extra_inbox=None):
         changes.append(f"⚠️ inbox-manifest 有 {pending} 条待分类")
 
     _banner("🔍 KEMS 强制更新检查", domain)
+    covered = {k: v for k, v in coverage.items() if v > 0}
+    excl = {k: v for k, v in excluded.items() if v > 0}
+    print(f"\n📐 本次检测面：{sum(covered.values())} 个文件 / {len(covered)} 个目录（递归·{HASH_MODE} 口径）")
+    print(f"   分目录：{covered}")
+    print(f"   显式排除：{sum(excl.values())} 个（{'/'.join(sorted(EXCLUDE_NAMES))} + 基线自身）{excl}")
     if not changes and saved.get("last_check"):
         print("\n✅ 系统状态正常，无需更新")
         print(f"   上次检查: {saved['last_check']}")
@@ -155,9 +219,40 @@ def run_health(domain):
 
     signals_file = domain / "_control" / "signals.md"
     signal_count = 0
+    signals_note = ""
     if signals_file.is_file():
+        # F12 修复（2026-09-20）：原以子串计数冒充条目计数
+        #   content.count("signal-") + content.count("- message:")
+        # 实测分解（卫健委域 2026-09-20）：全文子串 123（行首仅 116 ⇒ 正文多计 +7）
+        #   + "signal-" 全文 5（原判"死代码恒 0"已不成立——登记该缺陷的散文自己贡献了这 5 处）
+        #   = 128，而 yaml 实测真值 122 ⇒ 恒偏高 6，且随正文措辞漂移。
+        # 正解：切出 frontmatter 取 len(yaml.safe_load(fm)["signals"])。
+        # yaml 延迟导入：.kems/_scripts/kems-check 用系统 python3（已验证不依赖 PyYAML），
+        # 顶层 import 会打断启动器；无 PyYAML 时退化为"行首 '- message:' 行数"。
         content = signals_file.read_text()
-        signal_count = content.count("signal-") + content.count("- message:")
+        m = re.match(r"^---\n(.*?)\n---\n", content, re.S)
+        if not m:
+            signals_note = "（无 frontmatter，未计数）"
+        else:
+            fm = m.group(1)
+            try:
+                import yaml  # noqa: PLC0415 — 延迟导入是刻意的（见上）
+            except ImportError:
+                yaml = None
+            if yaml is not None:
+                try:
+                    sig = (yaml.safe_load(fm) or {}).get("signals")
+                    if isinstance(sig, list):
+                        signal_count = len(sig)
+                    else:
+                        signals_note = "（signals 键非列表，未计数）"
+                except Exception:
+                    signals_note = "（frontmatter 解析失败，未计数）"
+            else:
+                signal_count = sum(
+                    1 for line in fm.splitlines() if line.lstrip().startswith("- message:")
+                )
+                signals_note = "（无 PyYAML，退化为行首计数）"
 
     _banner("🔍 KEMS 知识库健康度巡检", domain)
     total = 0
@@ -185,7 +280,7 @@ def run_health(domain):
     else:
         print("\n✅ 无待分类文件")
 
-    print(f"\n📊 活跃信号：{signal_count}个")
+    print(f"\n📊 活跃信号：{signal_count}个{signals_note}")
     print("\n" + "=" * 60)
     if total == 0:
         print("✅ 知识库健康状况：良好")
@@ -197,15 +292,23 @@ def run_health(domain):
 
 
 def main():
-    global DRY_RUN
+    global DRY_RUN, HASH_MODE
     ap = argparse.ArgumentParser(description="KEMS 域工具集（统一版）")
     ap.add_argument("--root", required=True, help="域根绝对路径")
     ap.add_argument("--mode", choices=["check", "health"], default="check")
     ap.add_argument("--inbox-extra", default=None, help="额外检查的缓冲区目录")
     ap.add_argument("--dry-run", action="store_true", help="只读模式，不写状态文件")
+    ap.add_argument(
+        "--hash-mode",
+        choices=["meta", "content"],
+        default="meta",
+        help="哈希口径：meta=相对路径+大小+mtime_ns（快，适合 pre-commit）；"
+             "content=递归内容 sha256（慢，适合定期/CI 深检）",
+    )
     args = ap.parse_args()
 
     DRY_RUN = args.dry_run
+    HASH_MODE = args.hash_mode
     domain = resolve_root(args.root)
     state_file = domain / "_control" / ".kems_check_state.json"
 
