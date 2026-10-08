@@ -11,7 +11,11 @@
 
 负对照：--neg 传入无 frontmatter 文件 → 必须标记 failed（否则索引器形同虚设）。
 
-用法：kems-intake.py <文件> [--neg]
+用法：kems-intake.py <文件> [--domain <id>] [--neg]
+
+  --domain 指定域（默认 work-weijian 试点域用内置词表，保证 P3/P4 验收口径不变）；
+           其他域从 ~/.kems-pilot/domains/<id>/instances.yaml 派生挂载词表
+           （本体数据即词表源——进料索引按本域本体挂载，不手抄关键词）。
 """
 from __future__ import annotations
 
@@ -20,10 +24,12 @@ import pathlib
 import re
 import sys
 
+import yaml
+
 EVIDENCE_DIR = pathlib.Path.home() / ".kems-pilot/evidence"
 EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 
-# 本体挂载词表（对齐 kems-pilot M2：项目/环节/依据/事件）
+# 试点域内置本体挂载词表（对齐 kems-pilot M2：项目/环节/依据/事件）
 MOUNT_KEYWORDS = {
     "ProjectPilot": ["三医诊疗数据归集", "数据归集", "归集模块", "家医健康", "FAMDOC", "LIS升级", "基层信息系统升级"],
     "WorkflowStage": ["经信局审核", "财政评审", "专家论证", "申请资金", "政府采购", "申报材料", "内部决策"],
@@ -33,6 +39,26 @@ MOUNT_KEYWORDS = {
 }
 
 REQUIRED_FRONTMATTER = ["title", "date", "status", "owner"]
+
+DOMAINS_DIR = pathlib.Path.home() / ".kems-pilot/domains"
+
+
+def vocab_from_instances(dom_id: str) -> dict[str, list[str]]:
+    """非试点域：从域本体数据派生挂载词表（实例名/标题/要求/源文件名）。"""
+    inst_file = DOMAINS_DIR / dom_id / "instances.yaml"
+    vocab: dict[str, list[str]] = {}
+    if not inst_file.exists():
+        return vocab
+    data = yaml.safe_load(inst_file.read_text(encoding="utf-8"))
+    for kind, insts in (data.get("instances") or {}).items():
+        words = []
+        for i in insts:
+            for f in ("name", "title", "requirement_text", "full_name", "source"):
+                v = i.get(f)
+                if v and isinstance(v, str) and len(v) >= 2:
+                    words.append(v[:24])
+        vocab[kind] = words[:12]
+    return vocab
 
 
 def check_frontmatter(text: str) -> list[str]:
@@ -47,40 +73,49 @@ def check_frontmatter(text: str) -> list[str]:
     return missing
 
 
-def mount_candidates(name: str, text: str) -> dict[str, list[str]]:
+def mount_candidates(name: str, text: str, vocab: dict[str, list[str]]) -> dict[str, list[str]]:
     hits: dict[str, list[str]] = {}
     hay = name + "\n" + text[:4000]
-    for model, words in MOUNT_KEYWORDS.items():
-        found = [w for w in words if w in hay]
+    for model, words in vocab.items():
+        found = [w for w in words if w and w in hay]
         if found:
             hits[model] = found[:4]
     return hits
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print("用法: kems-intake.py <文件> [--neg]")
-        return 2
-    target = pathlib.Path(sys.argv[1])
-    text = target.read_text(encoding="utf-8", errors="replace")
+    args = [a for a in sys.argv[1:] if a != "--neg"]
     neg = "--neg" in sys.argv
+    domain = "work-weijian"
+    if "--domain" in args:
+        i = args.index("--domain")
+        domain = args[i + 1]
+        args = args[:i] + args[i + 2:]
+    if not args:
+        print("用法: kems-intake.py <文件> [--domain <id>] [--neg]")
+        return 2
+    target = pathlib.Path(args[0])
+    text = target.read_text(encoding="utf-8", errors="replace")
     if neg:  # 负对照：注入缺 frontmatter 的文件形态
         text = "正文内容，无元数据头\n" + text.split("---", 2)[-1]
 
+    vocab = MOUNT_KEYWORDS if domain == "work-weijian" else vocab_from_instances(domain)
     missing = check_frontmatter(text)
-    hits = mount_candidates(target.name, text)
+    hits = mount_candidates(target.name, text, vocab)
     verdict = "FAIL" if missing else "PASS"
     record = {
         "file": str(target),
         "basename": target.name,
+        "domain": domain,
+        "vocab_source": "内置词表(试点)" if domain == "work-weijian" else f"~/.kems-pilot/domains/{domain}/instances.yaml",
         "frontmatter_missing": missing,
         "mount_candidates": hits,
         "neg_control": neg,
         "verdict": verdict,
     }
-    out = EVIDENCE_DIR / f"intake-{target.stem}.json"
+    out = EVIDENCE_DIR / f"intake-{domain}-{target.stem}.json"
     out.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"verdict": verdict, "frontmatter_missing": missing,
+    print(json.dumps({"verdict": verdict, "domain": domain, "frontmatter_missing": missing,
                       "mount_candidates": hits}, ensure_ascii=False, indent=2))
     # 负对照必须 FAIL；正样本（有 frontmatter）必须 PASS
     ok = (verdict == "FAIL") if neg else (verdict == "PASS" and not missing)

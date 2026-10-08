@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sys
 
 import yaml
@@ -56,11 +57,44 @@ def probe(dom_dir: pathlib.Path) -> dict:
     return meta
 
 
+def parse_status_timeline(dom_id: str, ctrl: pathlib.Path, fname: str,
+                          seen_ids: set[str]) -> list[dict]:
+    """保守解析 STATUS.md/TIMELINE.md 的日期-标题行（表格行/列表行/纯文本行）→ Milestone。
+    仅确定性可解析行入本体；解析不出的行忽略（诚实，不编造）。"""
+    p = ctrl / fname
+    out: list[dict] = []
+    if not p.exists():
+        return out
+    text = p.read_text(encoding="utf-8", errors="replace")
+    for line in text.splitlines():
+        line = line.strip()
+        m = re.match(r"^\|?\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2})\s*\|?\s*([^|]{2,64})", line)
+        if not m:
+            m = re.match(r"^\s*[-*]\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2})\s+([^\n]{2,64})", line)
+        if not m:
+            m = re.match(r"^\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2})\s*[:：]\s*([^\n]{2,64})", line)
+        if not m:
+            continue
+        d, title = m.group(1), m.group(2).strip(" |·")
+        if "-" in d and len(d) == 10:
+            d = d[5:]  # YYYY-MM-DD → MM-DD
+        if not re.match(r"^\d{2}-\d{2}$", d) or not title:
+            continue
+        mid = f"{dom_id}-{fname.split('.')[0]}-{d.replace('-', '')}"
+        if mid in seen_ids:
+            continue
+        seen_ids.add(mid)
+        out.append({"id": mid, "date": d, "title": title[:40], "severity": "⚠️",
+                    "owner": "", "source": str(p.relative_to(ctrl.parent))})
+    return out
+
+
 def distill(dom_id: str, dom_dir: pathlib.Path) -> tuple[list, list, list]:
     """骨架提炼：Milestone / ProjectPilot / Caliber，全部标注源文件。"""
     milestones: list[dict] = []
     projects: list[dict] = []
     calibers: list[dict] = []
+    seen_ids: set[str] = set()
     ctrl = dom_dir / "_control"
     km = ctrl / "key-milestones.yaml"
     if km.exists():
@@ -76,7 +110,12 @@ def distill(dom_id: str, dom_dir: pathlib.Path) -> tuple[list, list, list]:
             if str(m.get("severity", "")).startswith("⛔"):
                 rec["blocked_reason"] = (m.get("note") or "阻塞（前置依赖）")[:60]
                 rec["impact"] = "影响域内关键路径推进"
+            seen_ids.add(rec["id"])
             milestones.append(rec)
+    # STATUS/TIMELINE 日期行补充（保守解析）
+    for fname in ("STATUS.md", "TIMELINE.md"):
+        milestones.extend(parse_status_timeline(dom_id, ctrl, fname, seen_ids))
+    milestones = milestones[:10]  # 每域里程碑上限（克制）
     cal = ctrl / "项目口径.yaml"
     if cal.exists():
         data = yaml.safe_load(cal.read_text(encoding="utf-8")) or {}
@@ -142,6 +181,7 @@ def main() -> int:
         payload = {
             "schema": "kems-pilot.instances.v1", "domain": dom_id,
             "provenance": "全域覆盖矩阵：SSOT registry 域发现 + 控制面只读探测 + 骨架蒸馏（通用 M2 校验）",
+            "_domain_meta": meta.get("domain"),
             "instances": {"Milestone": ms, "ProjectPilot": ps, "Caliber": cs},
         }
         (dom_out / "instances.yaml").write_text(

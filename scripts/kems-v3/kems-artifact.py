@@ -10,7 +10,9 @@
 负对照：--neg 缺格式要求/落点不存在 → 必须拒绝（契约失守即 FAIL）。
 
 用法：kems-artifact.py --check <交付物ID> --name <名称> --path <文件或落点> \
-       [--format-req <格式要求>] [--destination <落点目录>] [--neg]
+       [--format-req <格式要求>] [--destination <落点目录>] [--domain <id>] [--neg]
+
+  --domain 溯源标注（默认 work-weijian；跨域产物契约同样校验格式/落点/命名）。
 """
 from __future__ import annotations
 
@@ -38,6 +40,7 @@ def main() -> int:
     ap.add_argument("--path", required=True, help="产物路径或文件名")
     ap.add_argument("--format-req", default="")
     ap.add_argument("--destination", default="")
+    ap.add_argument("--domain", default="work-weijian")
     ap.add_argument("--neg", action="store_true")
     args = ap.parse_args()
 
@@ -58,9 +61,10 @@ def main() -> int:
     verdict = "REJECT" if violations else "OK"
     record = {
         "deliverable": args.check, "name": args.name, "path": args.path,
+        "domain": args.domain,
         "violations": violations, "neg_control": args.neg, "verdict": verdict,
     }
-    out = EVIDENCE_DIR / f"artifact-{args.check}.json"
+    out = EVIDENCE_DIR / f"artifact-{args.domain}-{args.check}.json"
     out.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"verdict": verdict, "violations": violations}, ensure_ascii=False, indent=2))
     # 正样本必须 OK；负对照必须 REJECT

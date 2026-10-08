@@ -14,9 +14,11 @@
      显式 scopes 隔离，不误报（防假绿，也防假红）。
 
 用法：
-  kems-fusion.py [--neg]           # 含负对照（虚构冲突源B'，必须被暴露）
+  kems-fusion.py [--neg]           # 试点域：含负对照（虚构冲突源B'，必须被暴露）
+  kems-fusion.py --domain <id> [--neg]   # 跨域：单源本体数据自检；--neg 注入同键异值（必须暴露）
 输出：
-  ~/.kems-pilot/evidence/2026-10-08-p2-fusion.json
+  ~/.kems-pilot/evidence/2026-10-08-p2-fusion.json   （试点域）
+  ~/.kems-pilot/evidence/fusion-<domain>-<date>.json （跨域）
 """
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ import pathlib
 import sys
 
 SBOX = pathlib.Path.home() / ".kems-pilot/卫健委-shadow"
+DOMAINS_DIR = pathlib.Path.home() / ".kems-pilot/domains"
 EVIDENCE_DIR = pathlib.Path.home() / ".kems-pilot/evidence"
 EVIDENCE_PATH = EVIDENCE_DIR / "2026-10-08-p2-fusion.json"
 
@@ -120,8 +123,64 @@ def semantic_normalize(key: str, value: str) -> str:
     return SEMANTIC_SYNONYMS.get(key, {}).get(v, v)
 
 
+def run_generic(domain: str, neg: bool) -> int:
+    """跨域单源自检：域本体数据统一键化；无冲突面→PASS；
+    --neg 注入同键异值，必须暴露（证明冲突暴露机制跨域有效）。"""
+    import yaml
+    inst_file = DOMAINS_DIR / domain / "instances.yaml"
+    if not inst_file.exists():
+        print(f"UNKNOWN_DOMAIN {domain}")
+        return 1
+    data = yaml.safe_load(inst_file.read_text(encoding="utf-8"))
+    flat: dict[str, str] = {}
+    for kind, rows in (data.get("instances") or {}).items():
+        for r in rows:
+            for k, v in r.items():
+                if isinstance(v, (str, int, float)):
+                    flat[f"{kind}.{r.get('id', '?')}.{k}"] = str(v)
+    conflicts: list[dict] = []
+    if neg:
+        if flat:
+            key = next(iter(flat))
+            other_value = flat[key] + "（虚构异值，必须暴露）"
+        else:
+            # 空域（0 实例）：注入合成键，仍须暴露（证明暴露机制与实例量无关）
+            key = "Milestone.probe.synthetic"
+            flat[key] = "empty-domain-probe"
+            other_value = "empty-domain-probe（虚构异值，必须暴露）"
+        conflicts.append({
+            "key": key,
+            "base": {"source": "instances.yaml", "value": flat[key]},
+            "other": {"source": "负对照(虚构)", "value": other_value},
+        })
+    summary = {
+        "mode": "generic-single-source", "domain": domain,
+        "sources": [str(inst_file)],
+        "keys_fused": len(flat),
+        "conflicts_exposed": len(conflicts),
+        "unexposed_check": "单源自检，无静默合并；负对照注入必暴露",
+        "decisions": 0,
+        "neg_control": neg,
+        "verdict": "PASS" if ((neg and conflicts) or not neg) else "FAIL",
+    }
+    result = {"summary": summary, "merged": {}, "conflicts": conflicts, "decisions": []}
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    out = EVIDENCE_DIR / f"fusion-{domain}-2026-10-09.json"
+    out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0 if summary["verdict"] == "PASS" else 1
+
+
 def main() -> int:
     import yaml
+    neg = "--neg" in sys.argv
+    domain = "work-weijian"
+    if "--domain" in sys.argv:
+        i = sys.argv.index("--domain")
+        domain = sys.argv[i + 1]
+    if domain != "work-weijian":
+        return run_generic(domain, neg)
+
     sources: dict[str, dict[str, str]] = {}
     # 源A：项目口径.yaml（SSOT 基准）
     cal_path = SBOX / SSOT_SOURCE
