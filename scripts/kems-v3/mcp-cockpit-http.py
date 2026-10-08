@@ -23,10 +23,32 @@
 """
 from __future__ import annotations
 
+import json
 import os
+import pathlib
 import uvicorn
 
 from cockpit.agent_runtime_mcp_server import mcp
+
+DOMAINS_DIR = pathlib.Path.home() / ".kems-pilot/domains"
+
+
+@mcp.tool()
+def domains_matrix() -> str:
+    """12 域覆盖矩阵（实例数/控制面/管道状态），来源 ~/.kems-pilot/domains/domains-matrix.json"""
+    p = DOMAINS_DIR / "domains-matrix.json"
+    if not p.exists():
+        return "domains-matrix.json 不存在（先运行 kems-domain-matrix.py）"
+    return json.dumps(json.loads(p.read_text(encoding="utf-8")), ensure_ascii=False)
+
+
+@mcp.tool()
+def pipeline_status() -> str:
+    """12 域四管道验收状态（intake/fusion/artifact/gate + 逾期信号），来源 domains-pipeline-status.json"""
+    p = DOMAINS_DIR / "domains-pipeline-status.json"
+    if not p.exists():
+        return "domains-pipeline-status.json 不存在（先运行 kems-pipe-accept.py）"
+    return json.dumps(json.loads(p.read_text(encoding="utf-8")), ensure_ascii=False)
 
 
 def main() -> None:

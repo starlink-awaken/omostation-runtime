@@ -31,7 +31,8 @@ REGISTRY = pathlib.Path.home() / "Documents/@公共/_control/L4-DOMAIN-REGISTRY.
 REG_BASE = REGISTRY.parent  # @公共/_control
 OUT_DIR = pathlib.Path.home() / ".kems-pilot/domains"
 
-MILESTONE_MAX = 6
+MILESTONE_MAX = 10
+MILESTONE_MAX_DEEP = 20
 CALIBER_MAX = 8
 
 
@@ -89,8 +90,9 @@ def parse_status_timeline(dom_id: str, ctrl: pathlib.Path, fname: str,
     return out
 
 
-def distill(dom_id: str, dom_dir: pathlib.Path) -> tuple[list, list, list]:
-    """骨架提炼：Milestone / ProjectPilot / Caliber，全部标注源文件。"""
+def distill(dom_id: str, dom_dir: pathlib.Path, cap: int) -> tuple[list, list, list]:
+    """骨架提炼：Milestone / ProjectPilot / Caliber，全部标注源文件。
+    cap：每域里程碑上限（骨架=10，--deep=20 全量）。"""
     milestones: list[dict] = []
     projects: list[dict] = []
     calibers: list[dict] = []
@@ -99,7 +101,7 @@ def distill(dom_id: str, dom_dir: pathlib.Path) -> tuple[list, list, list]:
     km = ctrl / "key-milestones.yaml"
     if km.exists():
         data = yaml.safe_load(km.read_text(encoding="utf-8")) or {}
-        for m in (data.get("milestones") or [])[:MILESTONE_MAX]:
+        for m in (data.get("milestones") or [])[:cap]:
             rec = {
                 "id": f"{dom_id}-{m.get('id', 'M?')}", "date": m.get("date", "01-01"),
                 "title": m.get("title", ""), "severity": str(m.get("severity", "⚠️")),
@@ -115,7 +117,7 @@ def distill(dom_id: str, dom_dir: pathlib.Path) -> tuple[list, list, list]:
     # STATUS/TIMELINE 日期行补充（保守解析）
     for fname in ("STATUS.md", "TIMELINE.md"):
         milestones.extend(parse_status_timeline(dom_id, ctrl, fname, seen_ids))
-    milestones = milestones[:10]  # 每域里程碑上限（克制）
+    milestones = milestones[:cap]  # 每域里程碑上限（克制）
     cal = ctrl / "项目口径.yaml"
     if cal.exists():
         data = yaml.safe_load(cal.read_text(encoding="utf-8")) or {}
@@ -168,13 +170,20 @@ def validate(dom_id: str, ms: list, ps: list, cs: list) -> tuple[int, int]:
 
 
 def main() -> int:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--deep", default="", help="逗号分隔的深提炼域 id（里程碑上限 20）")
+    args = ap.parse_args()
+    deep_set = {x.strip() for x in args.deep.split(",") if x.strip()}
     reg = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
-    matrix = {"registry": reg.get("id"), "domains": [], "total": 0, "distilled": 0, "failed": 0}
+    matrix = {"registry": reg.get("id"), "domains": [], "total": 0, "distilled": 0, "failed": 0,
+              "deep_domains": sorted(deep_set)}
     for entry in reg.get("manifests", []):
         dom_id = entry["id"]
+        cap = MILESTONE_MAX_DEEP if dom_id in deep_set else MILESTONE_MAX
         dom_dir = resolve_domain_path(entry["path"])
         meta = probe(dom_dir)
-        ms, ps, cs = distill(dom_id, dom_dir)
+        ms, ps, cs = distill(dom_id, dom_dir, cap)
         bad, total = validate(dom_id, ms, ps, cs)
         dom_out = OUT_DIR / dom_id
         dom_out.mkdir(parents=True, exist_ok=True)
