@@ -126,7 +126,8 @@ def check() -> dict:
     allow_ecos = ["src/ecos/ssot/mof"]
     for repo, allow in (("runtime", allow_runtime), ("ecos", allow_ecos)):
         base = H / f"Workspace/projects/{repo}"
-        r = subprocess.run(["git", "-C", str(base), "diff", "--name-only", "HEAD~1", "HEAD"],
+        r = subprocess.run(["git", "-C", str(base), "-c", "core.quotepath=false",
+                            "diff", "--name-only", "HEAD~1", "HEAD"],
                            capture_output=True, text=True)
         files = [ln for ln in (r.stdout or "").splitlines() if ln.strip()]
         out_of_scope = [f for f in files if not any(f.startswith(a) for a in allow)]

@@ -41,11 +41,23 @@ def resolve_domain_path(rel: str) -> pathlib.Path:
     return (REG_BASE / rel).resolve().parent
 
 
+def load_yaml_compat(path: pathlib.Path, want_key: str | None = None) -> dict:
+    """读取 YAML，兼容 frontmatter 头（多文档：取含 want_key 的文档，否则取首个 dict）。"""
+    text = path.read_text(encoding="utf-8")
+    try:
+        return yaml.safe_load(text) or {}
+    except yaml.composer.ComposerError:
+        for doc in yaml.safe_load_all(text):
+            if isinstance(doc, dict) and (want_key is None or want_key in doc):
+                return doc
+        return {}
+
+
 def probe(dom_dir: pathlib.Path) -> dict:
     meta: dict = {"control_files": {}}
     dom_yaml = dom_dir / "DOMAIN.yaml"
     if dom_yaml.exists():
-        d = yaml.safe_load(dom_yaml.read_text(encoding="utf-8")) or {}
+        d = load_yaml_compat(dom_yaml)
         meta["domain"] = {
             "id": d.get("id"), "archetype": d.get("archetype"),
             "authority_policy": d.get("authority_policy"), "default_sensitivity": d.get("default_sensitivity"),
@@ -110,7 +122,7 @@ def distill(dom_id: str, dom_dir: pathlib.Path, cap: int) -> tuple[list, list, l
     ctrl = dom_dir / "_control"
     km = ctrl / "key-milestones.yaml"
     if km.exists():
-        data = yaml.safe_load(km.read_text(encoding="utf-8")) or {}
+        data = load_yaml_compat(km, "milestones")
         for m in (data.get("milestones") or [])[:cap]:
             rec = {
                 "id": f"{dom_id}-{m.get('id', 'M?')}", "date": m.get("date", "01-01"),
@@ -130,7 +142,7 @@ def distill(dom_id: str, dom_dir: pathlib.Path, cap: int) -> tuple[list, list, l
     milestones = milestones[:cap]  # 每域里程碑上限（克制）
     cal = ctrl / "项目口径.yaml"
     if cal.exists():
-        data = yaml.safe_load(cal.read_text(encoding="utf-8")) or {}
+        data = load_yaml_compat(cal)
         kou = data.get("口径") or data.get("caliber") or data.get("项目口径") or {}
         proj_name = kou.get("项目全称") or kou.get("项目名称") or dom_id
         projects.append({
@@ -188,11 +200,32 @@ def main() -> int:
     reg = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
     matrix = {"registry": reg.get("id"), "domains": [], "total": 0, "distilled": 0, "failed": 0,
               "deep_domains": sorted(deep_set)}
+    # 聚合域（work-docs）由 kems-aggregate.py 维护子域投影，matrix 只读不写（防覆盖）
+    AGGREGATE_DOMAINS = {"work-docs"}
     for entry in reg.get("manifests", []):
         dom_id = entry["id"]
         cap = MILESTONE_MAX_DEEP if dom_id in deep_set else MILESTONE_MAX
         dom_dir = resolve_domain_path(entry["path"])
         meta = probe(dom_dir)
+        if dom_id in AGGREGATE_DOMAINS:
+            inst_file = OUT_DIR / dom_id / "instances.yaml"
+            if inst_file.exists():
+                ad = yaml.safe_load(inst_file.read_text(encoding="utf-8"))
+                total = sum(len(v) for v in ad.get("instances", {}).values())
+                status = "OK"
+                print(f"{dom_id}: {status} | instances={total}（子域聚合投影，matrix 只读）")
+            else:
+                total, status = 0, "OK"
+                print(f"{dom_id}: {status} | instances=0（聚合投影未生成）")
+            if status == "OK":
+                matrix["distilled"] += total
+            matrix["domains"].append({
+                "id": dom_id, "path": str(dom_dir), "status": status,
+                "distilled_instances": total, "bad": 0,
+                "domain_meta": meta.get("domain"), "control_files": meta["control_files"],
+                "extraction": meta.get("extraction"), "mode": "aggregate",
+            })
+            continue
         ms, ps, cs = distill(dom_id, dom_dir, cap)
         bad, total = validate(dom_id, ms, ps, cs)
         dom_out = OUT_DIR / dom_id
