@@ -55,6 +55,16 @@ def probe(dom_dir: pathlib.Path) -> dict:
         meta["control_files"][name] = (ctrl / name).exists()
     meta["control_dir"] = ctrl.is_dir()
     meta["_meta_dir"] = (dom_dir / "_meta").is_dir()
+    # 提取摘要元数据（语料统计，非业务实体——不参与 instances）
+    es = ctrl / "_kems_extraction_summary.json"
+    if es.exists():
+        try:
+            ed = json.loads(es.read_text(encoding="utf-8"))
+            meta["extraction"] = {"files": ed.get("total_files"), "chars": ed.get("total_chars"),
+                                  "domains_in_summary": ed.get("total_domains"),
+                                  "reported": {k: v.get("total_files") for k, v in (ed.get("reports") or {}).items()}}
+        except Exception:
+            meta["extraction"] = {"note": "unparseable"}
     return meta
 
 
@@ -204,6 +214,7 @@ def main() -> int:
             "id": dom_id, "path": str(dom_dir), "status": status,
             "distilled_instances": total, "bad": bad,
             "domain_meta": meta.get("domain"), "control_files": meta["control_files"],
+            "extraction": meta.get("extraction"),
         })
         print(f"{dom_id}: {status} | instances={total} | control={meta['control_files']}")
     matrix["total"] = len(matrix["domains"])

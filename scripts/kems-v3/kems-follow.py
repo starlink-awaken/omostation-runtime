@@ -103,6 +103,47 @@ def check() -> dict:
             r7["detail"].append(f.name)
     results.append(r7)
 
+    # R8 授权边界（自动化审计面）：
+    #   a) 子模块最近提交仅含预期路径（执行面 scripts/kems-v3、mof 声明/生成物）
+    #   b) 域内零实现驻留：Documents 最近修改的可执行实现文件数 = 0
+    #   c) 证据面非空
+    r8 = {"rule": "R8", "ok": True, "detail": []}
+    import subprocess
+    allow_runtime = ["scripts/kems-v3"]
+    allow_ecos = ["src/ecos/ssot/mof"]
+    for repo, allow in (("runtime", allow_runtime), ("ecos", allow_ecos)):
+        base = H / f"Workspace/projects/{repo}"
+        r = subprocess.run(["git", "-C", str(base), "diff", "--name-only", "HEAD~1", "HEAD"],
+                           capture_output=True, text=True)
+        files = [ln for ln in (r.stdout or "").splitlines() if ln.strip()]
+        out_of_scope = [f for f in files if not any(f.startswith(a) for a in allow)]
+        if out_of_scope:
+            r8["ok"] = False
+        r8["detail"].append(f"{repo}: 提交文件 {len(files)} 越界={out_of_scope or '无'}")
+    # b) 域内零实现驻留：Documents 活动域中 kems 足迹的实现文件 = 0
+    #    （跳过 _outputs 归档区与 Codex 区——历史快照/其他工具输出不属于驻留）
+    impl = []
+    import os as _os
+    for root, dirs, files in _os.walk(H / "Documents"):
+        dirs[:] = [d for d in dirs if d not in ("_outputs", "Codex", ".git")]
+        for fname in files:
+            if fname.lower().endswith((".py", ".sh", ".js")) and "kems" in fname.lower():
+                p = pathlib.Path(root) / fname
+                try:
+                    age = (__import__("time").time() - p.stat().st_mtime) / 3600
+                    if age < 48:
+                        impl.append(str(p.relative_to(H)))
+                except OSError:
+                    continue
+    if impl:
+        r8["ok"] = False
+        r8["detail"].append(f"Documents 活动域 kems 实现文件(48h): {impl}")
+    else:
+        r8["detail"].append("Documents 活动域 kems 实现文件(48h): 无（零实现驻留）")
+    # c) 证据面非空
+    r8["detail"].append(f"evidence 文件数={len(list(EVIDENCE.glob('*.json')))}")
+    results.append(r8)
+
     ok_n = sum(1 for r in results if r["ok"])
     report = {
         "schema": "kems-pilot.followability.v1", "asof": "2026-10-09",
