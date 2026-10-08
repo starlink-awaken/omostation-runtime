@@ -13,7 +13,10 @@
 
 负对照：--neg 注入虚构逾期任务 → 必须报逾期（否则门禁失守即 FAIL）。
 
-用法：kems-gate.py [--asof YYYY-MM-DD] [--neg]
+用法：kems-gate.py [--asof YYYY-MM-DD] [--domain <id>] [--neg]
+  --domain 试点域 work-weijian 用沙箱控制面（保持试点行为）；
+           其他域用 ~/.kems-pilot/domains/<id>/instances.yaml 的 Milestone
+           （日期→通用时限倒计时，⛔→阻塞面），实现跨域门禁演算。
 """
 from __future__ import annotations
 
@@ -26,6 +29,7 @@ import sys
 import yaml
 
 SBOX = pathlib.Path.home() / ".kems-pilot/卫健委-shadow"
+DOMAINS_DIR = pathlib.Path.home() / ".kems-pilot/domains"
 EVIDENCE_DIR = pathlib.Path.home() / ".kems-pilot/evidence"
 EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -55,25 +59,50 @@ def milestone_status(date_mmdd: str, severity: str, asof: dt.date) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--asof", default=dt.date.today().isoformat())
+    ap.add_argument("--domain", default="work-weijian")
     ap.add_argument("--neg", action="store_true")
     args = ap.parse_args()
     asof = dt.date.fromisoformat(args.asof)
 
-    km = yaml.safe_load((SBOX / "_control/key-milestones.yaml").read_text(encoding="utf-8"))
-    deadlines: list[dict] = []
-    blocks: list[dict] = []
-    violations: list[dict] = []
+    if args.domain == "work-weijian":
+        # 试点域：沙箱控制面 + 蒸馏 Deadline 表（保持 P3/P4 行为不变）
+        km = yaml.safe_load((SBOX / "_control/key-milestones.yaml").read_text(encoding="utf-8"))
+        deadlines: list[dict] = []
+        for d in DEADLINES:
+            delta = (d["due"] - asof).days
+            status = "已逾期" if delta < 0 else ("即将到期" if delta <= 3 else "未到期")
+            deadlines.append({"id": d["id"], "name": d["name"], "type": d["type"],
+                              "bound": d["bound"], "alarm": d["alarm"],
+                              "days_left": delta, "status": status,
+                              "due_iso": d["due"].isoformat()})
+        blocks = [{"id": m["id"], "title": m["title"], "owner": m["owner"]}
+                  for m in km["milestones"] if str(m["severity"]).startswith("⛔")]
+    else:
+        # 跨域：domains/<id>/instances.yaml 的 Milestone → 通用时限/阻塞面
+        inst_file = DOMAINS_DIR / args.domain / "instances.yaml"
+        if not inst_file.exists():
+            print(f"UNKNOWN_DOMAIN {args.domain}（~/.kems-pilot/domains/{args.domain}/instances.yaml 不存在）")
+            return 1
+        data = yaml.safe_load(inst_file.read_text(encoding="utf-8"))
+        deadlines = []
+        for m in data["instances"].get("Milestone", []):
+            mmdd = m.get("date", "")
+            if "-" not in mmdd:
+                continue
+            try:
+                due = dt.date(asof.year, *map(int, mmdd.split("-")))
+            except ValueError:
+                continue
+            delta = (due - asof).days
+            deadlines.append({"id": m["id"], "name": m.get("title", m["id"]), "type": "里程碑",
+                              "bound": "milestone", "alarm": "提前3天告警",
+                              "days_left": delta,
+                              "status": "已逾期" if delta < 0 else ("即将到期" if delta <= 3 else "未到期"),
+                              "due_iso": due.isoformat(), "source": m.get("source", "")})
+        blocks = [{"id": m["id"], "title": m.get("title", m["id"]), "owner": m.get("owner", "")}
+                  for m in data["instances"].get("Milestone", []) if str(m.get("severity", "")).startswith("⛔")]
 
-    for d in DEADLINES:
-        delta = (d["due"] - asof).days
-        status = "已逾期" if delta < 0 else ("即将到期" if delta <= 3 else "未到期")
-        deadlines.append({"id": d["id"], "name": d["name"], "type": d["type"],
-                          "bound": d["bound"], "alarm": d["alarm"],
-                          "days_left": delta, "status": status,
-                          "due_iso": d["due"].isoformat()})
-    for m in km["milestones"]:
-        if str(m["severity"]).startswith("⛔"):
-            blocks.append({"id": m["id"], "title": m["title"], "owner": m["owner"]})
+    violations: list[dict] = []
 
     # 门禁：done 必须核查交付物（蒸馏自事件卡任务契约）
     monthly_done_without_deliverable = False  # 真实数据：10 月报任务均 pending
@@ -99,7 +128,7 @@ def main() -> int:
         "neg_control": args.neg,
         "verdict": "ALERT" if (overdue or violations) else "OK",
     }
-    out = EVIDENCE_DIR / f"gate-{asof.isoformat()}.json"
+    out = EVIDENCE_DIR / f"gate-{args.domain}-{asof.isoformat()}.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"verdict": report["verdict"], "overdue": report["overdue"],
                       "due_soon": report["due_soon"], "blocks": report["blocked_milestones"],
