@@ -26,6 +26,7 @@ import json
 import re
 import pathlib
 import sys
+import datetime as dt
 
 SBOX = pathlib.Path.home() / ".kems-pilot/卫健委-shadow"
 DOMAINS_DIR = pathlib.Path.home() / ".kems-pilot/domains"
@@ -64,7 +65,13 @@ SSOT_SOURCE = "_control/项目口径.yaml"
 
 def extract_yaml(path: pathlib.Path) -> dict[str, str]:
     import yaml
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    try:
+        data = yaml.safe_load(text)  # 单文档（多数控制文件）
+    except yaml.composer.ComposerError:
+        # frontmatter 头升级后为多文档：取含目标键的文档（兼容 gate.load_control）
+        data = next((d for d in yaml.safe_load_all(text)
+                     if isinstance(d, dict) and d), None)
     out: dict[str, str] = {}
     def walk(node, prefix=""):
         if isinstance(node, dict):
@@ -75,7 +82,8 @@ def extract_yaml(path: pathlib.Path) -> dict[str, str]:
                 walk(v, f"{prefix}[{i}]")
         else:
             out[prefix] = str(node)
-    walk(data)
+    if data:
+        walk(data)
     return out
 
 
@@ -201,7 +209,12 @@ def main() -> int:
     if md_b.exists():
         sources["144号影响评估.md"] = extract_md(md_b)
     # 源C：key-milestones.yaml 的 M04/M07 注记（经信局环节/大兴开标）
-    km = yaml.safe_load((SBOX / "_control/key-milestones.yaml").read_text(encoding="utf-8"))
+    km_text = (SBOX / "_control/key-milestones.yaml").read_text(encoding="utf-8")
+    try:
+        km = yaml.safe_load(km_text)
+    except yaml.composer.ComposerError:
+        km = next((d for d in yaml.safe_load_all(km_text)
+                   if isinstance(d, dict) and "milestones" in d), None)
     notes = "；".join(m.get("note", "") for m in km["milestones"] if m["id"] in ("M04", "M05", "M07"))
     sources["key-milestones.yaml"] = {}
     if "经信局" in notes and "环节" in notes:
@@ -283,7 +296,9 @@ def main() -> int:
     }
     result = {"summary": summary, "merged": merged, "conflicts": conflicts, "decisions": decisions}
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
-    EVIDENCE_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 试点域 evidence 与跨域同构（按域命名，不再覆盖固定 p2 快照；p2-fusion.json 保留历史）
+    out = EVIDENCE_DIR / f"fusion-{domain}-{dt.date.today().isoformat()}.json"
+    out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0 if summary["verdict"] == "PASS" else 1
 

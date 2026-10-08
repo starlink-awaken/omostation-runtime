@@ -42,6 +42,26 @@ DEADLINES = [
 ]
 
 
+def dl_status(delta: int) -> str:
+    """时限状态：delta<0 逾期、==0 已到期（报送日触发）、<=3 即将到期。"""
+    if delta < 0:
+        return "已逾期"
+    if delta == 0:
+        return "已到期"
+    if delta <= 3:
+        return "即将到期"
+    return "未到期"
+
+
+def load_control(path: pathlib.Path) -> dict:
+    """读取控制文件，兼容 frontmatter 头（YAML 多文档：取含 milestones 的文档）。"""
+    text = path.read_text(encoding="utf-8")
+    for doc in yaml.safe_load_all(text):
+        if isinstance(doc, dict) and "milestones" in doc:
+            return doc
+    return yaml.safe_load(text) or {}
+
+
 def milestone_status(date_mmdd: str, severity: str, asof: dt.date) -> str:
     mm, dd = date_mmdd.split("-")
     try:
@@ -65,16 +85,36 @@ def main() -> int:
     asof = dt.date.fromisoformat(args.asof)
 
     if args.domain == "work-weijian":
-        # 试点域：沙箱控制面 + 蒸馏 Deadline 表（保持 P3/P4 行为不变）
-        km = yaml.safe_load((SBOX / "_control/key-milestones.yaml").read_text(encoding="utf-8"))
+        # 试点域：时限口径优先来自模型数据（instances Deadline），无则回退内置表
+        km = load_control(SBOX / "_control/key-milestones.yaml")
         deadlines: list[dict] = []
-        for d in DEADLINES:
-            delta = (d["due"] - asof).days
-            status = "已逾期" if delta < 0 else ("即将到期" if delta <= 3 else "未到期")
-            deadlines.append({"id": d["id"], "name": d["name"], "type": d["type"],
-                              "bound": d["bound"], "alarm": d["alarm"],
-                              "days_left": delta, "status": status,
-                              "due_iso": d["due"].isoformat()})
+        inst = SBOX / "_kems-pilot/data/instances-20261008.yaml"
+        dl_records: list[dict] = []
+        if inst.exists():
+            try:
+                idata = yaml.safe_load(inst.read_text(encoding="utf-8"))
+                dl_records = idata.get("instances", {}).get("Deadline", [])
+            except Exception:
+                dl_records = []
+        if dl_records:
+            for d in dl_records:
+                due = dt.date.fromisoformat(str(d["due_date"]))
+                delta = (due - asof).days
+                deadlines.append({
+                    "id": d["id"], "name": d.get("name", d["id"]), "type": d.get("deadline_type", "时限"),
+                    "bound": d.get("bound_milestone", ""), "alarm": d.get("alarm_rule", ""),
+                    "days_left": delta,
+                    "status": dl_status(delta),
+                    "due_iso": due.isoformat(), "source": "instances.Deadline(模型数据)",
+                })
+        else:
+            for d in DEADLINES:
+                delta = (d["due"] - asof).days
+                status = "已逾期" if delta < 0 else ("即将到期" if delta <= 3 else "未到期")
+                deadlines.append({"id": d["id"], "name": d["name"], "type": d["type"],
+                                  "bound": d["bound"], "alarm": d["alarm"],
+                                  "days_left": delta, "status": status,
+                                  "due_iso": d["due"].isoformat(), "source": "内置表(回退)"})
         blocks = [{"id": m["id"], "title": m["title"], "owner": m["owner"]}
                   for m in km["milestones"] if str(m["severity"]).startswith("⛔")]
     else:
@@ -97,7 +137,7 @@ def main() -> int:
             deadlines.append({"id": m["id"], "name": m.get("title", m["id"]), "type": "里程碑",
                               "bound": "milestone", "alarm": "提前3天告警",
                               "days_left": delta,
-                              "status": "已逾期" if delta < 0 else ("即将到期" if delta <= 3 else "未到期"),
+                              "status": dl_status(delta),
                               "due_iso": due.isoformat(), "source": m.get("source", "")})
         blocks = [{"id": m["id"], "title": m.get("title", m["id"]), "owner": m.get("owner", "")}
                   for m in data["instances"].get("Milestone", []) if str(m.get("severity", "")).startswith("⛔")]
@@ -116,7 +156,7 @@ def main() -> int:
                           "due_iso": (asof - dt.timedelta(days=1)).isoformat()})
         violations.append({"rule": "P-C7-NEG", "detail": "负对照-任务 done 无交付物（必须报）"})
 
-    overdue = [d for d in deadlines if d["status"] == "已逾期"]
+    overdue = [d for d in deadlines if d["status"] in ("已到期", "已逾期")]
     soon = [d for d in deadlines if d["status"] == "即将到期"]
     report = {
         "asof": asof.isoformat(),

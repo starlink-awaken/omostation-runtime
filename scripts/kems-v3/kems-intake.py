@@ -83,6 +83,24 @@ def mount_candidates(name: str, text: str, vocab: dict[str, list[str]]) -> dict[
     return hits
 
 
+def register_index(domain: str, record: dict) -> None:
+    """索引登记：按 basename 去重更新域索引面（负对照不登记，防污染）。"""
+    import time as _t
+    idx_path = DOMAINS_DIR / domain / "intake-index.json"
+    idx: dict = {"schema": "kems-pilot.intake-index.v1", "domain": domain, "entries": {}}
+    if idx_path.exists():
+        try:
+            idx = json.loads(idx_path.read_text(encoding="utf-8"))
+        except Exception:
+            idx = {"schema": "kems-pilot.intake-index.v1", "domain": domain, "entries": {}}
+    idx["entries"][record["basename"]] = {
+        "file": record["file"], "verdict": record["verdict"],
+        "mount_candidates": record["mount_candidates"],
+        "indexed_at": _t.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if a != "--neg"]
     neg = "--neg" in sys.argv
@@ -115,6 +133,8 @@ def main() -> int:
     }
     out = EVIDENCE_DIR / f"intake-{domain}-{target.stem}.json"
     out.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not neg:  # 索引登记（负对照不登记）
+        register_index(domain, record)
     print(json.dumps({"verdict": verdict, "domain": domain, "frontmatter_missing": missing,
                       "mount_candidates": hits}, ensure_ascii=False, indent=2))
     # 负对照必须 FAIL；正样本（有 frontmatter）必须 PASS

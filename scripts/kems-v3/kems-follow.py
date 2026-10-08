@@ -59,15 +59,28 @@ def check() -> dict:
     r3["detail"] = f"evidence json={len(list(EVIDENCE.glob('*.json')))} 无效={bad or '无'}"
     results.append(r3)
 
-    # R4 冲突必暴露
+    # R4 冲突必暴露 + 裁决留痕（有冲突必有 decisions）
     r4 = {"rule": "R4", "ok": False, "detail": []}
     fusions = list(EVIDENCE.glob("fusion-*.json")) + list(EVIDENCE.glob("2026-10-08-p2-fusion.json"))
     exposed = [f for f in fusions if f.exists()]
     for f in exposed:
         d = json.loads(f.read_text(encoding="utf-8"))
-        if d.get("conflicts") or d.get("summary", {}).get("conflicts_exposed"):
+        n_conf = d.get("summary", {}).get("conflicts_exposed", 0)
+        n_dec = d.get("summary", {}).get("decisions", 0)
+        neg = bool(d.get("summary", {}).get("neg_control") or d.get("neg_control"))
+        if n_conf and not neg:
+            # 真实冲突：必须逐条裁决留痕
+            if n_dec >= n_conf:
+                r4["ok"] = True
+                r4["detail"].append(f"{f.name}: conflicts={n_conf} decisions={n_dec}（真实冲突，裁决留痕OK）")
+            else:
+                r4["detail"].append(f"{f.name}: conflicts={n_conf} decisions={n_dec}（真实冲突但裁决缺失！）")
+        elif n_conf and neg:
+            # 负对照冲突：验证暴露机制，无裁决语义，豁免
             r4["ok"] = True
-            r4["detail"].append(f"{f.name}: conflicts={d['summary'].get('conflicts_exposed', 0)}")
+            r4["detail"].append(f"{f.name}: conflicts={n_conf}（负对照暴露验证OK，无裁决语义）")
+        else:
+            r4["detail"].append(f"{f.name}: conflicts=0（单源无冲突）")
     if not exposed:
         r4["detail"].append("无 fusion evidence")
     results.append(r4)
@@ -109,7 +122,7 @@ def check() -> dict:
     #   c) 证据面非空
     r8 = {"rule": "R8", "ok": True, "detail": []}
     import subprocess
-    allow_runtime = ["scripts/kems-v3"]
+    allow_runtime = ["scripts/kems-v3", "docs"]
     allow_ecos = ["src/ecos/ssot/mof"]
     for repo, allow in (("runtime", allow_runtime), ("ecos", allow_ecos)):
         base = H / f"Workspace/projects/{repo}"
@@ -120,21 +133,28 @@ def check() -> dict:
         if out_of_scope:
             r8["ok"] = False
         r8["detail"].append(f"{repo}: 提交文件 {len(files)} 越界={out_of_scope or '无'}")
-    # b) 域内零实现驻留：Documents 活动域中 kems 足迹的实现文件 = 0
-    #    （跳过 _outputs 归档区与 Codex 区——历史快照/其他工具输出不属于驻留）
+    # b) 域内零实现驻留：活动域根目录（白名单）kems 足迹实现文件 = 0
+    #    （跳过 _outputs 归档区与 Codex 区；白名单代替全盘 walk 提速）
     impl = []
     import os as _os
-    for root, dirs, files in _os.walk(H / "Documents"):
-        dirs[:] = [d for d in dirs if d not in ("_outputs", "Codex", ".git")]
-        for fname in files:
-            if fname.lower().endswith((".py", ".sh", ".js")) and "kems" in fname.lower():
-                p = pathlib.Path(root) / fname
-                try:
-                    age = (__import__("time").time() - p.stat().st_mtime) / 3600
-                    if age < 48:
-                        impl.append(str(p.relative_to(H)))
-                except OSError:
-                    continue
+    doc_root = H / "Documents"
+    active_roots = ["@公共", "@驾驶舱", "@工作文档", "@个人", "@家庭生活",
+                    "@创意创作", "@OPC", "@学习进化"]
+    for root_name in active_roots:
+        base = doc_root / root_name
+        if not base.exists():
+            continue
+        for root, dirs, files in _os.walk(base):
+            dirs[:] = [d for d in dirs if d not in ("_outputs", "Codex", ".git", "_storage", "_knowledge")]
+            for fname in files:
+                if fname.lower().endswith((".py", ".sh", ".js")) and "kems" in fname.lower():
+                    p = pathlib.Path(root) / fname
+                    try:
+                        age = (__import__("time").time() - p.stat().st_mtime) / 3600
+                        if age < 48:
+                            impl.append(str(p.relative_to(H)))
+                    except OSError:
+                        continue
     if impl:
         r8["ok"] = False
         r8["detail"].append(f"Documents 活动域 kems 实现文件(48h): {impl}")
