@@ -43,21 +43,46 @@ REQUIRED_FRONTMATTER = ["title", "date", "status", "owner"]
 DOMAINS_DIR = pathlib.Path.home() / ".kems-pilot/domains"
 
 
+def phrase_prefixes(text: str, min_n: int = 4, max_n: int = 10) -> list[str]:
+    """确定性中文短语前缀候选：按分隔符切短语，每短语产出 4..max_n 字前缀。
+    解决整句子串匹配过严的问题（如"养老服务体系建设调研报告"无法命中"养老服务体系建设"）。"""
+    cands: list[str] = []
+    for seg in re.split(r"[（(【\[、+，,。.\s|/：:;；]+", text or ""):
+        seg = seg.strip("（()）[]【】、")
+        if not seg or seg[0].isdigit():
+            continue  # 排除日期/数字噪音（如 "2026"、"2026-07"）
+        for n in range(min_n, min(len(seg), max_n) + 1):
+            c = seg[:n]
+            if c and c not in cands:
+                cands.append(c)
+    return cands
+
+
 def vocab_from_instances(dom_id: str) -> dict[str, list[str]]:
-    """非试点域：从域本体数据派生挂载词表（实例名/标题/要求/源文件名）。"""
+    """非试点域：从域本体数据派生挂载词表（实例名/标题/要求/源文件名 + 短语前缀）。"""
     inst_file = DOMAINS_DIR / dom_id / "instances.yaml"
     vocab: dict[str, list[str]] = {}
     if not inst_file.exists():
         return vocab
     data = yaml.safe_load(inst_file.read_text(encoding="utf-8"))
     for kind, insts in (data.get("instances") or {}).items():
+        # 真实蒸馏实例（业务词，real=True）优先，骨架实例随后
+        ordered = sorted(insts, key=lambda i: 0 if i.get("real") else 1)
         words = []
-        for i in insts:
+        for i in ordered:
             for f in ("name", "title", "requirement_text", "full_name", "source"):
                 v = i.get(f)
                 if v and isinstance(v, str) and len(v) >= 2:
+                    # 短语前缀优先（业务短语更易命中真实文本），完整片段随后
+                    words.extend(phrase_prefixes(v))
                     words.append(v[:24])
-        vocab[kind] = words[:12]
+        # 去重保序，限制词表规模（前 300 个候选，真实业务词优先入表）
+        seen, dedup = set(), []
+        for w in words:
+            if w not in seen:
+                seen.add(w)
+                dedup.append(w)
+        vocab[kind] = dedup[:300]
     return vocab
 
 
