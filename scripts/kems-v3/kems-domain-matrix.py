@@ -99,6 +99,9 @@ def parse_status_timeline(dom_id: str, ctrl: pathlib.Path, fname: str,
         if not m:
             continue
         d, title = m.group(1), m.group(2).strip(" |·")
+        # 排除状态标记行（STABLE/ACTIVE/🟢 等状态词开头 = 状态摘要，非任务里程碑）
+        if re.match(r"^(STABLE|ACTIVE|REVIEW|DONE|🔴|🟢|🟡|状态|进展|里程碑概述|总体状态)", title):
+            continue
         if "-" in d and len(d) == 10:
             d = d[5:]  # YYYY-MM-DD → MM-DD
         if not re.match(r"^\d{2}-\d{2}$", d) or not title:
@@ -227,6 +230,32 @@ def main() -> int:
             })
             continue
         ms, ps, cs = distill(dom_id, dom_dir, cap)
+        # 合并真实蒸馏实例（real-instances.yaml，独立文件防覆盖；matrix 写盘前并入 Milestone）
+        real_f = OUT_DIR / dom_id / "real-instances.yaml"
+        if real_f.exists():
+            real = load_yaml_compat(real_f, "instances")
+            if real.get("kind") == "milestone":
+                seen = {m["id"] for m in ms}
+                for r in real.get("instances", []):
+                    rid = r.get("id", f"{dom_id}-real-x")
+                    if rid in seen:
+                        continue
+                    d = r.get("date") or ""
+                    rec = {"id": rid, "title": r.get("title", ""),
+                           "severity": r.get("severity", "⚠️"), "owner": r.get("owner", ""),
+                           "source": r.get("source", ""), "real": True}
+                    if len(d) == 10:
+                        rec["date"] = d[-5:]
+                    elif re.match(r"^\d{2}-\d{2}$", d):
+                        rec["date"] = d
+                    else:
+                        # 仅相对时间表达：无绝对日期，不参与 gate 时限判定
+                        rec["date"] = "01-01"
+                        rec["gateable"] = False
+                    if r.get("relative"):
+                        rec["note"] = f"相对时间表达：{r['relative']}"
+                    ms.append(rec)
+                    seen.add(rid)
         bad, total = validate(dom_id, ms, ps, cs)
         dom_out = OUT_DIR / dom_id
         dom_out.mkdir(parents=True, exist_ok=True)

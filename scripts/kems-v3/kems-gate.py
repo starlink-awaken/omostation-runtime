@@ -126,6 +126,8 @@ def main() -> int:
         data = yaml.safe_load(inst_file.read_text(encoding="utf-8"))
         deadlines = []
         for m in data["instances"].get("Milestone", []):
+            if m.get("gateable") is False:  # 仅相对时间表达的真实实例，无绝对日期，不参与时限判定
+                continue
             mmdd = m.get("date", "")
             if "-" not in mmdd:
                 continue
