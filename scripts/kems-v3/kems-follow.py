@@ -47,16 +47,30 @@ def check() -> dict:
     r2["detail"] = f"沙箱={sandbox.exists()} 备份数={len(baks)}"
     results.append(r2)
 
-    # R3 数字可复算：evidence JSON 全部可解析
+    # R3 数字可复算：evidence JSON 全部可解析 + 结构抽查（空 JSON/缺关键字段必报）
     r3 = {"rule": "R3", "ok": True, "detail": []}
     bad = []
+    key_checks = {
+        "fusion-": ("summary", "conflicts", "decisions"), "gate-": ("verdict", "overdue"),
+        "intake-": ("verdict",), "artifact-": ("verdict",), "aggregate-": ("total_instances",),
+        "followability-": ("pass_rate",), "e2e-": ("steps", "all_ok"),
+    }
     for f in EVIDENCE.glob("*.json"):
         try:
-            json.loads(f.read_text(encoding="utf-8"))
+            d = json.loads(f.read_text(encoding="utf-8"))
+            if not isinstance(d, dict) or len(d) == 0:
+                bad.append(f"{f.name}: 空结构")
+                continue
+            for prefix, keys in key_checks.items():
+                if f.name.startswith(prefix):
+                    miss = [k for k in keys if k not in d and not any(k in s for s in (d.get("summary") or {}))]
+                    if miss:
+                        bad.append(f"{f.name}: 缺关键字段 {miss}")
+                    break
         except Exception as e:
             bad.append(f"{f.name}: {type(e).__name__}")
     r3["ok"] = not bad
-    r3["detail"] = f"evidence json={len(list(EVIDENCE.glob('*.json')))} 无效={bad or '无'}"
+    r3["detail"] = f"evidence json={len(list(EVIDENCE.glob('*.json')))} 无效/空洞={bad or '无'}"
     results.append(r3)
 
     # R4 冲突必暴露 + 裁决留痕（有冲突必有 decisions）

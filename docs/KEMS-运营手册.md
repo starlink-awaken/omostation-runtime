@@ -53,14 +53,15 @@ $PY $KEMS/kems-pipe-accept.py                                  # 12 域四管道
 $PY $KEMS/kems-follow.py                                       # 可遵循性 R1-R8
 $PY $KEMS/kems-gate.py --domain work-weijian --asof 2026-10-20 # 门禁演算
 $PY $KEMS/kems-frontmatter.py --domain all --apply             # 治理补全（先 dry-run）
+$PY $KEMS/kems-aggregate.py --domain work-docs --sub work-weijian,work-guozhuan,work-liyongke,work-contracts  # 聚合域投影（负对照不落盘）
 ```
 MCP 读面：`http://127.0.0.1:7431/mcp`（launchd 常驻，25 工具，含 domains_matrix/pipeline_status）。
 
 ## 6. 治理边界与已知限制（如实）
-- **聚合域**：@工作文档（work-docs）为聚合入口，子域控制面在各子域 _control；无独立业务控制面 → 实例 0（语料元数据 733 文件/3.7M 已记录）
+- **聚合域**：@工作文档（work-docs）已补齐子域聚合投影（用户 2026-10-09 拍板）——由 kems-aggregate.py 聚合 4 子域实例（32 条，每条标注 source_domain），matrix 对聚合域只读不覆盖；语料元数据 733 文件/3.7M 在 _domain_meta.extraction
 - **未授权动作**：系统级变更（除本机 LaunchAgent）不主动做；cron 定时任务需用户明确推进
 - **独立会话**：S8 终验须在无试点历史的新会话执行（10-20 定时任务会话满足条件）
-- **work-docs 业务实例**：待人工确认蒸馏源（如有子域级口径/里程碑，可在子域蒸馏）
+- **work-guozhuan 里程碑**：key-milestones 数据为空（控制面已接入，填写后矩阵自动加深）
 
 ## 7. 迭代纪律
 - 每轮推进：探查→约束→证据→执行→验证→交付；改域内文件先备份；实现只进执行面

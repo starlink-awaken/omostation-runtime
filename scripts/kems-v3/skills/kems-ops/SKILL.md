@@ -28,6 +28,7 @@ description: KEMS 运维工具组入口——覆盖矩阵、全域验收、front
 | kems-status.py | 试点域四管道状态聚合 | `--raw` |
 | kems-gate.py | 任务门禁（时限/阻塞/门禁面） | `--domain <id>` `--asof YYYY-MM-DD` `--neg` |
 | kems-intake.py | 进料索引（frontmatter+本体挂载） | `<文件>` `--domain <id>` `--neg` |
+| kems-aggregate.py | 聚合域投影（work-docs=4 子域实例汇总，标注 source_domain） | `--domain work-docs --sub <id,id...>` `--neg`（负对照不落盘） |
 | kems-fusion.py | 多源融合（冲突暴露+SSOT 裁决） | `--domain <id>` `--neg` |
 | kems-artifact.py | 产物契约（格式/落点/命名） | `--check/--name/--path` `--domain` `--neg` |
 | mcp-cockpit-http.py | MCP 读面桥（launchd 常驻，端口 7431） | 工具：domains_matrix/pipeline_status/kems_status 等 |
@@ -43,6 +44,7 @@ description: KEMS 运维工具组入口——覆盖矩阵、全域验收、front
 - 子模块提交：runtime/ecos 各自 commit+push main（仅预期路径）
 
 ## 已知限制（如实）
-- work-docs 为聚合域（子域控制面在各子域 _control），无独立业务控制面 → 实例 0，语料元数据在 _domain_meta.extraction
+- work-docs 为**聚合域**：实例=子域聚合投影（kems-aggregate.py 维护，32 条 source_domain 标注）；matrix 对聚合域只读不覆盖；子域控制面在各子域 _control
+- @感知信号 = 信号暂存区（非域，已记录 registry 备注）；work-guozhuan 里程碑数据空（填写后自动加深）
 - MCP 桥由 launchd 常驻（com.kems.cockpit-mcp），日志 /tmp/kems-mcp-launchd*.log
 - 10-20 月报门禁：定时任务「十月月报门禁巡检与S8终验」（at 2026-10-20 08:30）自动触发
