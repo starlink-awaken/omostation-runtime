@@ -1,0 +1,11 @@
+# 协议注册表 (protocols/*.yaml) 是**数据文件**, 不是手写配置 —— 单行最长达 237 字符,
+# 折行只会增加改动出错面。这里关掉行长与 document-start 两条风格规则。
+#
+# 根仓 `meta-model-check` 用
+#   yamllint -c projects/runtime/.yamllint.yml projects/runtime/protocols/
+# 读这份配置 (2026-11-03: 此前从根仓跑 yamllint 用默认 80 列, 35 条 line-length
+# error 让**每一次 runtime gitlink bump 都卡 root CI**)。
+extends: default
+rules:
+  line-length: disable
+  document-start: disable
