@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "eCOS Runtime Layer — L1 service registry, health monitoring, and protocol management"
 requires-python = ">=3.13"
 dependencies = [
-    "apscheduler>=3.11.2",
+    "apscheduler>=3.11.3",
     "croniter>=6.2.2",
     "fastapi>=0.162.0",
     "fastmcp>=4.1.4",
