@@ -50,7 +50,7 @@ graph TB
 |:--|:--|:--|
 | CLI | `runtime / ecos-matrix-scheduler` |  |
 | MCP stdio | `runtime.mcp_server` | MCP tools (见 project-registry.yaml: runtime) |
-| HTTP | `cron_service/server.py` | :7450 |
+| HTTP | `src/runtime/cron_service/server.py` | :7450 |
 
 ## 3. 核心模块
 

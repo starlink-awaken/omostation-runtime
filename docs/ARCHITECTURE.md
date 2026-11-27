@@ -9,7 +9,7 @@ status: active
 
 # runtime Architecture
 
-> Architecture overview for **runtime**. For the full workspace architecture, see [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md).
+> Architecture overview for **runtime**. For the full workspace architecture, see [`../../../ARCHITECTURE.md`](../../../ARCHITECTURE.md).
 
 ## Responsibilities
 
